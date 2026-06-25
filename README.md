@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LingoPRO
 
-## Getting Started
+Премиальный landing page **LingoPRO** — AI-платформы персональной подготовки к языковым экзаменам. На первом этапе платформа работает с турецким языком и экзаменом **TÖMER** для абитуриентов, поступающих в университеты Турции.
 
-First, run the development server:
+Главная цель сайта — побудить пользователя пройти бесплатную AI-диагностику уровня и начать персональную подготовку.
+
+## Стек
+
+- **Next.js 16** (App Router) + **React 19**
+- **TypeScript** (strict)
+- **Tailwind CSS v4** + кастомная дизайн-система (CSS-переменные в [`src/app/globals.css`](src/app/globals.css))
+- **Framer Motion** — анимации, reveal-эффекты, лёгкая псевдо-3D-композиция в hero
+- **next/font** (Geist) и метадата-файлы App Router (`robots.ts`, `sitemap.ts`)
+
+## Запуск
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # дев-сервер на http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Прочие команды:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build    # production-сборка
+npm run start    # запуск собранного приложения
+npm run lint     # ESLint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Структура
 
-## Learn More
+```
+src/
+  app/
+    page.tsx            — главная страница (композиция секций)
+    layout.tsx          — SEO-метадата, JSON-LD, шрифты, i18n-провайдер
+    globals.css         — дизайн-токены и утилитарные классы (светлая тема)
+    robots.ts / sitemap.ts
+    diagnostic/ login/ signup/   — стилизованные маршруты-заглушки
+  components/
+    Header, Hero, Hero3D, ExamsStrip, HowItWorks, Features,
+    PlanSection, Leaderboard, Gamification, DashboardPreview,
+    Pricing, FAQ, FinalCTA, Footer, LanguageSwitcher, PageShell
+    ui/  — Background, ScrollProgress, SectionHeading, Reveal, Logo
+  lib/
+    i18n.tsx            — провайдер локализации + весь текстовый контент
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Локализация
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Поддерживаются 4 языка интерфейса: **Русский**, **Қазақша**, **English**, **Türkçe**.
+Полностью реализована русская версия; переключатель и архитектура переводов готовы для остальных языков (весь контент вынесен в [`src/lib/i18n.tsx`](src/lib/i18n.tsx)). Выбранный язык сохраняется в `localStorage`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Дизайн-система
 
-## Deploy on Vercel
+Светлая премиальная тема: молочно-белый фон (`#F7F8FA`), глубокий navy-текст (`#101828`),
+бирюзовый и электрический-голубой AI-акценты, фиолетовый бренд-цвет, аккуратный красный акцент.
+Все цвета, радиусы и тени заданы CSS-переменными и легко настраиваются в одном файле.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Маршруты и CTA
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- «Пройти бесплатную диагностику» → `/diagnostic`
+- «Начать бесплатно» / «Создать аккаунт» → `/signup`
+- «Войти» → `/login`
+- «Как это работает» и навигация → плавный scroll по якорям
+
+## Юридическое примечание
+
+LingoPRO — независимая образовательная AI-платформа. Названия экзаменов и организаций
+принадлежат соответствующим правообладателям; их упоминание не означает официального
+партнёрства или одобрения.
