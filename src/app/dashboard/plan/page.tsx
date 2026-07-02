@@ -20,6 +20,7 @@ import {
   type Progress,
   type PlanTask,
 } from "@/lib/studyplan";
+import { saveProfileProgress } from "@/lib/profile";
 
 const T = {
   ru: {
@@ -140,6 +141,7 @@ export default function PlanPage() {
     setProgress((prev) => {
       const next = toggleTask(prev, t.id);
       saveProgress(next);
+      void saveProfileProgress(next);
       return next;
     });
   }

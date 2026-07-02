@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
-import { LanguageSwitcher } from "./LanguageSwitcher";
+import { pick } from "@/lib/localized";
 import { ExamSelector } from "./ExamSelector";
 import { Logo } from "./ui/Logo";
 
 export function Header() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -20,11 +20,19 @@ export function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const L = pick(locale, {
+    ru: { platform: "Платформа", reviews: "Отзывы", school: "Для школ" },
+    en: { platform: "Platform", reviews: "Reviews", school: "For schools" },
+    tr: { platform: "Platform", reviews: "Yorumlar", school: "Okullar için" },
+    kk: { platform: "Платформа", reviews: "Пікірлер", school: "Мектептерге" },
+  });
+
   const navLinks = [
-    { href: "#features", label: t.nav.features },
-    { href: "#how", label: t.nav.how },
+    { href: "#platform", label: L.platform },
+    { href: "#reviews", label: L.reviews },
     { href: "#pricing", label: t.nav.pricing },
     { href: "#faq", label: t.nav.faq },
+    { href: "/b2b", label: L.school },
   ];
 
   return (
@@ -62,7 +70,6 @@ export function Header() {
           <div className="hidden sm:block">
             <ExamSelector />
           </div>
-          <LanguageSwitcher />
           <Link
             href="/login"
             className="hidden rounded-full px-4 py-2 text-sm font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-foreground)] sm:inline-block"

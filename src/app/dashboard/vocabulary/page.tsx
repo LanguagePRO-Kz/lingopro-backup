@@ -4,38 +4,24 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { VOCABULARY } from "@/data/vocabulary";
 
 type Status = "learned" | "review" | "new";
 type Level = "A1" | "A2" | "B1" | "B2" | "C1";
 type Source = "reading" | "listening" | "writing" | "speaking" | "feedback" | "manual";
 type Word = { w: string; ru: string; en: string; kk: string; level: Level; status: Status; source: Source };
 
-// [tr, ru, en, kk, level]
-const RAW: [string, string, string, string, Level][] = [
-  ["merhaba", "привет", "hello", "сәлем", "A1"], ["kitap", "книга", "book", "кітап", "A1"], ["ev", "дом", "house", "үй", "A1"],
-  ["su", "вода", "water", "су", "A1"], ["ekmek", "хлеб", "bread", "нан", "A1"], ["okul", "школа", "school", "мектеп", "A1"],
-  ["araba", "машина", "car", "көлік", "A1"], ["gün", "день", "day", "күн", "A1"], ["gece", "ночь", "night", "түн", "A1"],
-  ["yemek", "еда", "food", "тамақ", "A1"], ["kütüphane", "библиотека", "library", "кітапхана", "A2"], ["sınav", "экзамен", "exam", "емтихан", "A2"],
-  ["hastane", "больница", "hospital", "аурухана", "A2"], ["öğretmen", "учитель", "teacher", "мұғалім", "A2"], ["çarşamba", "среда", "Wednesday", "сәрсенбі", "A2"],
-  ["alışveriş", "покупки", "shopping", "сауда", "A2"], ["yolculuk", "путешествие", "journey", "сапар", "A2"], ["hava", "погода", "weather", "ауа райы", "A2"],
-  ["mutlu", "счастливый", "happy", "бақытты", "A2"], ["kolay", "лёгкий", "easy", "оңай", "A2"], ["başvuru", "заявление", "application", "өтініш", "B1"],
-  ["karar", "решение", "decision", "шешім", "B1"], ["gelişmek", "развиваться", "to develop", "дамыту", "B1"], ["deneyim", "опыт", "experience", "тәжірибе", "B1"],
-  ["burs", "стипендия", "scholarship", "стипендия", "B1"], ["görüşme", "встреча", "meeting", "кездесу", "B1"], ["sorumluluk", "ответственность", "responsibility", "жауапкершілік", "B1"],
-  ["başarı", "успех", "success", "жетістік", "B1"], ["amaç", "цель", "goal", "мақсат", "B1"], ["fikir", "идея", "idea", "идея", "B1"],
-  ["yeterlilik", "квалификация", "qualification", "біліктілік", "B2"], ["sürdürülebilir", "устойчивый", "sustainable", "тұрақты", "B2"], ["etkilemek", "влиять", "to influence", "әсер ету", "B2"],
-  ["gözlem", "наблюдение", "observation", "бақылау", "B2"], ["katılım", "участие", "participation", "қатысу", "B2"], ["verimli", "продуктивный", "efficient", "тиімді", "B2"],
-  ["çözüm", "решение", "solution", "шешім", "B2"], ["gerekçe", "обоснование", "justification", "негіздеме", "B2"], ["öneri", "предложение", "suggestion", "ұсыныс", "B2"],
-  ["değişim", "изменение", "change", "өзгеріс", "B2"], ["kalkınma", "развитие", "development", "даму", "C1"], ["sürdürmek", "продолжать", "to sustain", "жалғастыру", "C1"],
-  ["kapsam", "охват", "scope", "қамту", "C1"], ["yaklaşım", "подход", "approach", "тәсіл", "C1"], ["belirsizlik", "неопределённость", "uncertainty", "белгісіздік", "C1"],
-  ["öngörü", "предвидение", "foresight", "болжам", "C1"], ["tutarlılık", "последовательность", "consistency", "дәйектілік", "C1"], ["ayrıcalık", "привилегия", "privilege", "артықшылық", "C1"],
-  ["dayanışma", "солидарность", "solidarity", "ынтымақ", "C1"], ["farkındalık", "осознанность", "awareness", "сана", "C1"],
-];
-
 const STATUSES: Status[] = ["learned", "review", "new"];
 const SOURCES: Source[] = ["reading", "listening", "writing", "speaking", "feedback", "manual"];
 
-const WORDS: Word[] = RAW.map(([w, ru, en, kk, level], i) => ({
-  w, ru, en, kk, level,
+// Real 400-word bank (src/data/vocabulary.ts). The data model carries one
+// translation, so it is shown for every locale; status/source stay demo-cyclic.
+const WORDS: Word[] = VOCABULARY.map((v, i) => ({
+  w: v.word,
+  ru: v.translation,
+  en: v.translation,
+  kk: v.translation,
+  level: v.level,
   status: STATUSES[i % 3],
   source: SOURCES[i % 6],
 }));

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Check, X } from "lucide-react";
 import { examLang, type Exam } from "@/lib/exams";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
@@ -91,7 +92,7 @@ export function ComingSoonModal({ exam, onClose }: { exam: Exam | null; onClose:
               aria-label={L.close}
               className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/[0.04] text-[var(--color-muted)] transition-colors hover:bg-black/[0.08] hover:text-[var(--color-foreground)]"
             >
-              ✕
+              <X size={16} />
             </button>
 
             {!sent ? (
@@ -129,8 +130,8 @@ export function ComingSoonModal({ exam, onClose }: { exam: Exam | null; onClose:
               </>
             ) : (
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-brand-2)]/15 text-3xl text-[var(--color-brand-2)]">
-                  ✓
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-brand-2)]/15 text-[var(--color-brand-2)]">
+                  <Check size={32} />
                 </div>
                 <h3 className="text-xl font-bold tracking-tight">{L.done}</h3>
                 <p className="mt-2 text-sm text-[var(--color-muted)]">{L.doneText(email, exam.name)}</p>

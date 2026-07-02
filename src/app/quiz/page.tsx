@@ -20,6 +20,9 @@ import {
   type ModuleId,
   computeResult,
   saveResult,
+  saveProgress,
+  loadProgress,
+  clearProgress,
   scoreMC,
   scoreWriting,
   scoreSpeakingAnswer,
@@ -28,7 +31,9 @@ import {
   qt,
   type QuizTKey,
 } from "@/lib/quiz";
-import { loadPlan } from "@/lib/billing";
+import { saveProfileResult } from "@/lib/profile";
+import { createClient } from "@/lib/supabase/client";
+import { PostQuizAuth } from "@/components/PostQuizAuth";
 
 /* ------------------------------- Speech (TTS) ----------------------------- */
 /** Speak Turkish text a touch slower than normal; `onEnd` fires when done. */
@@ -66,7 +71,7 @@ function fmt(sec: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-type Phase = "onboarding" | "transition" | "module";
+type Phase = "onboarding" | "transition" | "module" | "signup";
 
 const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [
   { id: "a1", label: "lvBeginner", hint: "A0–A1" },
@@ -91,6 +96,9 @@ export default function QuizPage() {
   const [moduleIdx, setModuleIdx] = useState(0);
   const [scores, setScores] = useState<Partial<Record<ModuleId, number>>>({});
   const [writingWords, setWritingWords] = useState(0);
+  // guards the progress-save effect from re-writing a snapshot once the quiz
+  // is finished (the async getUser() below yields a render mid-teardown)
+  const doneRef = useRef(false);
 
   const hint = useCallback(
     (l: Localized | undefined) => (l && locale !== "tr" ? l[locale] || l.ru : null),
@@ -99,7 +107,7 @@ export default function QuizPage() {
 
   /** A module reports its 0–100 score and we advance the flow. */
   const finishModule = useCallback(
-    (score: number, meta?: { words?: number }) => {
+    async (score: number, meta?: { words?: number }) => {
       const id = MODULES[moduleIdx].id;
       const nextScores = { ...scores, [id]: score };
       setScores(nextScores);
@@ -107,10 +115,23 @@ export default function QuizPage() {
       if (meta?.words !== undefined) setWritingWords(meta.words);
 
       if (moduleIdx + 1 >= MODULES.length) {
+        doneRef.current = true; // block any further progress snapshots
         const result = computeResult(nextScores as Record<ModuleId, number>, { writingWords: words });
-        saveResult(result);
-        // logged-in dashboard users go straight to their personal plan
-        router.push(loadPlan() ? "/dashboard/plan" : "/results");
+        saveResult(result); // anonymous cache — survives the sign-up hop
+        clearProgress(); // quiz is done; drop the in-progress snapshot
+
+        const {
+          data: { user },
+        } = await createClient().auth.getUser();
+
+        if (user) {
+          // already signed in → persist and show the result immediately
+          void saveProfileResult(result);
+          router.push("/quiz/result");
+        } else {
+          // guest → the one and only sign-up gate, then /quiz/result
+          setPhase("signup");
+        }
         return;
       }
       setPhase("transition");
@@ -122,6 +143,30 @@ export default function QuizPage() {
     setModuleIdx((i) => i + 1);
     setPhase("module");
   }
+
+  // ── refresh-safe progress ──────────────────────────────────────────────
+  // Restore the coarse snapshot on mount (before the save effect can run),
+  // then persist it whenever the flow advances. The active module restarts
+  // from its first question; completed-module scores are preserved.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const p = loadProgress();
+    if (p) {
+      setOnbStep(p.onbStep);
+      setModuleIdx(p.moduleIdx);
+      setScores(p.scores);
+      setWritingWords(p.writingWords);
+      setPhase(p.phase);
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || doneRef.current) return;
+    if (phase === "onboarding" || phase === "module" || phase === "transition") {
+      saveProgress({ phase, onbStep, moduleIdx, scores, writingWords });
+    }
+  }, [hydrated, phase, onbStep, moduleIdx, scores, writingWords]);
 
   /* ------------------------------ Onboarding ----------------------------- */
   if (phase === "onboarding") {
@@ -248,6 +293,11 @@ export default function QuizPage() {
         </div>
       </PageShell>
     );
+  }
+
+  /* ------------------------- Sign-up gate (once) ------------------------- */
+  if (phase === "signup") {
+    return <PostQuizAuth />;
   }
 
   /* ------------------------------ Transition ----------------------------- */
@@ -971,7 +1021,9 @@ function SpeakingModule({ moduleIdx, locale, onDone }: ModuleProps) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {answered && (
+        {/* on the last question the "see result" button is always available so
+            the diagnostic can be finished even if the recording didn't register */}
+        {(answered || step + 1 >= SPEAKING.length) && (
           <motion.button
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

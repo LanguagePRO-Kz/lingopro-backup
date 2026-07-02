@@ -239,16 +239,34 @@ body {
   color: var(--color-navy);
 }
 
-/* ---------- AI tutor avatar (pure CSS) ---------- */
+/* ---------- AI tutor avatar (pure SVG + CSS) ---------- */
 @keyframes lp-blink {
-  0%, 88%, 100% { transform: scaleY(1); }
-  93% { transform: scaleY(0.1); }
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
 }
-.lp-blink { animation: lp-blink 3s infinite; transform-origin: center; }
+.lp-blink {
+  animation: lp-blink 4s infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* wandering pupils — pseudo-random darts roughly every 2s */
+@keyframes lp-look {
+  0%, 22% { transform: translate(0, 0); }
+  28%, 47% { transform: translate(5px, -3px); }
+  53%, 72% { transform: translate(-5px, 2px); }
+  78%, 96% { transform: translate(3px, 3px); }
+  100% { transform: translate(0, 0); }
+}
+.lp-look {
+  animation: lp-look 8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
 
 @keyframes lp-bob {
-  0%, 100% { transform: translateY(-3px); }
-  50% { transform: translateY(3px); }
+  0%, 100% { transform: translateY(-4px); }
+  50% { transform: translateY(4px); }
 }
 .lp-bob { animation: lp-bob 3s ease-in-out infinite; }
 
@@ -258,12 +276,17 @@ body {
 }
 .lp-ring { animation: lp-ring 1.6s ease-out infinite; }
 
-@keyframes lp-mouth {
-  0%, 100% { height: 8px; width: 26px; }
-  33% { height: 22px; width: 30px; }
-  66% { height: 13px; width: 24px; }
+/* talking mouth — 3-frame open/close loop */
+@keyframes lp-mouth-talk {
+  0%, 100% { transform: scaleY(0.35); }
+  33% { transform: scaleY(1); }
+  66% { transform: scaleY(0.62); }
 }
-.lp-mouth { animation: lp-mouth 0.5s ease-in-out infinite; }
+.lp-mouth-talk {
+  animation: lp-mouth-talk 0.45s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
 
 @keyframes lp-wave {
   0%, 100% { height: 8px; }

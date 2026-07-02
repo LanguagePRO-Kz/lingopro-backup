@@ -74,7 +74,7 @@ export function Reviews() {
   const c = pick(locale, CONTENT);
 
   return (
-    <section className="px-4 py-20 sm:py-28">
+    <section id="reviews" className="scroll-mt-24 px-4 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <Reveal className="flex flex-col items-center text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{c.heading}</h2>

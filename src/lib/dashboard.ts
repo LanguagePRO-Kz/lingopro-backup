@@ -51,8 +51,9 @@ export const CURRENT_WEEK = 3;
 
 export const PLAN_MONTHS: Record<PackageId, string> = { "1m": "1", "3m": "3", "6m": "6" };
 
-export function planBadge(plan: PackageId | null, locale: Locale): string {
-  const mo = plan ? PLAN_MONTHS[plan] : "3";
+export function planBadge(plan: string | null, locale: Locale): string {
+  const mo = plan ? PLAN_MONTHS[plan as PackageId] : undefined;
+  if (!mo) return "Premium";
   const unit: Loc = { ru: "мес", en: "mo", tr: "ay", kk: "ай" };
   return `Premium · ${mo} ${unit[locale]}`;
 }

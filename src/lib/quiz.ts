@@ -381,6 +381,57 @@ export function loadResult(): QuizResult | null {
   }
 }
 
+/** Drop the cached result once it lives safely in Supabase. */
+export function clearResult() {
+  try {
+    window.localStorage.removeItem(RESULT_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+/* --------------------------- In-progress persistence --------------------- */
+/**
+ * Coarse quiz progress so a page refresh doesn't drop the user back to the
+ * landing / onboarding. We restore the phase, module index and per-module
+ * scores; the active module restarts from its first question (module internals
+ * — answers, timers — aren't lifted here).
+ */
+export type QuizProgress = {
+  phase: "onboarding" | "module" | "transition";
+  onbStep: number;
+  moduleIdx: number;
+  scores: Partial<Record<ModuleId, number>>;
+  writingWords: number;
+};
+
+const PROGRESS_KEY = "lingopro:quizProgress";
+
+export function saveProgress(p: QuizProgress) {
+  try {
+    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+export function loadProgress(): QuizProgress | null {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_KEY);
+    return raw ? (JSON.parse(raw) as QuizProgress) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearProgress() {
+  try {
+    window.localStorage.removeItem(PROGRESS_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 /* ----------------------------- UI translations ---------------------------- */
 
 const T = {

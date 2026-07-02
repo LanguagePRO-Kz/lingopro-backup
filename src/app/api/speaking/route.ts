@@ -25,15 +25,20 @@ Kurallar:
 5. Her 3-4 mesajda yeni bir kelime öğret: "📚 [kelime] — [перевод]".
 6. Samimi ve destekleyici ol.
 7. Düzeltmeleri ve açıklamaları Rusça yaz, diyalogu Türkçe sürdür.
+8. Mümkün olduğunca doğru yaz: hiçbir dilbilgisi hatası, yazım hatası veya yanlış çekim olmasın. Göndermeden önce her cümleyi kontrol et. Türkçe: ünlü ve ünsüz uyumuna, doğru eklere dikkat et (ç, ş, ğ, ı, ö, ü harflerini doğru kullan). Rusça: doğru hâller, sayı uyumu ve noktalama. Öğrenci senden öğreniyor — örnek metnin kusursuz olmalı.
 
 Yanıtını SADECE bu JSON formatında ver:
 {"reply": "Türkçe cevap (sesli okunacak)", "correction": "düzeltme veya null", "newWord": "yeni kelime veya null", "note": "Rusça açıklama veya null"}`;
 
+const QUALITY = "Mümkün olduğunca doğru yaz: dilbilgisi hatası, yazım hatası veya yanlış çekim olmasın; göndermeden önce her cümleyi kontrol et. Türkçe: ünlü/ünsüz uyumu ve doğru ekler (ç, ş, ğ, ı, ö, ü). Rusça: doğru hâller, sayı uyumu ve noktalama.";
+
 const HINT_SYSTEM =
-  "Sen bir Türkçe öğretmenisin. Öğrenciye şimdi ne söyleyebileceği hakkında KISA (1 cümle) Türkçe bir ipucu ver ve parantez içinde Rusça çevirisini ekle. Sadece ipucunu yaz.";
+  "Sen bir Türkçe öğretmenisin. Öğrenciye şimdi ne söyleyebileceği hakkında KISA (1 cümle) Türkçe bir ipucu ver ve parantez içinde Rusça çevirisini ekle. Sadece ipucunu yaz. " +
+  QUALITY;
 
 const SUMMARY_SYSTEM =
-  "Bu Türkçe konuşma dersinin özetini yap: konuşulan konu, yapılan hatalar, öğrenilen kelimeler ve genel seviye değerlendirmesi (A1-C1). Kısa ve net, Rusça yaz.";
+  "Bu Türkçe konuşma dersinin özetini yap: konuşulan konu, yapılan hatalar, öğrenilen kelimeler ve genel seviye değerlendirmesi (A1-C1). Kısa ve net, Rusça yaz. " +
+  QUALITY;
 
 function chatFallback(messages: ChatMsg[]) {
   const last = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";

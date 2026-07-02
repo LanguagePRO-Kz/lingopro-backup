@@ -13,6 +13,7 @@ import {
   savePlan,
   type PackageId,
 } from "@/lib/billing";
+import { saveProfilePlan } from "@/lib/profile";
 
 const T = {
   ru: {
@@ -144,8 +145,9 @@ export function PaymentModal({
     }
   }
 
-  function pay() {
+  async function pay() {
     savePlan(pkgId);
+    await saveProfilePlan(pkgId);
     router.push("/dashboard");
   }
 

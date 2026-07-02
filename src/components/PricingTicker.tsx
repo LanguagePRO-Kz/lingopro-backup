@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { Flame } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 
@@ -29,9 +30,9 @@ function hourlyJoined(d: Date) {
 
 const T = {
   ru: { headline: "Студенты начали подготовку с LingoPRO:", joinedTpl: "{n} человек присоединились к {brand} за последний час", months: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } },
-  en: { headline: "Students just started preparing with LingoPRO:", joinedTpl: "{n} people joined {brand} in the last hour", months: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } },
-  tr: { headline: "Öğrenciler LingoPRO ile hazırlığa başladı:", joinedTpl: "son bir saatte {n} kişi {brand}'a katıldı", months: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } },
-  kk: { headline: "Студенттер LingoPRO-мен дайындықты бастады:", joinedTpl: "соңғы бір сағатта {n} адам {brand}-ке қосылды", months: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } },
+  en: { headline: "Students started preparing with LingoPRO:", joinedTpl: "{n} people joined {brand} in the last hour", months: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } },
+  tr: { headline: "Öğrenciler LingoPRO ile hazırlanmaya başladı:", joinedTpl: "{n} kişi son bir saatte {brand}'ya katıldı", months: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } },
+  kk: { headline: "Студенттер LingoPRO-мен дайындыққа кірісті:", joinedTpl: "{n} адам соңғы сағатта {brand}-ға қосылды", months: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } },
 };
 
 const PLAQUES: { name: string; plan: "1m" | "3m" | "6m" }[] = [
@@ -64,14 +65,14 @@ export function PricingTicker() {
     });
     return (
       <span key={key} className={PILL}>
-        🔥 <span className="leading-none">{parts}</span>
+        <Flame size={16} className="shrink-0 text-[#f97316]" /> <span className="leading-none">{parts}</span>
       </span>
     );
   }
 
   const nodes: ReactNode[] = [
     <span key="head" className="flex shrink-0 items-center gap-2 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-sm font-semibold text-[var(--color-brand)]">
-      🔥 {c.headline}
+      <Flame size={16} className="shrink-0" /> {c.headline}
     </span>,
   ];
   PLAQUES.forEach((p, i) => {

@@ -130,43 +130,102 @@ const T = {
   },
 };
 
-/* ------------------------------- Avatar (CSS) ----------------------------- */
+/* ------------------------------- Avatar (SVG) ----------------------------- */
+/**
+ * Expressive SVG face for the AI tutor. Always alive (blink + wandering
+ * pupils); bobs while idle; pulsing rings while listening; talking mouth,
+ * raised brows and side sound-waves while speaking. Purely 2D vector + CSS.
+ */
 function Avatar({ state }: { state: RecState }) {
   const listening = state === "listening";
   const speaking = state === "speaking";
+  const idle = state === "idle";
+
+  const eyeStyle = { transformBox: "fill-box", transformOrigin: "center" } as const;
+
   return (
     <div className="relative h-[260px] w-[260px]">
+      {/* listening — two soft blue pulsing rings */}
       {listening &&
-        [0, 0.5, 1].map((d) => (
-          <span key={d} className="lp-ring absolute inset-0 rounded-full" style={{ boxShadow: "0 0 0 6px rgba(124,58,237,0.4)", animationDelay: `${d}s` }} />
+        [0, 0.9].map((d) => (
+          <span
+            key={d}
+            className="lp-ring absolute inset-0 rounded-full"
+            style={{ boxShadow: "0 0 0 5px rgba(56,189,248,0.45)", animationDelay: `${d}s` }}
+          />
         ))}
 
-      {/* side sound waves */}
+      {/* soft elliptical ground shadow */}
+      <div
+        aria-hidden
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{ bottom: -2, width: 160, height: 26, background: "rgba(76,29,149,0.35)", borderRadius: "50%", filter: "blur(13px)" }}
+      />
+
+      {/* speaking — side sound waves */}
       {speaking &&
-        ["-left-8", "-right-8"].map((side) => (
+        (["left-[-24px]", "right-[-24px]"] as const).map((side) => (
           <div key={side} className={`absolute top-1/2 ${side} flex -translate-y-1/2 items-center gap-1`}>
             {[0, 1, 2].map((i) => (
-              <span key={i} className="lp-wave w-1.5 rounded-full bg-[var(--color-brand)]" style={{ animationDelay: `${i * 0.1}s` }} />
+              <span key={i} className="lp-wave w-1.5 rounded-full bg-[#7C3AED]" style={{ animationDelay: `${i * 0.12}s` }} />
             ))}
           </div>
         ))}
 
-      <div className={`relative flex h-full w-full flex-col items-center justify-center rounded-full ${state === "idle" ? "lp-bob" : ""}`} style={{ background: "linear-gradient(135deg,#7C3AED,#6366F1)", boxShadow: "0 24px 70px -20px rgba(124,58,237,0.7)" }}>
-        {/* eyes */}
-        <div className="flex items-center gap-12">
-          {[0, 1].map((i) => (
-            <span key={i} className={`relative flex items-center justify-center rounded-full bg-white ${state === "idle" ? "lp-blink" : ""}`} style={{ width: 40, height: 28 }}>
-              <span className="rounded-full bg-[#1b1640]" style={{ width: listening ? 16 : 13, height: listening ? 16 : 13 }} />
-            </span>
-          ))}
-        </div>
-        {/* mouth */}
+      {/* face */}
+      <svg
+        viewBox="0 0 200 200"
+        className={`relative h-full w-full ${idle ? "lp-bob" : ""}`}
+        style={{ filter: "drop-shadow(0 24px 50px rgba(124,58,237,0.55))", overflow: "visible" }}
+      >
+        <defs>
+          <linearGradient id="lp-face" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#7C3AED" />
+            <stop offset="1" stopColor="#6366F1" />
+          </linearGradient>
+        </defs>
+
+        <circle cx="100" cy="100" r="96" fill="url(#lp-face)" />
+
+        {/* eyebrows — raise slightly while speaking */}
+        <g
+          stroke="#fff"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+          style={{
+            transform: speaking ? "translateY(-5px)" : "translateY(0)",
+            transition: "transform 0.3s ease",
+            transformBox: "fill-box",
+            transformOrigin: "center",
+          }}
+        >
+          <path d="M56 68 Q72 58 88 66" />
+          <path d="M112 66 Q128 58 144 68" />
+        </g>
+
+        {/* eyes — blink group wraps whites + wandering pupils */}
+        <g className="lp-blink">
+          <ellipse cx="72" cy="94" rx="15" ry="19" fill="#fff" />
+          <g className="lp-look" style={eyeStyle}>
+            <circle cx="72" cy="95" r="7.5" fill="#1b1640" />
+            <circle cx="69" cy="92" r="2.3" fill="#fff" />
+          </g>
+
+          <ellipse cx="128" cy="94" rx="15" ry="19" fill="#fff" />
+          <g className="lp-look" style={eyeStyle}>
+            <circle cx="128" cy="95" r="7.5" fill="#1b1640" />
+            <circle cx="125" cy="92" r="2.3" fill="#fff" />
+          </g>
+        </g>
+
+        {/* mouth — smile when idle, opening loop while speaking */}
         {speaking ? (
-          <span className="lp-mouth mt-7 block rounded-full bg-white" />
+          <ellipse className="lp-mouth-talk" cx="100" cy="140" rx="17" ry="13" fill="#fff" style={eyeStyle} />
         ) : (
-          <span className="mt-7 block h-7 w-16 rounded-b-[40px] border-b-[6px] border-white" />
+          <path d="M74 134 Q100 156 126 134" stroke="#fff" strokeWidth="6" strokeLinecap="round" fill="none" />
         )}
-      </div>
+      </svg>
     </div>
   );
 }

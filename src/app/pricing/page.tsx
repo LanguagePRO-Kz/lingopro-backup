@@ -2,24 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Background } from "@/components/ui/Background";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Logo } from "@/components/ui/Logo";
-import { PaymentModal } from "@/components/PaymentModal";
 import { useI18n } from "@/lib/i18n";
-import { pick } from "@/lib/localized";
-import { loadResult, PLANS, type QuizResult } from "@/lib/quiz";
-import {
-  applyDiscount,
-  formatPrice,
-  perDay,
-  PACKAGES,
-  QUIZ_DISCOUNT,
-  DISCOUNT_WINDOW,
-  type Package,
-} from "@/lib/billing";
+import { pick, pluralize } from "@/lib/localized";
+import { loadResult, saveResult, PLANS, LEVEL_ORDER, levelIndex, type QuizResult } from "@/lib/quiz";
+import { savePlan, type PackageId } from "@/lib/billing";
+import { PRICING, currencyFor, fmtMoney, type Currency } from "@/lib/pricing";
 import { PricingTicker } from "@/components/PricingTicker";
+import { createClient } from "@/lib/supabase/client";
+import { saveProfilePlan, fetchProfile } from "@/lib/profile";
 
 const T = {
   ru: {
@@ -27,17 +22,19 @@ const T = {
     sub: "Выбери план и начни подготовку к TÖMER уже сегодня",
     yourLevel: "Твой уровень",
     recoPlan: "Рекомендуемый план",
-    bannerText: "Ты прошёл диагностику — скидка 30% уже применена!",
-    bannerTimer: "Скидка действует:",
-    choose: "Выбрать",
+    choose: "Выбрать пакет",
     fullAccess: "Полный доступ ко всем функциям",
     popular: "Популярный",
     includedTitle: "Что входит в каждый пакет",
-    noQuizText: "Пройди бесплатную диагностику и получи скидку 30%",
-    noQuizCta: "Пройти диагностику →",
+    perDayLabel: " в день",
     back: "На главную",
+    levelWord: "Ваш уровень",
+    toGoal: "До цели C1 —",
+    levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
+    choosePlan: "Выберите план подготовки",
+    discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
     names: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } as Record<string, string>,
-    extra: { "3m": "Экономия 40%", "6m": "Максимальная экономия" } as Record<string, string>,
+    badges: { "3m": "Экономия 50%", "6m": "Максимальная экономия" } as Record<string, string>,
     features: [
       "AI-диагностика уровня",
       "Персональный план подготовки",
@@ -54,17 +51,19 @@ const T = {
     sub: "Pick a plan and start preparing for TÖMER today",
     yourLevel: "Your level",
     recoPlan: "Recommended plan",
-    bannerText: "You finished the diagnostic — 30% off already applied!",
-    bannerTimer: "Discount ends in:",
-    choose: "Choose",
+    choose: "Choose plan",
     fullAccess: "Full access to all features",
     popular: "Popular",
-    includedTitle: "What every package includes",
-    noQuizText: "Take the free diagnostic and get 30% off",
-    noQuizCta: "Take the diagnostic →",
+    includedTitle: "What's included",
+    perDayLabel: "/day",
     back: "Home",
+    levelWord: "Your level",
+    toGoal: "To the C1 goal —",
+    levels: (n: number) => (n === 1 ? "level" : "levels"),
+    choosePlan: "Choose a prep plan",
+    discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
     names: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } as Record<string, string>,
-    extra: { "3m": "Save 40%", "6m": "Maximum savings" } as Record<string, string>,
+    badges: { "3m": "Save 50%", "6m": "Best value" } as Record<string, string>,
     features: [
       "AI level diagnostic",
       "Personal preparation plan",
@@ -81,17 +80,19 @@ const T = {
     sub: "Bir plan seç ve bugün TÖMER hazırlığına başla",
     yourLevel: "Seviyen",
     recoPlan: "Önerilen plan",
-    bannerText: "Teşhisi tamamladın — %30 indirim çoktan uygulandı!",
-    bannerTimer: "İndirim bitişi:",
-    choose: "Seç",
+    choose: "Paketi seç",
     fullAccess: "Tüm özelliklere tam erişim",
     popular: "Popüler",
-    includedTitle: "Her pakete dahil olanlar",
-    noQuizText: "Ücretsiz teşhisi geç ve %30 indirim kazan",
-    noQuizCta: "Teşhise başla →",
+    includedTitle: "Her pakete dahil",
+    perDayLabel: "/gün",
     back: "Ana sayfa",
+    levelWord: "Seviyen",
+    toGoal: "C1 hedefine —",
+    levels: () => "seviye",
+    choosePlan: "Bir hazırlık planı seç",
+    discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
     names: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } as Record<string, string>,
-    extra: { "3m": "%40 tasarruf", "6m": "Maksimum tasarruf" } as Record<string, string>,
+    badges: { "3m": "%50 tasarruf", "6m": "En iyi değer" } as Record<string, string>,
     features: [
       "AI seviye tanısı",
       "Kişisel hazırlık planı",
@@ -108,17 +109,19 @@ const T = {
     sub: "Жоспарды таңда да бүгін TÖMER-ге дайындықты баста",
     yourLevel: "Сенің деңгейің",
     recoPlan: "Ұсынылатын жоспар",
-    bannerText: "Сен диагностикадан өттің — 30% жеңілдік қолданылды!",
-    bannerTimer: "Жеңілдік аяқталады:",
-    choose: "Таңдау",
-    fullAccess: "Барлық функцияларға толық қолжетімділік",
+    choose: "Пакетті таңдау",
+    fullAccess: "Барлық мүмкіндіктерге толық қол жеткізу",
     popular: "Танымал",
-    includedTitle: "Әр пакетке не кіреді",
-    noQuizText: "Тегін диагностикадан өт және 30% жеңілдік ал",
-    noQuizCta: "Диагностикадан өту →",
+    includedTitle: "Әрбір пакетке кіреді",
+    perDayLabel: "/күніне",
     back: "Басты бетке",
+    levelWord: "Сенің деңгейің",
+    toGoal: "C1 мақсатына дейін —",
+    levels: () => "деңгей",
+    choosePlan: "Дайындық жоспарын таңда",
+    discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
     names: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } as Record<string, string>,
-    extra: { "3m": "40% үнемдеу", "6m": "Максималды үнемдеу" } as Record<string, string>,
+    badges: { "3m": "50% үнемдеу", "6m": "Ең тиімді" } as Record<string, string>,
     features: [
       "Деңгейдің AI-диагностикасы",
       "Жеке дайындық жоспары",
@@ -132,42 +135,59 @@ const T = {
   },
 };
 
-function fmtClock(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  return [h, m, s].map((x) => x.toString().padStart(2, "0")).join(":");
-}
-
 export default function PricingPage() {
   const { locale } = useI18n();
   const c = pick(locale, T);
-  const pd = pick(locale, {
-    ru: { pre: "всего ≈ ", post: " в день" },
-    en: { pre: "that's ≈ ", post: " per day" },
-    tr: { pre: "günde yaklaşık ", post: "" },
-    kk: { pre: "күніне ≈ ", post: "" },
-  });
 
+  // currency follows the interface language (RU/KZ → ₸, else → $)
+  const cur: Currency = currencyFor(locale);
+  const plans = PRICING[cur].plans;
+
+  const router = useRouter();
   const [result, setResult] = useState<QuizResult | null>(null);
   const [name, setName] = useState("");
-  const [now, setNow] = useState(() => Date.now());
-  const [selected, setSelected] = useState<Package | null>(null);
+  const [authed, setAuthed] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setResult(loadResult());
+    const local = loadResult();
+    if (local) setResult(local);
     setName(window.localStorage.getItem("lingopro:name") || "");
+    createClient()
+      .auth.getUser()
+      .then(async ({ data }) => {
+        setAuthed(!!data.user);
+        // result may live only in Supabase after the sign-up hop cleared the
+        // local cache — hydrate from the profile so personalization works
+        if (!local && data.user) {
+          const profile = await fetchProfile();
+          if (profile?.quiz_result) {
+            setResult(profile.quiz_result);
+            saveResult(profile.quiz_result);
+          }
+        }
+      });
   }, []);
 
-  // live countdown
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // pick a plan — no payment yet (Kaspi later): save to profile + cache, go to dashboard
+  async function selectPlan(plan: PackageId) {
+    if (busy) return;
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/register");
+      return;
+    }
+    setBusy(true);
+    await saveProfilePlan(plan);
+    savePlan(plan);
+    router.push("/dashboard");
+  }
 
+  // finished the diagnostic → personal 30% discount
   const hasDiscount = !!result;
-  const remaining = result ? result.takenAt + DISCOUNT_WINDOW - now : 0;
 
   return (
     <>
@@ -197,6 +217,32 @@ export default function PricingPage() {
         </h1>
         <p className="mt-1.5 text-sm text-[var(--color-muted)] sm:text-base">{c.sub}</p>
 
+        {/* personal 30% discount banner — anyone who finished the diagnostic */}
+        {hasDiscount && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative mt-5 overflow-hidden rounded-3xl px-5 py-4 sm:px-7 sm:py-5"
+          >
+            <div
+              aria-hidden
+              className="absolute inset-0 -z-10"
+              style={{ background: "linear-gradient(120deg, #6d5bff, #5b8cff 50%, #19c6b3)" }}
+            />
+            <p className="text-base font-semibold text-white sm:text-lg">{c.discountBanner}</p>
+          </motion.div>
+        )}
+
+        {/* funnel message — authed user who just finished the diagnostic */}
+        {authed && result && (
+          <div className="mt-5 rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] px-5 py-4 text-sm sm:text-base">
+            <span className="text-[var(--color-foreground)]">
+              {c.levelWord}: <span className="font-bold text-[var(--color-brand)]">{result.level}</span>. {c.toGoal}{" "}
+              <span className="font-semibold">{(() => { const n = LEVEL_ORDER.length - 1 - levelIndex(result.level); return `${n} ${c.levels(n)}`; })()}</span>. {c.choosePlan}:
+            </span>
+          </div>
+        )}
+
         {/* recommended plan mini-card */}
         {result && (
           <div className="glass mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl px-4 py-3 text-sm">
@@ -208,27 +254,6 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* discount banner with countdown */}
-        {hasDiscount && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative mt-6 overflow-hidden rounded-3xl px-5 py-4 sm:px-7 sm:py-5"
-          >
-            <div
-              aria-hidden
-              className="absolute inset-0 -z-10"
-              style={{ background: "linear-gradient(120deg, #6d5bff, #5b8cff 50%, #19c6b3)" }}
-            />
-            <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
-              <p className="text-base font-semibold text-white sm:text-lg">🎉 {c.bannerText}</p>
-              <div className="shrink-0 rounded-full bg-white/20 px-4 py-2 text-sm font-bold text-white">
-                {c.bannerTimer} <span className="tabular-nums">{fmtClock(remaining)}</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* names + live counter ticker */}
         <div className="mt-8">
           <PricingTicker />
@@ -236,9 +261,9 @@ export default function PricingPage() {
 
         {/* packages */}
         <div className="mt-6 grid items-stretch gap-6 lg:grid-cols-3">
-          {PACKAGES.map((p) => {
+          {plans.map((p) => {
             const popular = !!p.popular;
-            const discounted = applyDiscount(p.base, QUIZ_DISCOUNT);
+            const badge = c.badges[p.id];
             return (
               <motion.div
                 key={p.id}
@@ -258,35 +283,36 @@ export default function PricingPage() {
                   )}
                   <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-muted)]">{c.names[p.id]}</h3>
 
-                  {/* price — total is the main accent */}
+                  {/* price — 30% off after the diagnostic, else the full price */}
                   {hasDiscount ? (
                     <>
-                      <div className="mt-2 text-sm text-[var(--color-muted)] line-through">{formatPrice(p.base)} ₸</div>
+                      <div className="mt-2 text-sm text-[var(--color-muted)] line-through">{fmtMoney(cur, p.price)}</div>
                       <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
-                        <span className="text-[34px] font-bold leading-none text-[#16a34a]">{formatPrice(discounted)} ₸</span>
+                        <span className="text-[34px] font-bold leading-none text-[#16a34a]">{fmtMoney(cur, p.disc)}</span>
                         <span className="rounded-full bg-[#16a34a]/15 px-2 py-0.5 text-[11px] font-bold text-[#16a34a]">−30%</span>
                       </div>
                     </>
                   ) : (
-                    <div className="mt-2 text-[34px] font-bold leading-none text-[var(--color-foreground)]">{formatPrice(p.base)} ₸</div>
+                    <div className="mt-2 text-[34px] font-bold leading-none text-[var(--color-foreground)]">{fmtMoney(cur, p.price)}</div>
                   )}
 
                   <div className="my-4 h-px w-full bg-black/[0.07]" />
                   <div className="text-[#374151]">
-                    <span className="text-[16px]">{pd.pre}</span>
-                    <span className="text-[20px] font-bold">{formatPrice(perDay(hasDiscount ? discounted : p.base, p.id))} ₸</span>
-                    <span className="text-[16px]">{pd.post}</span>
+                    <span className="text-[16px]">≈ </span>
+                    <span className="text-[20px] font-bold">{fmtMoney(cur, hasDiscount ? p.discPerDay : p.perDay)}</span>
+                    <span className="text-[16px]">{c.perDayLabel}</span>
                   </div>
 
                   <p className="mt-3 text-sm text-[var(--color-foreground)]">✅ {c.fullAccess}</p>
-                  {c.extra[p.id] && (
-                    <p className="mt-1 text-sm font-medium text-[var(--color-brand)]">{c.extra[p.id]}</p>
+                  {badge && (
+                    <p className="mt-1 text-sm font-medium text-[var(--color-brand)]">{badge}</p>
                   )}
 
                   <button
                     type="button"
-                    onClick={() => setSelected(p)}
-                    className={`mt-7 rounded-full px-5 py-3 text-center text-sm font-semibold transition-all ${
+                    onClick={() => selectPlan(p.id)}
+                    disabled={busy}
+                    className={`mt-7 rounded-full px-5 py-3 text-center text-sm font-semibold transition-all disabled:opacity-50 ${
                       popular ? "btn-primary" : "btn-ghost"
                     }`}
                   >
@@ -297,26 +323,6 @@ export default function PricingPage() {
             );
           })}
         </div>
-
-        {/* no-quiz banner */}
-        {!hasDiscount && (
-          <div className="relative mt-6 overflow-hidden rounded-3xl px-6 py-5">
-            <div
-              aria-hidden
-              className="absolute inset-0 -z-10"
-              style={{ background: "linear-gradient(120deg, #6d5bff, #5b8cff 50%, #19c6b3)" }}
-            />
-            <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
-              <p className="text-lg font-semibold text-white">🎁 {c.noQuizText}</p>
-              <Link
-                href="/quiz"
-                className="shrink-0 rounded-full bg-white px-6 py-3 text-sm font-bold text-[var(--color-brand)] shadow-lg transition-transform hover:-translate-y-0.5"
-              >
-                {c.noQuizCta}
-              </Link>
-            </div>
-          </div>
-        )}
 
         {/* included features */}
         <div className="glass mt-8 rounded-3xl p-7">
@@ -335,18 +341,6 @@ export default function PricingPage() {
           </ul>
         </div>
       </main>
-
-      <AnimatePresence>
-        {selected && (
-          <PaymentModal
-            pkgId={selected.id}
-            base={selected.base}
-            name={c.names[selected.id]}
-            hasDiscount={hasDiscount}
-            onClose={() => setSelected(null)}
-          />
-        )}
-      </AnimatePresence>
     </>
   );
 }

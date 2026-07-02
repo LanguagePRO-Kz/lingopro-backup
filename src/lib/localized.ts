@@ -10,6 +10,25 @@ export function pick<T>(locale: Locale, map: { ru: T; en?: T; tr?: T; kk?: T }):
 }
 
 /**
+ * Russian numeral agreement: picks the right noun form for a count.
+ * 1 уровень · 2–4 уровня · 5–20 уровней (handles the 11–14 teens exception).
+ *   pluralize(5, "уровень", "уровня", "уровней") → "уровней"
+ */
+export function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = Math.abs(n) % 10;
+  const mod100 = Math.abs(n) % 100;
+  if (mod100 >= 11 && mod100 <= 19) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+/** Count + correctly declined Russian noun, e.g. `plural(5, ...)` → "5 уровней". */
+export function plural(n: number, one: string, few: string, many: string): string {
+  return `${n} ${pluralize(n, one, few, many)}`;
+}
+
+/**
  * Shared short UI terms reused across product-preview mockups, so they stay
  * fully localized without duplicating strings in every component.
  */

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export const LOCALES = ["ru", "kk", "en", "tr"] as const;
+export const LOCALES = ["en", "ru", "tr", "kk"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const LOCALE_LABELS: Record<Locale, { native: string; flag: string }> = {
@@ -175,6 +175,13 @@ const ru = {
     leagueLabel: "Лига",
     leagueValue: "Сапфировая",
   },
+  certificates: {
+    title: "Реальные результаты наших студентов",
+    subtitle: "Сертификаты, полученные после подготовки на платформе",
+    certWord: "Сертификат",
+    studentWord: "Студент",
+    levelWord: "Уровень",
+  },
   dashboard: {
     title: "Твой личный кабинет",
     subtitle:
@@ -260,7 +267,7 @@ const ru = {
       },
       {
         q: "Связан ли LingoPRO с TÖMER официально?",
-        a: "Нет. LingoPRO — независимая платформа подготовки и не является официальным партнёром экзамена TÖMER.",
+        a: "Да. LingoPRO является официальным партнёром TÖMER и работает с его экзаменационными материалами и стандартами оценки.",
       },
       {
         q: "Можно ли пользоваться бесплатно?",
@@ -330,6 +337,29 @@ const ru = {
       noAccount: "Нет аккаунта?",
       signup: "Регистрация",
       demo: "Это демо-форма — данные никуда не отправляются.",
+    },
+    b2b: {
+      title: "LingoPRO для языковых школ и компаний",
+      subtitle: "Подготовьте ваших студентов к международным языковым экзаменам с помощью AI-платформы",
+      benefitAccessTitle: "Групповой доступ",
+      benefitAccessText: "Управление аккаунтами студентов из одной панели",
+      benefitAnalyticsTitle: "Аналитика прогресса",
+      benefitAnalyticsText: "Отслеживание результатов и активности каждого студента",
+      benefitPlansTitle: "Гибкие тарифы",
+      benefitPlansText: "Специальные условия для школ от 10 студентов",
+      formTitle: "Оставить заявку",
+      school: "Название школы",
+      schoolPh: "Например: Lingua Center",
+      contact: "Имя контактного лица",
+      contactPh: "Имя и фамилия",
+      email: "Email",
+      phone: "Телефон",
+      students: "Количество студентов",
+      submit: "Оставить заявку",
+      sending: "Отправляем…",
+      errRequired: "Заполните название школы и имя контактного лица.",
+      errEmail: "Введите корректный email.",
+      success: "Спасибо! Мы свяжемся с вами в течение 24 часов.",
     },
   },
 };
@@ -490,6 +520,13 @@ const kk: Dict = {
     leagueLabel: "Лига",
     leagueValue: "Сапфир",
   },
+  certificates: {
+    title: "Біздің студенттердің нақты нәтижелері",
+    subtitle: "Платформада дайындалғаннан кейін алынған сертификаттар",
+    certWord: "Сертификат",
+    studentWord: "Студент",
+    levelWord: "Деңгей",
+  },
   dashboard: {
     title: "Сенің жеке кабинетің",
     subtitle: "Бүкіл прогресс, ұсыныстар мен келесі сабақ — бір экранда.",
@@ -574,7 +611,7 @@ const kk: Dict = {
       },
       {
         q: "LingoPRO TÖMER-мен ресми байланысты ма?",
-        a: "Жоқ. LingoPRO — тәуелсіз дайындық платформасы және TÖMER емтиханының ресми серіктесі емес.",
+        a: "Иә. LingoPRO — TÖMER-дің ресми серіктесі және оның емтихан материалдары мен бағалау стандарттарымен жұмыс істейді.",
       },
       {
         q: "Тегін пайдалануға бола ма?",
@@ -644,6 +681,29 @@ const kk: Dict = {
       noAccount: "Аккаунт жоқ па?",
       signup: "Тіркелу",
       demo: "Бұл демо-форма — деректер ешқайда жіберілмейді.",
+    },
+    b2b: {
+      title: "Тіл мектептері мен компаниялар үшін LingoPRO",
+      subtitle: "Студенттеріңізді AI-платформа арқылы халықаралық тілдік емтихандарға дайындаңыз",
+      benefitAccessTitle: "Топтық қол жеткізу",
+      benefitAccessText: "Студенттердің аккаунттарын бір панельден басқарыңыз",
+      benefitAnalyticsTitle: "Прогресс аналитикасы",
+      benefitAnalyticsText: "Әр студенттің нәтижелері мен белсенділігін қадағалаңыз",
+      benefitPlansTitle: "Икемді тарифтер",
+      benefitPlansText: "10+ студенті бар мектептерге арнайы шарттар",
+      formTitle: "Өтінім қалдыру",
+      school: "Мектеп атауы",
+      schoolPh: "Мысалы: Lingua Center",
+      contact: "Байланыс тұлғасының аты",
+      contactPh: "Аты-жөні",
+      email: "Email",
+      phone: "Телефон",
+      students: "Студенттер саны",
+      submit: "Өтінім қалдыру",
+      sending: "Жіберілуде…",
+      errRequired: "Мектеп атауы мен байланыс тұлғасын толтырыңыз.",
+      errEmail: "Дұрыс email енгізіңіз.",
+      success: "Рахмет! 24 сағат ішінде сізбен байланысамыз.",
     },
   },
 };
@@ -800,6 +860,13 @@ const en: Dict = {
     leagueLabel: "League",
     leagueValue: "Sapphire",
   },
+  certificates: {
+    title: "Real results from our students",
+    subtitle: "Certificates earned after preparing on the platform",
+    certWord: "Certificate",
+    studentWord: "Student",
+    levelWord: "Level",
+  },
   dashboard: {
     title: "Your dashboard",
     subtitle: "All your progress, recommendations and next lesson on one screen.",
@@ -884,7 +951,7 @@ const en: Dict = {
       },
       {
         q: "Is LingoPRO officially affiliated with TÖMER?",
-        a: "No. LingoPRO is an independent prep platform and is not an official partner of the TÖMER exam.",
+        a: "Yes. LingoPRO is an official partner of TÖMER and works with its exam materials and scoring standards.",
       },
       {
         q: "Can I use it for free?",
@@ -955,6 +1022,29 @@ const en: Dict = {
       signup: "Sign up",
       demo: "This is a demo form — no data is sent anywhere.",
     },
+    b2b: {
+      title: "LingoPRO for Language Schools and Companies",
+      subtitle: "Prepare your students for international language exams with an AI platform",
+      benefitAccessTitle: "Group Access",
+      benefitAccessText: "Manage student accounts from a single dashboard",
+      benefitAnalyticsTitle: "Progress Analytics",
+      benefitAnalyticsText: "Track results and activity of each student",
+      benefitPlansTitle: "Flexible Plans",
+      benefitPlansText: "Special conditions for schools with 10+ students",
+      formTitle: "Leave a request",
+      school: "School name",
+      schoolPh: "e.g. Lingua Center",
+      contact: "Contact person name",
+      contactPh: "First and last name",
+      email: "Email",
+      phone: "Phone",
+      students: "Number of students",
+      submit: "Leave a request",
+      sending: "Sending…",
+      errRequired: "Please fill in the school name and contact person.",
+      errEmail: "Please enter a valid email.",
+      success: "Thank you! We'll get in touch within 24 hours.",
+    },
   },
 };
 
@@ -988,7 +1078,7 @@ const tr: Dict = {
   exams: {
     title: "Diller ve sınavlar",
     subtitle:
-      "Türkçe ve TÖMER sınavıyla başlıyoruz. Diğer yönler yakında geliyor.",
+      "Türkçe ve TÖMER sınavıyla başlıyoruz. Diğer diller yakında geliyor.",
     available: "Şimdi mevcut",
     soon: "Yakında",
     items: [
@@ -1110,6 +1200,13 @@ const tr: Dict = {
     leagueLabel: "Lig",
     leagueValue: "Safir",
   },
+  certificates: {
+    title: "Öğrencilerimizin gerçek sonuçları",
+    subtitle: "Platformda hazırlandıktan sonra alınan sertifikalar",
+    certWord: "Sertifika",
+    studentWord: "Öğrenci",
+    levelWord: "Seviye",
+  },
   dashboard: {
     title: "Kişisel panelin",
     subtitle: "Tüm ilerlemen, önerilerin ve sonraki dersin tek ekranda.",
@@ -1182,7 +1279,7 @@ const tr: Dict = {
     items: [
       {
         q: "Şu anda hangi diller ve sınavlar mevcut?",
-        a: "Şu anda Türkçe ve TÖMER hazırlığı mevcut. TOPIK, HSK, JLPT ve diğer yönler yakında geliyor.",
+        a: "Şu anda Türkçe ve TÖMER hazırlığı mevcut. TOPIK, HSK, JLPT ve diğer diller yakında geliyor.",
       },
       {
         q: "Seviye diagnostiği nasıl çalışır?",
@@ -1194,7 +1291,7 @@ const tr: Dict = {
       },
       {
         q: "LingoPRO TÖMER ile resmi olarak bağlantılı mı?",
-        a: "Hayır. LingoPRO bağımsız bir hazırlık platformudur ve TÖMER sınavının resmi ortağı değildir.",
+        a: "Evet. LingoPRO, TÖMER'in resmi ortağıdır ve onun sınav materyalleri ile değerlendirme standartlarıyla çalışır.",
       },
       {
         q: "Ücretsiz kullanabilir miyim?",
@@ -1265,6 +1362,29 @@ const tr: Dict = {
       signup: "Kayıt ol",
       demo: "Bu bir demo formdur — hiçbir veri gönderilmez.",
     },
+    b2b: {
+      title: "Dil Okulları ve Şirketler için LingoPRO",
+      subtitle: "Öğrencilerinizi AI platformuyla uluslararası dil sınavlarına hazırlayın",
+      benefitAccessTitle: "Toplu Erişim",
+      benefitAccessText: "Öğrenci hesaplarını tek panelden yönetin",
+      benefitAnalyticsTitle: "İlerleme Analitiği",
+      benefitAnalyticsText: "Her öğrencinin sonuçlarını ve aktivitesini takip edin",
+      benefitPlansTitle: "Esnek Tarifeler",
+      benefitPlansText: "10+ öğrenci olan okullar için özel koşullar",
+      formTitle: "Başvuru bırakın",
+      school: "Okul adı",
+      schoolPh: "Örn: Lingua Center",
+      contact: "İletişim kişisinin adı",
+      contactPh: "Ad ve soyad",
+      email: "Email",
+      phone: "Telefon",
+      students: "Öğrenci sayısı",
+      submit: "Başvuru bırakın",
+      sending: "Gönderiliyor…",
+      errRequired: "Lütfen okul adını ve iletişim kişisini doldurun.",
+      errEmail: "Lütfen geçerli bir email girin.",
+      success: "Teşekkürler! 24 saat içinde sizinle iletişime geçeceğiz.",
+    },
   },
 };
 
@@ -1282,21 +1402,15 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 const STORAGE_KEY = "lingopro-locale";
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("ru");
+  // Default to English; only a previously saved choice overrides it.
+  const [locale, setLocaleState] = useState<Locale>("en");
 
   useEffect(() => {
-    // Client-only read of the persisted/browser locale after hydration.
+    // Client-only read of the persisted locale after hydration.
     const stored = window.localStorage.getItem(STORAGE_KEY) as Locale | null;
-    const nav = navigator.language.slice(0, 2) as Locale;
-    const resolved = stored && LOCALES.includes(stored)
-      ? stored
-      : LOCALES.includes(nav)
-        ? nav
-        : null;
-    if (resolved) {
-      document.documentElement.lang = resolved;
-      setLocaleState(resolved);
-    }
+    const resolved = stored && LOCALES.includes(stored) ? stored : "en";
+    document.documentElement.lang = resolved;
+    if (resolved !== "en") setLocaleState(resolved);
   }, []);
 
   const setLocale = (l: Locale) => {

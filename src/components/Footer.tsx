@@ -27,7 +27,7 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold text-[var(--color-foreground)]">{t.footer.product}</h4>
             <ul className="mt-4 flex flex-col gap-2.5 text-sm text-[var(--color-muted)]">
-              <li><a href="#features" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.features}</a></li>
+              <li><Link href="/#platform" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.features}</Link></li>
               <li><a href="#pricing" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.pricing}</a></li>
               <li><Link href="/quiz" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.diagnostic}</Link></li>
               <li><a href="#faq" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.faq}</a></li>
@@ -37,16 +37,16 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold text-[var(--color-foreground)]">{t.footer.company}</h4>
             <ul className="mt-4 flex flex-col gap-2.5 text-sm text-[var(--color-muted)]">
-              <li><a href="#" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.about}</a></li>
-              <li><a href="#" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.contact}</a></li>
+              <li><Link href="/about" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.about}</Link></li>
+              <li><Link href="/contacts" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.contact}</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-sm font-semibold text-[var(--color-foreground)]">{t.footer.legal}</h4>
             <ul className="mt-4 flex flex-col gap-2.5 text-sm text-[var(--color-muted)]">
-              <li><a href="#" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.privacy}</a></li>
-              <li><a href="#" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.terms}</a></li>
+              <li><Link href="/privacy" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.privacy}</Link></li>
+              <li><Link href="/terms" className="transition-colors hover:text-[var(--color-foreground)]">{t.footer.links.terms}</Link></li>
             </ul>
           </div>
         </div>

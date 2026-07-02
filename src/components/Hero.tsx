@@ -16,6 +16,12 @@ export function Hero() {
     tr: `${exam.name} resmi partneri`,
     kk: `${exam.name} ресми серіктесі`,
   });
+  const copy = pick(locale, {
+    ru: { titleLead: "Сдай", titleTail: "с первого раза", subtitle: "AI-диагностика, персональный план и преподаватель 24/7.", platform: "Платформа" },
+    en: { titleLead: "Pass", titleTail: "on your first try", subtitle: "AI diagnostic, a personal plan and a 24/7 tutor.", platform: "Platform" },
+    tr: { titleLead: "", titleTail: "'i ilk denemede geç", subtitle: "AI teşhis, kişisel plan ve 7/24 öğretmen.", platform: "Platform" },
+    kk: { titleLead: "", titleTail: "-ді бірден тапсыр", subtitle: "AI-диагностика, жеке жоспар және 24/7 мұғалім.", platform: "Платформа" },
+  });
 
   return (
     <section className="relative flex min-h-screen items-center px-4 pt-32 pb-16 sm:pt-36">
@@ -40,9 +46,9 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.08 }}
             className="text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl"
           >
-            {t.hero.titleLead}{" "}
-            <span className="text-gradient">{exam.name}</span>{" "}
-            {t.hero.titleTail}
+            {copy.titleLead && <>{copy.titleLead}{" "}</>}
+            <span className="text-gradient">{exam.name}</span>
+            {copy.titleTail.startsWith("'") || copy.titleTail.startsWith("-") ? copy.titleTail : <> {copy.titleTail}</>}
           </motion.h1>
 
           <motion.p
@@ -51,7 +57,7 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.16 }}
             className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-[var(--color-muted)] sm:text-lg lg:mx-0"
           >
-            {t.hero.subtitle}
+            {copy.subtitle}
           </motion.p>
 
           <motion.div
@@ -67,10 +73,10 @@ export function Hero() {
               {t.hero.primary}
             </Link>
             <a
-              href="#how"
+              href="#platform"
               className="btn-ghost w-full rounded-full px-7 py-3.5 text-center text-sm font-medium sm:w-auto"
             >
-              {t.hero.secondary}
+              {copy.platform}
             </a>
           </motion.div>
 
@@ -87,22 +93,6 @@ export function Hero() {
             </span>
             {partnerLabel}
           </motion.p>
-
-          <motion.dl
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.36 }}
-            className="mt-12 grid grid-cols-3 gap-4 border-t border-black/[0.07] pt-6"
-          >
-            {t.hero.stats.map((s, i) => (
-              <div key={s.label} className="text-center lg:text-left">
-                <dt className="text-lg font-bold text-[var(--color-foreground)] sm:text-2xl">
-                  {i === 2 ? exam.name : s.value}
-                </dt>
-                <dd className="mt-1 text-xs leading-snug text-[var(--color-muted)]">{s.label}</dd>
-              </div>
-            ))}
-          </motion.dl>
         </div>
 
         <motion.div

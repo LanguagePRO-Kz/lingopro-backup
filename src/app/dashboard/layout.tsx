@@ -8,8 +8,12 @@ import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { loadPlan, type PackageId } from "@/lib/billing";
+import { loadPlan, savePlan, type PackageId } from "@/lib/billing";
 import { NAV, activeNav, planBadge } from "@/lib/dashboard";
+import { createClient } from "@/lib/supabase/client";
+import { fetchProfile } from "@/lib/profile";
+import { saveResult } from "@/lib/quiz";
+import { saveProgress } from "@/lib/studyplan";
 
 const NOTIF_META = [
   { emoji: "🟣", read: false },
@@ -19,7 +23,7 @@ const NOTIF_META = [
   { emoji: "🔥", read: true },
 ];
 
-const ENROLL_MAILTO = `mailto:info@lingopro.app?subject=${encodeURIComponent(
+const ENROLL_MAILTO = `mailto:lingopro2026@gmail.com?subject=${encodeURIComponent(
   "Запись на экзамен TÖMER",
 )}&body=${encodeURIComponent(
   "Здравствуйте! Хочу записаться на экзамен TÖMER. Мой текущий уровень: ___. Желаемая дата экзамена: ___.",
@@ -82,6 +86,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const [allowed, setAllowed] = useState(false);
   const [name, setName] = useState("студент");
+  const [user, setUser] = useState<{ name: string; email: string; avatar: string | null } | null>(null);
   const [plan, setPlan] = useState<PackageId | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -91,15 +96,42 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const unread = reads.filter((r) => !r).length;
 
   useEffect(() => {
-    const p = loadPlan();
-    if (!p) {
-      router.replace("/pricing");
-      return;
-    }
-    setPlan(p);
-    setAllowed(true);
-    const stored = window.localStorage.getItem("lingopro:name");
-    if (stored) setName(stored);
+    let active = true;
+    (async () => {
+      const supabase = createClient();
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+
+      if (u) {
+        const full = (u.user_metadata?.full_name as string) || u.email || "";
+        if (active) {
+          setUser({ name: full, email: u.email ?? "", avatar: (u.user_metadata?.avatar_url as string) ?? null });
+          if (full) setName(full);
+        }
+        // hydrate the localStorage cache from the persistent Supabase profile
+        const profile = await fetchProfile();
+        if (profile?.plan) savePlan(profile.plan as PackageId);
+        if (profile?.quiz_result) saveResult(profile.quiz_result);
+        if (profile?.plan_progress && Object.keys(profile.plan_progress).length) saveProgress(profile.plan_progress);
+      }
+
+      if (!active) return;
+      const p = loadPlan();
+      if (!p) {
+        router.replace("/pricing");
+        return;
+      }
+      setPlan(p);
+      setAllowed(true);
+      if (!u) {
+        const stored = window.localStorage.getItem("lingopro:name");
+        if (stored) setName(stored);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -114,6 +146,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [notifOpen]);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
 
   if (!allowed) {
     return (
@@ -229,12 +267,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         <div className="rounded-2xl border border-black/[0.06] bg-white p-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-sm font-bold text-white">
-              {name.charAt(0).toUpperCase()}
-            </span>
+            {user?.avatar ? (
+              <span
+                className="h-9 w-9 shrink-0 rounded-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${user.avatar})` }}
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-sm font-bold text-white">
+                {(user?.name || name).charAt(0).toUpperCase()}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[var(--color-foreground)]">{name}</div>
-              <div className="text-xs text-[var(--color-brand)]">{planBadge(plan, locale)}</div>
+              <div className="truncate text-sm font-semibold text-[var(--color-foreground)]">{user?.name || name}</div>
+              <div className="truncate text-xs text-[var(--color-muted)]">{user?.email || planBadge(plan, locale)}</div>
             </div>
             <Link
               href={settings.href}
@@ -246,7 +291,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={handleLogout}
             className="mt-2.5 w-full rounded-xl border border-black/[0.08] py-2 text-xs font-medium text-[var(--color-muted)] transition-colors hover:bg-black/[0.03] hover:text-[var(--color-foreground)]"
           >
             {tx.logout}

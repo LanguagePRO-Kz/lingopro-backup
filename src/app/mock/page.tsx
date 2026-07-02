@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
 import { useExam } from "@/lib/exam-context";
 import { GRAMMAR, VOCAB, READING, READING_TEXT, levelFromScore, type MCQuestion } from "@/lib/quiz";
+import { pluralize } from "@/lib/localized";
 
 type Section = { name: string; minutes: number; questions: MCQuestion[] };
 
@@ -100,15 +101,15 @@ export default function MockPage() {
                   {s.name}
                 </span>
                 <span className="text-xs text-[var(--color-muted)]">
-                  {s.questions.length} вопросов · {s.minutes} мин
+                  {s.questions.length} {pluralize(s.questions.length, "вопрос", "вопроса", "вопросов")} · {s.minutes} мин
                 </span>
               </div>
             ))}
           </div>
 
           <p className="mt-5 text-center text-xs leading-relaxed text-[var(--color-muted)]">
-            Тренировочные задания на основе открытых требований и типовых форматов. LingoPRO — независимый
-            образовательный сервис и не является официальным экзаменационным центром.
+            Тренировочные задания на основе экзаменационных материалов и стандартов оценки TÖMER. LingoPRO —
+            официальный партнёр TÖMER.
           </p>
 
           <button

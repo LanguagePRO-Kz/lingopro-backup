@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useI18n, type Locale } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { LISTENING_TASKS } from "@/data/listening-tasks";
+import type { Level, ReadingTask } from "@/data/types";
+
+const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
 function speakSeq(lines: string[], onEnd?: () => void) {
   if (typeof window === "undefined" || !window.speechSynthesis) {
@@ -20,90 +24,79 @@ function speakSeq(lines: string[], onEnd?: () => void) {
   });
 }
 
-type Q = { q: string; options: string[]; answer: number };
-type Ex = { id: string; title: string; level: string; min: number; lines: string[]; questions: Q[] };
-
-const EXERCISES: Ex[] = [
-  {
-    id: "shop", title: "Mağazada", level: "A2", min: 4,
-    lines: ["— Merhaba, bu gömlek kaç para?", "— İki yüz lira efendim.", "— Biraz pahalı, indirim var mı?", "— Sizin için yüz seksen olsun."],
-    questions: [
-      { q: "Gömlek kaç para?", options: ["100 lira", "180 lira", "200 lira"], answer: 2 },
-      { q: "İndirimli fiyat ne kadar?", options: ["180 lira", "150 lira", "200 lira"], answer: 0 },
-    ],
-  },
-  {
-    id: "cafe", title: "Kafede", level: "A2", min: 4,
-    lines: ["— Ne içmek istersiniz?", "— Bir çay lütfen.", "— Yanında bir şey ister misiniz?", "— Hayır, teşekkürler."],
-    questions: [
-      { q: "Müşteri ne içmek istiyor?", options: ["Kahve", "Çay", "Su"], answer: 1 },
-      { q: "Yanında bir şey istiyor mu?", options: ["Evet", "Hayır", "Bilmiyor"], answer: 1 },
-    ],
-  },
-  {
-    id: "directions", title: "Yol tarifi", level: "B1", min: 5,
-    lines: ["— Affedersiniz, postane nerede?", "— Düz gidin, sonra sağa dönün.", "— Ne kadar uzak?", "— Yaklaşık beş dakika yürüyün."],
-    questions: [
-      { q: "Postane için nereye dönmeli?", options: ["Sola", "Sağa", "Geriye"], answer: 1 },
-      { q: "Ne kadar yürümeli?", options: ["5 dakika", "10 dakika", "15 dakika"], answer: 0 },
-    ],
-  },
-  {
-    id: "phone", title: "Telefon görüşmesi", level: "B1", min: 5,
-    lines: ["— Alo, Ali orada mı?", "— Hayır, şu an dışarıda.", "— Ne zaman döner?", "— Akşam saat yedide döner."],
-    questions: [
-      { q: "Ali şu an nerede?", options: ["Evde", "Dışarıda", "İşte"], answer: 1 },
-      { q: "Ali ne zaman döner?", options: ["Saat 5'te", "Saat 7'de", "Yarın"], answer: 1 },
-    ],
-  },
-  {
-    id: "weather", title: "Hava durumu", level: "B2", min: 6,
-    lines: ["Bugün hava parçalı bulutlu olacak.", "Sıcaklık yirmi beş derece civarında.", "Akşam saatlerinde yağmur bekleniyor.", "Yarın hava daha güneşli olacak."],
-    questions: [
-      { q: "Bugün akşam ne bekleniyor?", options: ["Kar", "Yağmur", "Rüzgâr"], answer: 1 },
-      { q: "Yarın hava nasıl olacak?", options: ["Yağmurlu", "Güneşli", "Bulutlu"], answer: 1 },
-    ],
-  },
-];
-
 const T = {
-  ru: { title: "Тренировка аудирования", sub: "Слушай турецкую речь и отвечай на вопросы", min: "мин", back: "К списку", play: "Прослушать", playing: "Воспроизведение…", showText: "Показать текст", hideText: "Скрыть текст", correct: "Верно!", wrong: "Неверно", answer: "Правильный ответ" },
-  en: { title: "Listening practice", sub: "Listen to Turkish speech and answer", min: "min", back: "To list", play: "Play audio", playing: "Playing…", showText: "Show transcript", hideText: "Hide transcript", correct: "Correct!", wrong: "Wrong", answer: "Correct answer" },
-  tr: { title: "Dinleme pratiği", sub: "Türkçe dinle ve soruları cevapla", min: "dk", back: "Listeye dön", play: "Dinle", playing: "Çalıyor…", showText: "Metni göster", hideText: "Metni gizle", correct: "Doğru!", wrong: "Yanlış", answer: "Doğru cevap" },
-  kk: { title: "Тыңдалым жаттығуы", sub: "Түрік тілін тыңда да жауап бер", min: "мин", back: "Тізімге", play: "Тыңдау", playing: "Ойнатылуда…", showText: "Мәтінді көрсету", hideText: "Мәтінді жасыру", correct: "Дұрыс!", wrong: "Қате", answer: "Дұрыс жауап" },
+  ru: { title: "Тренировка аудирования", sub: "Слушай турецкую речь и отвечай на вопросы", back: "К списку", play: "Прослушать", playing: "Воспроизведение…", showText: "Показать текст", hideText: "Скрыть текст", correct: "Верно!", wrong: "Неверно", answer: "Правильный ответ", explanation: "Объяснение", questions: "вопросов", done: "пройдено", all: "Все", unfinished: "Непройденные", allLevels: "Все уровни", empty: "Нет записей по выбранным фильтрам." },
+  en: { title: "Listening practice", sub: "Listen to Turkish speech and answer", back: "To list", play: "Play audio", playing: "Playing…", showText: "Show transcript", hideText: "Hide transcript", correct: "Correct!", wrong: "Wrong", answer: "Correct answer", explanation: "Explanation", questions: "questions", done: "done", all: "All", unfinished: "Unfinished", allLevels: "All levels", empty: "No recordings match the selected filters." },
+  tr: { title: "Dinleme pratiği", sub: "Türkçe dinle ve soruları cevapla", back: "Listeye dön", play: "Dinle", playing: "Çalıyor…", showText: "Metni göster", hideText: "Metni gizle", correct: "Doğru!", wrong: "Yanlış", answer: "Doğru cevap", explanation: "Açıklama", questions: "soru", done: "tamamlandı", all: "Tümü", unfinished: "Tamamlanmamış", allLevels: "Tüm seviyeler", empty: "Seçilen filtrelere uygun kayıt yok." },
+  kk: { title: "Тыңдалым жаттығуы", sub: "Түрік тілін тыңда да жауап бер", back: "Тізімге", play: "Тыңдау", playing: "Ойнатылуда…", showText: "Мәтінді көрсету", hideText: "Мәтінді жасыру", correct: "Дұрыс!", wrong: "Қате", answer: "Дұрыс жауап", explanation: "Түсіндірме", questions: "сұрақ", done: "орындалды", all: "Барлығы", unfinished: "Орындалмаған", allLevels: "Барлық деңгей", empty: "Таңдалған сүзгілерге сай жазба жоқ." },
 };
 
 export default function ListeningPage() {
   const { locale } = useI18n();
   const c = pick(locale, T);
-  const [active, setActive] = useState<Ex | null>(null);
+  const [level, setLevel] = useState<Level | "all">("all");
+  const [onlyUnfinished, setOnlyUnfinished] = useState(false);
+  const [active, setActive] = useState<ReadingTask | null>(null);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
 
-  if (active) return <Player ex={active} c={c} onBack={() => setActive(null)} />;
+  const isDone = useMemo(
+    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === q.correctAnswer),
+    [answers],
+  );
+  const doneCount = useMemo(() => LISTENING_TASKS.filter(isDone).length, [isDone]);
+
+  const list = useMemo(
+    () =>
+      LISTENING_TASKS.filter((t) => {
+        const byLevel = level === "all" || t.level === level;
+        const byStatus = !onlyUnfinished || !isDone(t);
+        return byLevel && byStatus;
+      }),
+    [level, onlyUnfinished, isDone],
+  );
+
+  if (active) return <Player ex={active} c={c} answers={answers} setAnswers={setAnswers} onBack={() => setActive(null)} />;
 
   return (
     <div>
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
+      <div className="mt-2 text-sm text-[var(--color-muted)]">
+        <span className="font-semibold text-[var(--color-brand)]">{doneCount}</span> / {LISTENING_TASKS.length} {c.done}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <FilterBtn active={level === "all"} onClick={() => setLevel("all")}>{c.allLevels}</FilterBtn>
+        {LEVELS.map((l) => (
+          <FilterBtn key={l} active={level === l} onClick={() => setLevel(l)}>{l}</FilterBtn>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <FilterBtn active={!onlyUnfinished} onClick={() => setOnlyUnfinished(false)}>{c.all}</FilterBtn>
+        <FilterBtn active={onlyUnfinished} onClick={() => setOnlyUnfinished(true)}>{c.unfinished}</FilterBtn>
+      </div>
+
       <div className="mt-5 flex flex-col gap-3">
-        {EXERCISES.map((e) => (
+        {list.map((e) => (
           <button key={e.id} type="button" onClick={() => setActive(e)} className="glass flex items-center justify-between rounded-2xl p-4 text-left transition-shadow hover:shadow-md">
             <span className="flex items-center gap-3">
-              <span className="text-lg">🎧</span>
+              <span className="text-lg">{isDone(e) ? "✅" : "🎧"}</span>
               <span className="text-sm font-medium text-[var(--color-foreground)]">{e.title}</span>
             </span>
-            <span className="text-xs text-[var(--color-muted)]">{e.level} · {e.min} {c.min}</span>
+            <span className="text-xs text-[var(--color-muted)]">{e.level} · {e.questions.length} {c.questions}</span>
           </button>
         ))}
+        {list.length === 0 && <div className="rounded-2xl border border-black/[0.07] bg-white/60 px-5 py-8 text-center text-sm text-[var(--color-muted)]">{c.empty}</div>}
       </div>
     </div>
   );
 }
 
-function Player({ ex, c, onBack }: { ex: Ex; c: (typeof T)[Locale]; onBack: () => void }) {
+function Player({ ex, c, answers, setAnswers, onBack }: { ex: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; onBack: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [showText, setShowText] = useState(false);
-  const [picked, setPicked] = useState<(number | null)[]>(() => Array(ex.questions.length).fill(null));
   const mounted = useRef(true);
+  const lines = useMemo(() => ex.text.split("\n").filter(Boolean), [ex.text]);
 
   useEffect(() => {
     mounted.current = true;
@@ -115,7 +108,7 @@ function Player({ ex, c, onBack }: { ex: Ex; c: (typeof T)[Locale]; onBack: () =
 
   function play() {
     setPlaying(true);
-    speakSeq(ex.lines, () => mounted.current && setPlaying(false));
+    speakSeq(lines, () => mounted.current && setPlaying(false));
   }
 
   return (
@@ -138,33 +131,36 @@ function Player({ ex, c, onBack }: { ex: Ex; c: (typeof T)[Locale]; onBack: () =
         </button>
         {showText && (
           <div className="mt-2 rounded-xl bg-black/[0.03] p-3 text-left text-sm leading-relaxed text-[var(--color-foreground)]">
-            {ex.lines.map((l, i) => <p key={i}>{l}</p>)}
+            {lines.map((l, i) => <p key={i}>{l}</p>)}
           </div>
         )}
       </div>
 
       <div className="mt-5 flex flex-col gap-4">
-        {ex.questions.map((q, qi) => {
-          const sel = picked[qi];
+        {ex.questions.map((q) => {
+          const sel = answers[q.id];
+          const answered = sel !== undefined;
           return (
-            <div key={qi} className="glass rounded-2xl p-5">
-              <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.q}</div>
+            <div key={q.id} className="glass rounded-2xl p-5">
+              <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
               <div className="mt-3 grid gap-2">
                 {q.options.map((opt, oi) => {
-                  const answered = sel !== null;
                   let cls = "border-black/[0.08] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.16]";
-                  if (answered && oi === q.answer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
+                  if (answered && oi === q.correctAnswer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
                   else if (answered && oi === sel) cls = "border-[#dc2626] bg-[#dc2626]/[0.06]";
                   return (
-                    <button key={oi} type="button" disabled={answered} onClick={() => setPicked((p) => p.map((v, j) => (j === qi ? oi : v)))} className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all disabled:cursor-default ${cls}`}>
+                    <button key={oi} type="button" disabled={answered} onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))} className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all disabled:cursor-default ${cls}`}>
                       {opt}
                     </button>
                   );
                 })}
               </div>
-              {sel !== null && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-xs font-medium">
-                  {sel === q.answer ? <span className="text-[#16a34a]">✅ {c.correct}</span> : <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {q.options[q.answer]}</span>}
+              {answered && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-xs">
+                  <div className="font-medium">
+                    {sel === q.correctAnswer ? <span className="text-[#16a34a]">✅ {c.correct}</span> : <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {q.options[q.correctAnswer]}</span>}
+                  </div>
+                  <p className="mt-1 leading-relaxed text-[var(--color-muted)]">{q.explanation}</p>
                 </motion.div>
               )}
             </div>
@@ -172,5 +168,13 @@ function Player({ ex, c, onBack }: { ex: Ex; c: (typeof T)[Locale]; onBack: () =
         })}
       </div>
     </div>
+  );
+}
+
+function FilterBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${active ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)]" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}>
+      {children}
+    </button>
   );
 }

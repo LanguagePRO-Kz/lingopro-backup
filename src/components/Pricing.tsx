@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { PACKAGES, perDay, formatPrice, type PackageId } from "@/lib/billing";
+import type { PackageId } from "@/lib/billing";
+import { currencyFor, fmtMoney, planRow } from "@/lib/pricing";
 import { SectionHeading } from "./ui/SectionHeading";
+import { Gift } from "lucide-react";
 import { PricingTicker } from "./PricingTicker";
 import { StaggerGroup, StaggerItem, Reveal } from "./ui/Reveal";
 
-type Pkg = { id: string; name: string; price: string; note: string; badge?: string };
+type Pkg = { id: PackageId; name: string; note: string; badge?: string };
 type Content = {
   title: string;
   subtitle: string;
@@ -38,9 +40,9 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Статистика и прогресс",
     ],
     packages: [
-      { id: "1m", name: "1 месяц", price: "15 990 ₸", note: "Полный доступ ко всем функциям" },
-      { id: "3m", name: "3 месяца", price: "23 990 ₸", note: "Экономия 40%", badge: "Популярный" },
-      { id: "6m", name: "6 месяцев", price: "33 990 ₸", note: "Максимальная экономия" },
+      { id: "1m", name: "1 месяц", note: "Полный доступ ко всем функциям" },
+      { id: "3m", name: "3 месяца", note: "Экономия 40%", badge: "Популярный" },
+      { id: "6m", name: "6 месяцев", note: "Максимальная экономия" },
     ],
     bannerText: "Пройди бесплатную диагностику и получи скидку на любой пакет",
     bannerStrong: "−30%",
@@ -62,9 +64,9 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Statistics & progress",
     ],
     packages: [
-      { id: "1m", name: "1 month", price: "15 990 ₸", note: "Full access to all features" },
-      { id: "3m", name: "3 months", price: "23 990 ₸", note: "Save 40%", badge: "Popular" },
-      { id: "6m", name: "6 months", price: "33 990 ₸", note: "Maximum savings" },
+      { id: "1m", name: "1 month", note: "Full access to all features" },
+      { id: "3m", name: "3 months", note: "Save 40%", badge: "Popular" },
+      { id: "6m", name: "6 months", note: "Maximum savings" },
     ],
     bannerText: "Take the free diagnostic and get a discount on any package",
     bannerStrong: "−30%",
@@ -86,9 +88,9 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "İstatistik ve ilerleme",
     ],
     packages: [
-      { id: "1m", name: "1 ay", price: "15 990 ₸", note: "Tüm özelliklere tam erişim" },
-      { id: "3m", name: "3 ay", price: "23 990 ₸", note: "%40 tasarruf", badge: "Popüler" },
-      { id: "6m", name: "6 ay", price: "33 990 ₸", note: "Maksimum tasarruf" },
+      { id: "1m", name: "1 ay", note: "Tüm özelliklere tam erişim" },
+      { id: "3m", name: "3 ay", note: "%40 tasarruf", badge: "Popüler" },
+      { id: "6m", name: "6 ay", note: "Maksimum tasarruf" },
     ],
     bannerText: "Ücretsiz tanıyı tamamla ve her pakette indirim kazan",
     bannerStrong: "−30%",
@@ -110,9 +112,9 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Статистика және прогресс",
     ],
     packages: [
-      { id: "1m", name: "1 ай", price: "15 990 ₸", note: "Барлық функцияларға толық қолжетімділік" },
-      { id: "3m", name: "3 ай", price: "23 990 ₸", note: "40% үнемдеу", badge: "Танымал" },
-      { id: "6m", name: "6 ай", price: "33 990 ₸", note: "Максималды үнемдеу" },
+      { id: "1m", name: "1 ай", note: "Барлық функцияларға толық қолжетімділік" },
+      { id: "3m", name: "3 ай", note: "40% үнемдеу", badge: "Танымал" },
+      { id: "6m", name: "6 ай", note: "Максималды үнемдеу" },
     ],
     bannerText: "Тегін диагностикадан өт және кез келген пакетке жеңілдік ал",
     bannerStrong: "−30%",
@@ -123,6 +125,7 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
 export function Pricing() {
   const { locale } = useI18n();
   const c = pick(locale, CONTENT);
+  const cur = currencyFor(locale);
   const pd = pick(locale, {
     ru: { pre: "всего ≈ ", post: " в день" },
     en: { pre: "that's ≈ ", post: " per day" },
@@ -144,7 +147,7 @@ export function Pricing() {
         <StaggerGroup className="mt-8 grid items-stretch gap-6 lg:grid-cols-3">
           {c.packages.map((p) => {
             const popular = !!p.badge;
-            const base = PACKAGES.find((x) => x.id === p.id)?.base ?? 0;
+            const row = planRow(cur, p.id);
             return (
               <StaggerItem key={p.id} className={popular ? "lg:-mt-4" : ""}>
                 <div
@@ -158,11 +161,11 @@ export function Pricing() {
                     </span>
                   )}
                   <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-muted)]">{p.name}</h3>
-                  <div className="mt-2 text-[34px] font-bold leading-none text-[var(--color-foreground)]">{p.price}</div>
+                  <div className="mt-2 text-[34px] font-bold leading-none text-[var(--color-foreground)]">{fmtMoney(cur, row.price)}</div>
                   <div className="my-4 h-px w-full bg-black/[0.07]" />
                   <div className="text-[#374151]">
                     <span className="text-[16px]">{pd.pre}</span>
-                    <span className="text-[20px] font-bold">{formatPrice(perDay(base, p.id as PackageId))} ₸</span>
+                    <span className="text-[20px] font-bold">{fmtMoney(cur, row.perDay)}</span>
                     <span className="text-[16px]">{pd.post}</span>
                   </div>
                   <p className="mt-3 text-sm font-medium text-[var(--color-brand)]">{p.note}</p>
@@ -212,7 +215,7 @@ export function Pricing() {
             <div aria-hidden className="dot-grid absolute inset-0 -z-10 opacity-20" />
             <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">
               <div className="flex shrink-0 items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-2xl">🎁</span>
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-white"><Gift size={24} /></span>
                 <span className="text-[28px] font-extrabold leading-none text-white">{c.bannerStrong}</span>
               </div>
               <p className="flex-1 text-[20px] font-semibold leading-snug text-white">{c.bannerText}</p>
