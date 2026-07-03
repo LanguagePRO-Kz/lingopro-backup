@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { GRAMMAR_TASKS } from "@/data/grammar-tasks";
+import { shuffleOptions } from "@/lib/shuffle";
 import type { Level } from "@/data/types";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
@@ -24,20 +25,30 @@ export default function GrammarPage() {
   const [onlyUnfinished, setOnlyUnfinished] = useState(false);
   const [answers, setAnswers] = useState<Record<string, number>>({});
 
+  // shuffle options once per mount → correct answer lands on varying positions
+  const shuffled = useMemo(() => {
+    const m: Record<string, { options: string[]; answer: number }> = {};
+    for (const q of GRAMMAR_TASKS) {
+      const s = shuffleOptions(q.options, q.correctAnswer);
+      m[q.id] = { options: s.shuffled, answer: s.newCorrectIndex };
+    }
+    return m;
+  }, []);
+
   const doneCount = useMemo(
-    () => GRAMMAR_TASKS.filter((q) => answers[q.id] === q.correctAnswer).length,
-    [answers],
+    () => GRAMMAR_TASKS.filter((q) => answers[q.id] === shuffled[q.id].answer).length,
+    [answers, shuffled],
   );
 
   const filtered = useMemo(
     () =>
       GRAMMAR_TASKS.filter((q) => {
         const byLevel = level === "all" || q.level === level;
-        const correct = answers[q.id] === q.correctAnswer;
+        const correct = answers[q.id] === shuffled[q.id].answer;
         const byStatus = !onlyUnfinished || !correct;
         return byLevel && byStatus;
       }),
-    [level, onlyUnfinished, answers],
+    [level, onlyUnfinished, answers, shuffled],
   );
 
   return (
@@ -78,9 +89,9 @@ export default function GrammarPage() {
               </div>
               <div className="mt-2 text-sm font-medium text-[var(--color-foreground)]">{q.question}</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {q.options.map((opt, oi) => {
+                {shuffled[q.id].options.map((opt, oi) => {
                   let cls = "border-black/[0.1] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.18]";
-                  if (answered && oi === q.correctAnswer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
+                  if (answered && oi === shuffled[q.id].answer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
                   else if (answered && oi === sel) cls = "border-[#dc2626] bg-[#dc2626]/[0.06]";
                   return (
                     <button

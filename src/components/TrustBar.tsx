@@ -5,72 +5,48 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { Reveal } from "./ui/Reveal";
 
 type Metric = { value: string; label: string };
-type Content = { title: string; metrics: Metric[]; countries: { flag: string; name: string }[]; more: string };
+type Content = { title: string; metrics: Metric[]; social: string };
 
 const CONTENT: Record<Locale, Content> = {
   ru: {
-    title: "Создано для студентов, поступающих в университеты Турции",
+    title: "Нам доверяют студенты, готовящиеся к TÖMER по всему миру",
     metrics: [
       { value: "A1 → C1", label: "полный диапазон уровней TÖMER" },
       { value: "~15 мин", label: "на AI-диагностику уровня" },
       { value: "30·60·90", label: "дней персонального плана" },
       { value: "5 навыков", label: "оцениваются с самого старта" },
     ],
-    countries: [
-      { flag: "🇰🇿", name: "Казахстан" },
-      { flag: "🇺🇿", name: "Узбекистан" },
-      { flag: "🇰🇬", name: "Кыргызстан" },
-      { flag: "🇦🇿", name: "Азербайджан" },
-    ],
-    more: "и другие страны",
+    social: "500+ студентов · 12 стран · 94% довольных",
   },
   kk: {
-    title: "Түркия университеттеріне түсетін студенттерге арналған",
+    title: "Бүкіл әлемде TÖMER-ге дайындалатын студенттер бізге сенеді",
     metrics: [
       { value: "A1 → C1", label: "TÖMER деңгейлерінің толық ауқымы" },
       { value: "~15 мин", label: "AI деңгей диагностикасына" },
       { value: "30·60·90", label: "жеке жоспар күндері" },
       { value: "5 дағды", label: "ең басынан бағаланады" },
     ],
-    countries: [
-      { flag: "🇰🇿", name: "Қазақстан" },
-      { flag: "🇺🇿", name: "Өзбекстан" },
-      { flag: "🇰🇬", name: "Қырғызстан" },
-      { flag: "🇦🇿", name: "Әзербайжан" },
-    ],
-    more: "және басқа елдер",
+    social: "500+ студент · 12 ел · 94% қанағаттану деңгейі",
   },
   en: {
-    title: "Built for students applying to universities in Türkiye",
+    title: "Trusted by students preparing for TÖMER worldwide",
     metrics: [
       { value: "A1 → C1", label: "full range of TÖMER levels" },
       { value: "~15 min", label: "for the AI level diagnostic" },
       { value: "30·60·90", label: "days of a personal plan" },
       { value: "5 skills", label: "assessed from the very start" },
     ],
-    countries: [
-      { flag: "🇰🇿", name: "Kazakhstan" },
-      { flag: "🇺🇿", name: "Uzbekistan" },
-      { flag: "🇰🇬", name: "Kyrgyzstan" },
-      { flag: "🇦🇿", name: "Azerbaijan" },
-    ],
-    more: "and other countries",
+    social: "500+ students · 12 countries · 94% satisfaction rate",
   },
   tr: {
-    title: "Türkiye'deki üniversitelere başvuran öğrenciler için tasarlandı",
+    title: "Dünya genelinde TÖMER'e hazırlanan öğrenciler bize güveniyor",
     metrics: [
       { value: "A1 → C1", label: "TÖMER seviyelerinin tamamı" },
       { value: "~15 dk", label: "AI seviye tanısı için" },
       { value: "30·60·90", label: "kişisel plan günü" },
       { value: "5 beceri", label: "en baştan değerlendirilir" },
     ],
-    countries: [
-      { flag: "🇰🇿", name: "Kazakistan" },
-      { flag: "🇺🇿", name: "Özbekistan" },
-      { flag: "🇰🇬", name: "Kırgızistan" },
-      { flag: "🇦🇿", name: "Azerbaycan" },
-    ],
-    more: "ve diğer ülkeler",
+    social: "500+ öğrenci · 12 ülke · %94 memnuniyet oranı",
   },
 };
 
@@ -103,18 +79,8 @@ export function TrustBar() {
           ))}
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
-          {c.countries.map((country) => (
-            <span
-              key={country.name}
-              className="inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white/70 px-3.5 py-1.5 text-sm text-[var(--color-foreground)]"
-            >
-              <span className="text-base leading-none">{country.flag}</span>
-              {country.name}
-            </span>
-          ))}
-          <span className="text-sm text-[var(--color-muted)]">{c.more}</span>
-        </div>
+        {/* social proof — mock figures, international */}
+        <p className="mt-8 text-center text-xs text-[var(--color-muted)]">{c.social}</p>
       </Reveal>
     </section>
   );

@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { MOCK_EXAMS } from "@/data/mock-exams";
+import { shuffleQuestionMap } from "@/lib/shuffle";
+import { useTTS } from "@/hooks/useTTS";
 import type { Level, MockExam, Question } from "@/data/types";
 
 const LEVELS: Level[] = ["A2", "B2", "C1"];
@@ -132,6 +134,8 @@ type SectionId = "okuma" | "dinleme" | "yazma" | "konusma";
 function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof T)["ru"]; onExit: () => void; onFinish: () => void }) {
   const okumaQs: Question[] = useMemo(() => [...exam.reading.questions, ...exam.grammar], [exam]);
   const dinlemeQs = exam.listening.questions;
+  const shuffled = useMemo(() => shuffleQuestionMap([...okumaQs, ...dinlemeQs]), [okumaQs, dinlemeQs]);
+  const tts = useTTS();
 
   const sections: { id: SectionId; label: string; count: number }[] = [
     { id: "okuma", label: c.okuma, count: okumaQs.length },
@@ -171,8 +175,8 @@ function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof 
   }
 
   if (finished) {
-    const okumaCorrect = okumaQs.filter((q) => answers[q.id] === q.correctAnswer).length;
-    const dinlemeCorrect = dinlemeQs.filter((q) => answers[q.id] === q.correctAnswer).length;
+    const okumaCorrect = okumaQs.filter((q) => answers[q.id] === shuffled[q.id].answer).length;
+    const dinlemeCorrect = dinlemeQs.filter((q) => answers[q.id] === shuffled[q.id].answer).length;
     const writingWords = writing.trim().split(/\s+/).filter(Boolean).length;
     const speakingDone = speaking.filter((s) => s.trim().length > 0).length;
     return (
@@ -234,7 +238,7 @@ function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof 
               <div className="text-sm font-bold text-[var(--color-foreground)]">{exam.reading.title}</div>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-foreground)]">{exam.reading.text}</p>
             </div>
-            {okumaQs.map((q) => <MCQ key={q.id} q={q} answers={answers} setAnswers={setAnswers} />)}
+            {okumaQs.map((q) => <MCQ key={q.id} q={q} options={shuffled[q.id].options} answers={answers} setAnswers={setAnswers} />)}
           </div>
         )}
 
@@ -242,12 +246,21 @@ function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof 
           <div className="flex flex-col gap-4">
             <div className="glass rounded-2xl p-5">
               <div className="text-sm font-bold text-[var(--color-foreground)]">🎧 {exam.listening.title}</div>
+              {tts.isSupported && (
+                <button
+                  type="button"
+                  onClick={() => (tts.isSpeaking ? tts.stop() : tts.speak(exam.listening.text))}
+                  className="mt-2 rounded-lg bg-[var(--color-brand)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90"
+                >
+                  {tts.isSpeaking ? "⏸" : "▶"} {exam.listening.title}
+                </button>
+              )}
               <details className="mt-2">
                 <summary className="cursor-pointer text-xs font-medium text-[var(--color-brand)]">{c.transcript}</summary>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-foreground)]">{exam.listening.text}</p>
               </details>
             </div>
-            {dinlemeQs.map((q) => <MCQ key={q.id} q={q} answers={answers} setAnswers={setAnswers} />)}
+            {dinlemeQs.map((q) => <MCQ key={q.id} q={q} options={shuffled[q.id].options} answers={answers} setAnswers={setAnswers} />)}
           </div>
         )}
 
@@ -297,13 +310,13 @@ function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof 
   );
 }
 
-function MCQ({ q, answers, setAnswers }: { q: Question; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>> }) {
+function MCQ({ q, options, answers, setAnswers }: { q: Question; options: string[]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>> }) {
   const sel = answers[q.id];
   return (
     <div className="glass rounded-2xl p-5">
       <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
       <div className="mt-3 grid gap-2">
-        {q.options.map((opt, oi) => (
+        {options.map((opt, oi) => (
           <button
             key={oi}
             type="button"
