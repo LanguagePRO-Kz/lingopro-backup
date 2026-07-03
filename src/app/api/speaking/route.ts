@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -65,6 +66,11 @@ async function callClaude(system: string, messages: ChatMsg[], key: string): Pro
 }
 
 export async function POST(req: Request) {
+  // throttle abusive / runaway clients (30 req/min per IP)
+  if (!checkRateLimit(`speaking:${clientKey(req)}`, 30, 60_000)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
+
   let body: { messages?: ChatMsg[]; mode?: Mode; kind?: Kind };
   try {
     body = await req.json();

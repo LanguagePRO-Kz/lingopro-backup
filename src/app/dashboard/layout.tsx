@@ -12,8 +12,9 @@ import { loadPlan, savePlan, type PackageId } from "@/lib/billing";
 import { NAV, activeNav, planBadge } from "@/lib/dashboard";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
-import { saveResult } from "@/lib/quiz";
+import { saveResult, loadResult } from "@/lib/quiz";
 import { saveProgress } from "@/lib/studyplan";
+import { peekToday } from "@/lib/daily-plan";
 
 const NOTIF_META = [
   { emoji: "🟣", read: false },
@@ -95,6 +96,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const notifRef = useRef<HTMLDivElement>(null);
   const unread = reads.filter((r) => !r).length;
 
+  // today's daily-plan progress → sidebar "Home" indicator
+  const [daily, setDaily] = useState<{ completed: number; total: number } | null>(null);
+  useEffect(() => {
+    let active = true;
+    peekToday().then((d) => {
+      if (active && d) setDaily(d);
+    });
+    function onUpdate(e: Event) {
+      const detail = (e as CustomEvent<{ completed: number; total: number }>).detail;
+      if (detail) setDaily(detail);
+    }
+    window.addEventListener("lp:daily-updated", onUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("lp:daily-updated", onUpdate);
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -103,6 +122,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         data: { user: u },
       } = await supabase.auth.getUser();
 
+      let profile: Awaited<ReturnType<typeof fetchProfile>> = null;
       if (u) {
         const full = (u.user_metadata?.full_name as string) || u.email || "";
         if (active) {
@@ -110,19 +130,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           if (full) setName(full);
         }
         // hydrate the localStorage cache from the persistent Supabase profile
-        const profile = await fetchProfile();
+        profile = await fetchProfile();
         if (profile?.plan) savePlan(profile.plan as PackageId);
         if (profile?.quiz_result) saveResult(profile.quiz_result);
         if (profile?.plan_progress && Object.keys(profile.plan_progress).length) saveProgress(profile.plan_progress);
       }
 
       if (!active) return;
-      const p = loadPlan();
-      if (!p) {
+
+      // funnel gating (moved out of middleware to avoid a per-request DB query).
+      // The DB profile is the source of truth, but we fall back to the
+      // localStorage cache so users whose quiz/plan only lives locally (older
+      // sessions, DB write skipped) aren't wrongly bounced out of the dashboard.
+      const hasQuiz = !!profile?.quiz_result || !!loadResult();
+      const planId = (profile?.plan as PackageId | null) ?? loadPlan();
+      if (!hasQuiz) {
+        router.replace("/quiz");
+        return;
+      }
+      if (!planId) {
         router.replace("/pricing");
         return;
       }
-      setPlan(p);
+      setPlan(planId);
       setAllowed(true);
       if (!u) {
         const stored = window.localStorage.getItem("lingopro:name");
@@ -194,6 +224,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span className="ml-auto rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)] px-1.5 py-0.5 text-[9px] font-bold text-white">
                   {tx.new}
                 </span>
+              )}
+              {n.id === "home" && daily && (
+                daily.completed >= daily.total ? (
+                  <span className="ml-auto text-sm font-bold text-[#16a34a]" aria-label="daily plan done">✓</span>
+                ) : (
+                  <span
+                    className={`ml-auto h-2.5 w-2.5 rounded-full ${daily.completed === 0 ? "bg-[#ef4444]" : "bg-[#f59e0b]"}`}
+                    aria-label="daily plan progress"
+                  />
+                )
               )}
             </Link>
           );

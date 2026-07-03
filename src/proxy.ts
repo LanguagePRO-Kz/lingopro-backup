@@ -1,7 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+/**
+ * Runs on every /dashboard request (Next 16 renamed Middleware → Proxy). Kept
+ * intentionally light for scale: it only refreshes the auth session and blocks
+ * anonymous access. The funnel gating (quiz_result → /quiz, plan → /pricing)
+ * lives in the dashboard layout so we don't hit the `profiles` table on every
+ * navigation.
+ */
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -23,38 +30,15 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  // Session refresh + anonymous gate only — no DB query.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-
-  // not signed in → send to login
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
-  }
-
-  // signed in → funnel based on the user's profile state
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("quiz_result, plan")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  // if the profiles table is unavailable, don't lock the user out
-  if (!error) {
-    if (!profile?.quiz_result && path !== "/quiz" && !path.startsWith("/quiz/")) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/quiz";
-      return NextResponse.redirect(url);
-    }
-    if (profile?.quiz_result && !profile?.plan && path !== "/pricing") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/pricing";
-      return NextResponse.redirect(url);
-    }
   }
 
   return supabaseResponse;
