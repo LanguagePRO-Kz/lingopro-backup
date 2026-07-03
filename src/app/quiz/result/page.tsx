@@ -7,6 +7,7 @@ import { ResultView } from "@/components/ResultView";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, saveProfileResult } from "@/lib/profile";
 import { loadResult, saveResult, type QuizResult } from "@/lib/quiz";
+import { awardXp, XP } from "@/lib/xp";
 
 /**
  * Post-diagnostic result page. Requires auth (→ /login otherwise). The
@@ -42,7 +43,11 @@ export default function QuizResultPage() {
         await saveProfileResult(local);
       }
 
-      if (final) saveResult(final); // keep the fast localStorage cache warm
+      if (final) {
+        saveResult(final); // keep the fast localStorage cache warm
+        // one-time XP for completing the diagnostic (dedup_key → never doubles)
+        void awardXp("diagnostic", XP.DIAGNOSTIC, { dedupKey: "diagnostic", metadata: { level: final.level } });
+      }
 
       if (cancelled) return;
       setResult(final);

@@ -5,7 +5,11 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { LISTENING_TASKS } from "@/data/listening-tasks";
+import { shuffleQuestionMap } from "@/lib/shuffle";
+import { awardXp, XP } from "@/lib/xp";
 import type { Level, ReadingTask } from "@/data/types";
+
+type Shuffled = Record<string, { options: string[]; answer: number }>;
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -38,12 +42,24 @@ export default function ListeningPage() {
   const [onlyUnfinished, setOnlyUnfinished] = useState(false);
   const [active, setActive] = useState<ReadingTask | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const shuffled = useMemo(() => shuffleQuestionMap(LISTENING_TASKS.flatMap((t) => t.questions)), []);
 
   const isDone = useMemo(
-    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === q.correctAnswer),
-    [answers],
+    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === shuffled[q.id].answer),
+    [answers, shuffled],
   );
   const doneCount = useMemo(() => LISTENING_TASKS.filter(isDone).length, [isDone]);
+
+  // award XP once per listening exercise the first time it's fully answered correctly
+  const awarded = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const t of LISTENING_TASKS) {
+      if (!awarded.current.has(t.id) && isDone(t)) {
+        awarded.current.add(t.id);
+        void awardXp("listening_test", XP.LISTENING_TEST, { dedupKey: `listening:${t.id}`, metadata: { taskId: t.id, level: t.level } });
+      }
+    }
+  }, [isDone]);
 
   const list = useMemo(
     () =>
@@ -55,7 +71,7 @@ export default function ListeningPage() {
     [level, onlyUnfinished, isDone],
   );
 
-  if (active) return <Player ex={active} c={c} answers={answers} setAnswers={setAnswers} onBack={() => setActive(null)} />;
+  if (active) return <Player ex={active} c={c} answers={answers} setAnswers={setAnswers} shuffled={shuffled} onBack={() => setActive(null)} />;
 
   return (
     <div>
@@ -92,7 +108,7 @@ export default function ListeningPage() {
   );
 }
 
-function Player({ ex, c, answers, setAnswers, onBack }: { ex: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; onBack: () => void }) {
+function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; shuffled: Shuffled; onBack: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [showText, setShowText] = useState(false);
   const mounted = useRef(true);
@@ -144,9 +160,9 @@ function Player({ ex, c, answers, setAnswers, onBack }: { ex: ReadingTask; c: (t
             <div key={q.id} className="glass rounded-2xl p-5">
               <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
               <div className="mt-3 grid gap-2">
-                {q.options.map((opt, oi) => {
+                {shuffled[q.id].options.map((opt, oi) => {
                   let cls = "border-black/[0.08] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.16]";
-                  if (answered && oi === q.correctAnswer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
+                  if (answered && oi === shuffled[q.id].answer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
                   else if (answered && oi === sel) cls = "border-[#dc2626] bg-[#dc2626]/[0.06]";
                   return (
                     <button key={oi} type="button" disabled={answered} onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))} className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all disabled:cursor-default ${cls}`}>
@@ -158,7 +174,7 @@ function Player({ ex, c, answers, setAnswers, onBack }: { ex: ReadingTask; c: (t
               {answered && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-xs">
                   <div className="font-medium">
-                    {sel === q.correctAnswer ? <span className="text-[#16a34a]">✅ {c.correct}</span> : <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {q.options[q.correctAnswer]}</span>}
+                    {sel === shuffled[q.id].answer ? <span className="text-[#16a34a]">✅ {c.correct}</span> : <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {shuffled[q.id].options[shuffled[q.id].answer]}</span>}
                   </div>
                   <p className="mt-1 leading-relaxed text-[var(--color-muted)]">{q.explanation}</p>
                 </motion.div>

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { WRITING_TASKS } from "@/data/writing-tasks";
+import { awardXp, XP } from "@/lib/xp";
 import type { Level, WritingTask } from "@/data/types";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
@@ -90,7 +91,11 @@ export default function WritingPage() {
 
   function submit() {
     setSubmitted(true);
-    if (active) setDoneIds((s) => new Set(s).add(active.id));
+    if (active) {
+      setDoneIds((s) => new Set(s).add(active.id));
+      // XP once per writing task
+      void awardXp("writing_test", XP.WRITING_TEST, { dedupKey: `writing:${active.id}`, metadata: { taskId: active.id, level: active.level } });
+    }
   }
 
   if (!active) {

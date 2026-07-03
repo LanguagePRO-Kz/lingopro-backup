@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { awardXp, XP } from "@/lib/xp";
 
 /* ----------------------------- Web Speech API ----------------------------- */
 type SRResult = { 0: { transcript: string }; isFinal: boolean };
@@ -365,6 +366,8 @@ export default function SpeakingPage() {
     } catch { /* ignore */ }
     setSummary({ text, mins, msgs: userMsgs, corr, words });
     setEnding(false);
+    // XP for a real completed speaking session (each genuine session counts)
+    if (userMsgs >= 2) void awardXp("speaking_test", XP.SPEAKING_TEST, { metadata: { mode, msgs: userMsgs } });
   }
 
   function resetToModal() {

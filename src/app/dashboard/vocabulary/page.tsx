@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { VOCABULARY } from "@/data/vocabulary";
+import { awardXp, XP } from "@/lib/xp";
 
 type Status = "learned" | "review" | "new";
 type Level = "A1" | "A2" | "B1" | "B2" | "C1";
@@ -115,6 +116,8 @@ export default function VocabularyPage() {
   function addWord() {
     if (!newW.trim() || !newT.trim()) return;
     setWords((prev) => [{ w: newW.trim(), ru: newT.trim(), en: newT.trim(), kk: newT.trim(), level: "A1", status: "new", source: "manual" }, ...prev]);
+    // XP for adding a word to the dictionary (each word counts)
+    void awardXp("vocab_word", XP.VOCAB_WORD, { metadata: { word: newW.trim() } });
     setNewW("");
     setNewT("");
     setAdding(false);

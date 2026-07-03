@@ -1,213 +1,441 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-
-const TASKS = [
-  { emoji: "🎧", typeKey: "listening", href: "/dashboard/listening", titleKey: 0 },
-  { emoji: "📖", typeKey: "reading", href: "/dashboard/reading", titleKey: 1 },
-  { emoji: "✍️", typeKey: "writing", href: "/dashboard/writing", titleKey: 2 },
-  { emoji: "🎤", typeKey: "speaking", href: "/dashboard/speaking", titleKey: 3 },
-  { emoji: "📚", typeKey: "vocab", href: "/dashboard/vocabulary", titleKey: 4 },
-] as const;
+import { saveProfileIntensity, type Intensity } from "@/lib/profile";
+import { LEVELS, type Level } from "@/data/types";
+import { IntensityModal } from "@/components/IntensityModal";
+import { TaskModal } from "@/components/TaskModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { awardXp, awardSkillTest, XP } from "@/lib/xp";
+import {
+  loadDashboardData,
+  loadDailyState,
+  saveDay,
+  saveTaskResult,
+  SKILL_META,
+  skillLabel,
+  taskDescription,
+  minutesLabel,
+  intensityLabel,
+  contentLevel,
+  computeStreak,
+  weekCalendar,
+  totalTasksDone,
+  wordsLearned,
+  lastActivity,
+  getMotivation,
+  phraseOfDay,
+  type DayRow,
+  type DailyTask,
+} from "@/lib/daily-plan";
 
 const T = {
   ru: {
-    hi: "Привет", day: "День 12 подготовки к TÖMER",
-    todayTitle: "Сегодняшняя практика", todayDone: "выполнено", start: "Начать",
-    types: { listening: "Аудирование · Диалог A2", reading: "Чтение · Текст A2", writing: "Письмо · Задание A2", speaking: "Говорение · Тема A2", vocab: "Повторение слов · 10 новых слов" },
-    titles: ["Разговор в магазине", "Письмо от друга", "Напиши о своём дне", "Расскажи о семье", "Тема: Еда и напитки"],
-    goal: "Твоя цель", goalHint: "Пройди тесты и AI отметит прогресс", now: "сейчас", target: "цель",
-    scores: "Баллы по навыкам", scoresHint: "Баллы появятся после первых тестов",
-    recent: "Последние тесты", recentHint: "Пройдите первый пробный тест, чтобы увидеть результаты", startPractice: "Начать практику",
-    overview: "Обзор прогресса", weekProgress: "Прогресс за неделю", noWeekData: "Нет данных за эту неделю",
-    accuracy: "Точность по секциям", noAccData: "Пройдите тесты, чтобы увидеть статистику",
-    legend: { reading: "Чтение", listening: "Аудирование", writing: "Письмо", speaking: "Спикинг", goal: "Цель" },
+    hi: "Привет", planTitle: "План на сегодня", change: "Изменить", done: "выполнено", remaining: "осталось",
+    start: "Начать →", doneLabel: "Выполнено", allDone: "🎉 Отлично! План на сегодня выполнен!",
+    streakTitle: "дней подряд", streakHint: "Выполняйте план каждый день!", week: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+    myProgress: "Мой прогресс", levelCard: "Уровень", statsCard: "Статистика",
+    statTasks: "Заданий выполнено", statWords: "Слов выучено", statDays: "Дней подряд",
+    continueTitle: "План выполнен! Хочешь продолжить?", localeCode: "ru-RU",
+    cont: { grammar: "Грамматика", reading: "Чтение", listening: "Аудирование", mock: "Пробный TÖMER" },
   },
   en: {
-    hi: "Hi", day: "Day 12 of TÖMER prep",
-    todayTitle: "Today's practice", todayDone: "done", start: "Start",
-    types: { listening: "Listening · A2 dialogue", reading: "Reading · A2 text", writing: "Writing · A2 task", speaking: "Speaking · A2 topic", vocab: "Word review · 10 new words" },
-    titles: ["A conversation at a shop", "A letter from a friend", "Write about your day", "Tell about your family", "Topic: Food & drinks"],
-    goal: "Your goal", goalHint: "Take tests and AI will track your progress", now: "now", target: "goal",
-    scores: "Skill scores", scoresHint: "Scores appear after your first tests",
-    recent: "Recent tests", recentHint: "Take your first mock test to see results", startPractice: "Start practice",
-    overview: "Progress overview", weekProgress: "Weekly progress", noWeekData: "No data for this week",
-    accuracy: "Accuracy by section", noAccData: "Take tests to see your stats",
-    legend: { reading: "Reading", listening: "Listening", writing: "Writing", speaking: "Speaking", goal: "Goal" },
+    hi: "Hi", planTitle: "Today's plan", change: "Change", done: "done", remaining: "left",
+    start: "Start →", doneLabel: "Done", allDone: "🎉 Great job! Today's plan is complete!",
+    streakTitle: "days in a row", streakHint: "Complete the plan every day!", week: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    myProgress: "My progress", levelCard: "Level", statsCard: "Statistics",
+    statTasks: "Tasks completed", statWords: "Words learned", statDays: "Days in a row",
+    continueTitle: "Plan complete! Want to keep going?", localeCode: "en-US",
+    cont: { grammar: "Grammar", reading: "Reading", listening: "Listening", mock: "Mock TÖMER" },
   },
   tr: {
-    hi: "Merhaba", day: "TÖMER hazırlığının 12. günü",
-    todayTitle: "Bugünün pratiği", todayDone: "tamamlandı", start: "Başla",
-    types: { listening: "Dinleme · A2 diyalog", reading: "Okuma · A2 metin", writing: "Yazma · A2 görev", speaking: "Konuşma · A2 konu", vocab: "Kelime tekrarı · 10 yeni kelime" },
-    titles: ["Mağazada konuşma", "Arkadaştan mektup", "Gününü yaz", "Aileni anlat", "Konu: Yiyecek ve içecek"],
-    goal: "Hedefin", goalHint: "Test çöz, AI ilerlemeni takip etsin", now: "şimdi", target: "hedef",
-    scores: "Beceri puanları", scoresHint: "Puanlar ilk testlerden sonra görünür",
-    recent: "Son testler", recentHint: "Sonuçları görmek için ilk deneme testini çöz", startPractice: "Pratiğe başla",
-    overview: "İlerleme özeti", weekProgress: "Haftalık ilerleme", noWeekData: "Bu hafta için veri yok",
-    accuracy: "Bölüm doğruluğu", noAccData: "İstatistik için test çöz",
-    legend: { reading: "Okuma", listening: "Dinleme", writing: "Yazma", speaking: "Konuşma", goal: "Hedef" },
+    hi: "Merhaba", planTitle: "Bugünün planı", change: "Değiştir", done: "tamamlandı", remaining: "kaldı",
+    start: "Başla →", doneLabel: "Tamamlandı", allDone: "🎉 Harika! Bugünün planı tamamlandı!",
+    streakTitle: "gün üst üste", streakHint: "Planı her gün tamamla!", week: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"],
+    myProgress: "İlerlemem", levelCard: "Seviye", statsCard: "İstatistik",
+    statTasks: "Tamamlanan görev", statWords: "Öğrenilen kelime", statDays: "Gün üst üste",
+    continueTitle: "Plan tamam! Devam etmek ister misin?", localeCode: "tr-TR",
+    cont: { grammar: "Dil bilgisi", reading: "Okuma", listening: "Dinleme", mock: "Deneme TÖMER" },
   },
   kk: {
-    hi: "Сәлем", day: "TÖMER дайындығының 12-күні",
-    todayTitle: "Бүгінгі практика", todayDone: "орындалды", start: "Бастау",
-    types: { listening: "Тыңдалым · A2 диалог", reading: "Оқу · A2 мәтін", writing: "Жазу · A2 тапсырма", speaking: "Сөйлеу · A2 тақырып", vocab: "Сөз қайталау · 10 жаңа сөз" },
-    titles: ["Дүкендегі әңгіме", "Достан хат", "Күнің туралы жаз", "Отбасың туралы айт", "Тақырып: Тағам мен сусын"],
-    goal: "Сенің мақсатың", goalHint: "Тест тапсыр, AI прогресті белгілейді", now: "қазір", target: "мақсат",
-    scores: "Дағды баллдары", scoresHint: "Баллдар алғашқы тесттерден кейін шығады",
-    recent: "Соңғы тесттер", recentHint: "Нәтижені көру үшін алғашқы сынақ тестін тапсыр", startPractice: "Практиканы бастау",
-    overview: "Прогресс шолуы", weekProgress: "Апталық прогресс", noWeekData: "Бұл аптаға дерек жоқ",
-    accuracy: "Бөлім бойынша дәлдік", noAccData: "Статистика үшін тест тапсыр",
-    legend: { reading: "Оқу", listening: "Тыңдалым", writing: "Жазу", speaking: "Сөйлеу", goal: "Мақсат" },
+    hi: "Сәлем", planTitle: "Бүгінгі жоспар", change: "Өзгерту", done: "орындалды", remaining: "қалды",
+    start: "Бастау →", doneLabel: "Орындалды", allDone: "🎉 Тамаша! Бүгінгі жоспар орындалды!",
+    streakTitle: "күн қатарынан", streakHint: "Жоспарды күн сайын орында!", week: ["Дс", "Сс", "Ср", "Бс", "Жм", "Сб", "Жс"],
+    myProgress: "Менің прогресім", levelCard: "Деңгей", statsCard: "Статистика",
+    statTasks: "Орындалған тапсырма", statWords: "Үйренілген сөз", statDays: "Күн қатарынан",
+    continueTitle: "Жоспар орындалды! Жалғастырғың келе ме?", localeCode: "kk-KZ",
+    cont: { grammar: "Грамматика", reading: "Оқу", listening: "Тыңдалым", mock: "Сынақ TÖMER" },
   },
 };
 
-const SKILL_DOTS = [
-  { emoji: "📖", key: "reading", color: "#3b82f6" },
-  { emoji: "🎧", key: "listening", color: "#ef4444" },
-  { emoji: "✍️", key: "writing", color: "#f59e0b" },
-  { emoji: "🎤", key: "speaking", color: "#eab308" },
-  { emoji: "📝", key: "grammar", color: "#6d5bff" },
+const CONTINUE = [
+  { key: "grammar", href: "/dashboard/grammar", emoji: "📝" },
+  { key: "reading", href: "/dashboard/reading", emoji: "📖" },
+  { key: "listening", href: "/dashboard/listening", emoji: "🎧" },
+  { key: "mock", href: "/dashboard/mock", emoji: "🧪" },
 ] as const;
 
 export default function DashboardHome() {
   const { locale } = useI18n();
   const c = pick(locale, T);
+
   const [name, setName] = useState("студент");
-  const [done, setDone] = useState<boolean[]>([false, false, false, false, false]);
+  const [levelRaw, setLevelRaw] = useState("A2");
+  const [level, setLevel] = useState<Level>("A2");
+  const [dayNumber, setDayNumber] = useState(1);
+  const [intensity, setIntensity] = useState<Intensity | null>(null);
+  const [today, setToday] = useState<DayRow | null>(null);
+  const [history, setHistory] = useState<DayRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showIntensity, setShowIntensity] = useState(false);
+  const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lingopro:name");
     if (stored) setName(stored);
   }, []);
 
-  const doneCount = done.filter(Boolean).length;
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      // one getUser + one Promise.all(profile, history) — no duplicate queries
+      const data = await loadDashboardData(locale);
+      if (!active) return;
+      setLevelRaw(data.levelRaw);
+      setLevel(data.level);
+      setDayNumber(data.dayNumber);
+
+      if (!data.intensity) {
+        setLoading(false);
+        setShowIntensity(true); // first visit → choose intensity
+        return;
+      }
+      setIntensity(data.intensity);
+      setToday(data.today);
+      setHistory(data.history);
+      setLoading(false);
+      if (data.today) {
+        window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: data.today.completedCount, total: data.today.total } }));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function chooseIntensity(i: Intensity) {
+    const firstTime = !intensity;
+    setIntensity(i);
+    setShowIntensity(false);
+    void saveProfileIntensity(i);
+    if (firstTime) {
+      setLoading(true);
+      const { today: t, history: h } = await loadDailyState(level, i, dayNumber, locale);
+      setToday(t);
+      setHistory(h);
+      setLoading(false);
+      window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: t.completedCount, total: t.total } }));
+    }
+    // if changed later, the new intensity applies to the next day's plan
+  }
+
+  function completeTask(task: DailyTask, result: { score: number; maxScore: number; answers: unknown }) {
+    setActiveTask(null);
+    if (!today) return;
+    const tasks = today.tasks.map((t) => (t.id === task.id ? { ...t, completed: true } : t));
+    const completedCount = tasks.filter((t) => t.completed).length;
+    const wasAll = today.completedCount >= today.total;
+    const row: DayRow = { ...today, tasks, completedCount };
+    setToday(row);
+    setHistory((h) => h.map((r) => (r.date === row.date ? row : r)));
+    void saveDay(row);
+    void saveTaskResult({ taskId: task.taskId, skill: task.skill, score: result.score, maxScore: result.maxScore, answers: result.answers });
+
+    // XP for the task itself (no cap — extra work beyond the plan still earns full XP)
+    if (task.skill === "vocabulary") {
+      const words = result.maxScore || task.count || 0;
+      if (words > 0) void awardXp("vocab_word", XP.VOCAB_WORD * words, { metadata: { taskId: task.taskId, words } });
+    } else {
+      void awardSkillTest(task.skill, { taskId: task.taskId });
+    }
+
+    window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: completedCount, total: row.total } }));
+    if (!wasAll && completedCount >= row.total) {
+      setCelebrate(true);
+      setTimeout(() => setCelebrate(false), 2600);
+      // bonuses — once per day (dedup_key makes a repeat a no-op)
+      void awardXp("daily_plan_bonus", XP.DAILY_PLAN_BONUS, { dedupKey: `daily_plan:${row.date}` });
+      void awardXp("streak_day_bonus", XP.STREAK_DAY_BONUS, { dedupKey: `streak_day:${row.date}` });
+    }
+  }
+
+  const dateStr = useMemo(
+    () => new Intl.DateTimeFormat(c.localeCode, { day: "numeric", month: "long", weekday: "long" }).format(new Date()),
+    [c.localeCode],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin-slow rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
+      </div>
+    );
+  }
+
+  // first visit — only the intensity modal
+  if (!today || !intensity) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
+        <IntensityModal open={showIntensity} current={intensity} onSelect={chooseIntensity} />
+      </div>
+    );
+  }
+
+  const { completedCount, total } = today;
+  const allDone = completedCount >= total;
+  const pct = Math.round((completedCount / total) * 100);
+  const totalMin = today.tasks.reduce((s, t) => s + (t.estimatedMinutes || 10), 0);
+  const remainingMin = today.tasks.filter((t) => !t.completed).reduce((s, t) => s + (t.estimatedMinutes || 10), 0);
+  const streak = computeStreak(history);
+  const week = weekCalendar(history);
+  const lvl = contentLevel(levelRaw);
+  const lvlPct = Math.round((LEVELS.indexOf(lvl) / (LEVELS.length - 1)) * 100);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
-      <p className="mt-1 text-sm text-[var(--color-muted)]">{c.day}</p>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* ---- left: daily practice ---- */}
-        <div>
-          <div className="rounded-3xl bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold">{c.todayTitle}</h2>
-                <p className="mt-0.5 text-sm text-white/80">{doneCount}/5 {c.todayDone}</p>
-              </div>
-              <Link href={TASKS[doneCount] ? TASKS[doneCount].href : "/dashboard/listening"} className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[var(--color-brand)]">
-                ▶ {c.start}
-              </Link>
-            </div>
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/25">
-              <motion.div className="h-full rounded-full bg-white" animate={{ width: `${(doneCount / 5) * 100}%` }} transition={{ duration: 0.5 }} />
-            </div>
+    <div className="relative">
+      {/* confetti */}
+      <AnimatePresence>
+        {celebrate && (
+          <div className="pointer-events-none fixed inset-0 z-[80] overflow-hidden">
+            {Array.from({ length: 28 }).map((_, i) => {
+              const left = (i * 37) % 100;
+              const delay = (i % 7) * 0.08;
+              const emoji = ["🎉", "✨", "🎊", "⭐️", "🔥"][i % 5];
+              return (
+                <motion.span
+                  key={i}
+                  className="absolute text-xl"
+                  style={{ left: `${left}%`, top: "-5%" }}
+                  initial={{ y: "-10vh", opacity: 1, rotate: 0 }}
+                  animate={{ y: "110vh", opacity: [1, 1, 0], rotate: 360 }}
+                  transition={{ duration: 2.2, delay, ease: "easeIn" }}
+                >
+                  {emoji}
+                </motion.span>
+              );
+            })}
           </div>
+        )}
+      </AnimatePresence>
 
-          <div className="mt-4 flex flex-col gap-2.5">
-            {TASKS.map((task, i) => (
-              <div key={task.typeKey} className="glass flex items-center gap-3 rounded-2xl p-3.5">
-                <button
-                  type="button"
-                  onClick={() => setDone((d) => d.map((v, j) => (j === i ? !v : v)))}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs transition-colors ${
-                    done[i] ? "border-[var(--color-brand-2)] bg-[var(--color-brand-2)] text-white" : "border-black/[0.2] text-transparent"
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
+
+      {/* ===== PLAN ===== */}
+      <div className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--color-foreground)]">📋 {c.planTitle}</h2>
+            <p className="mt-0.5 text-sm capitalize text-[var(--color-muted)]">{dateStr}</p>
+          </div>
+          <div className="text-right text-sm">
+            <div className="font-medium text-[var(--color-foreground)]">
+              {minutesLabel(totalMin, locale)} · {intensityLabel(intensity, locale)}
+            </div>
+            <button type="button" onClick={() => setShowIntensity(true)} className="text-xs font-medium text-[var(--color-brand)] hover:underline">
+              {c.change}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="font-semibold text-[var(--color-foreground)]">{completedCount}/{total} {c.done}</span>
+          {!allDone && <span className="text-[var(--color-muted)]">{minutesLabel(remainingMin, locale)} {c.remaining}</span>}
+        </div>
+        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: allDone ? "linear-gradient(to right,#16a34a,#22c55e)" : "linear-gradient(to right,var(--color-brand),var(--color-brand-2))" }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+
+        {allDone && (
+          <div className="mt-4 rounded-2xl bg-[#16a34a]/[0.08] px-4 py-3 text-center text-sm font-semibold text-[#16a34a]">
+            {c.allDone}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col gap-2.5">
+          {today.tasks.map((task) => {
+            const meta = SKILL_META[task.skill];
+            return (
+              <div
+                key={task.id}
+                className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
+                  task.completed ? "border-[#16a34a]/25 bg-[#16a34a]/[0.05]" : "border-black/[0.07] bg-white"
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs ${
+                    task.completed ? "bg-[#16a34a] text-white" : "border border-black/[0.2] text-transparent"
                   }`}
                 >
                   ✓
-                </button>
-                <span className="text-xl">{task.emoji}</span>
+                </span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg" style={{ background: `${meta.color}1a`, color: meta.color }}>
+                  {meta.emoji}
+                </span>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-xs text-[var(--color-muted)] ${done[i] ? "line-through" : ""}`}>{c.types[task.typeKey]}</div>
-                  <div className={`text-sm font-medium text-[var(--color-foreground)] ${done[i] ? "line-through opacity-50" : ""}`}>{c.titles[task.titleKey]}</div>
+                  <div className={`flex flex-wrap items-center gap-1.5 text-sm font-medium text-[var(--color-foreground)] ${task.completed ? "line-through opacity-60" : ""}`}>
+                    {skillLabel(task.skill, locale)}
+                    <span className="text-[var(--color-muted)]">· {taskDescription(task, locale)}</span>
+                    {task.skill !== "vocabulary" && task.skill !== "writing" && (
+                      <span className="rounded-full bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-brand-2)]">{task.level}</span>
+                    )}
+                    <span className="text-[11px] text-[var(--color-muted)]">· {minutesLabel(task.estimatedMinutes || 10, locale)}</span>
+                  </div>
                 </div>
-                <Link href={task.href} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand)]/10 text-sm text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20">
-                  ▶
-                </Link>
+                {task.completed ? (
+                  <span className="shrink-0 text-xs font-semibold text-[#16a34a]">✓ {c.doneLabel}</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTask(task)}
+                    className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+                  >
+                    {c.start}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ===== STREAK ===== */}
+      <div className="mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#f59e0b] to-[#ef4444] p-6 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-2xl font-bold">🔥 {streak} {c.streakTitle}</div>
+            <p className="mt-1 max-w-xs text-sm text-white/80">{c.streakHint}</p>
+          </div>
+          <div className="flex shrink-0 gap-1.5">
+            {week.map((d, i) => (
+              <div key={d.iso} className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-white/70">{c.week[i]}</span>
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
+                    d.done ? "bg-white text-[#ea580c]" : d.today ? "border-2 border-white/70 text-white" : "bg-white/20 text-white/60"
+                  }`}
+                >
+                  {d.done ? "✓" : ""}
+                </span>
               </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* ---- right: panel ---- */}
-        <div className="flex flex-col gap-4">
-          {/* goal */}
-          <div className="rounded-3xl bg-gradient-to-br from-[#5b4bd6] to-[#3a1d9c] p-6 text-white">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-white/60">{c.goal}</div>
-            <div className="mt-1 text-4xl font-bold">C1</div>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/20">
-              <div className="h-full w-[40%] rounded-full bg-white" />
+      {/* ===== AI motivator ===== */}
+      {(() => {
+        const m = getMotivation(locale, streak, lastActivity(history));
+        const p = phraseOfDay(locale);
+        return (
+          <div className="mt-6 flex items-start gap-4 rounded-3xl border border-black/[0.06] bg-gradient-to-br from-[var(--color-brand)]/[0.06] to-[var(--color-brand-2)]/[0.06] p-5 sm:p-6">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg text-white">
+              🤖
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-[var(--color-foreground)]">{m.title}</div>
+              <p className="mt-0.5 text-sm text-[var(--color-muted)]">{m.text[locale]}</p>
+              <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--color-brand)]">{p.tr}</span>
+                <span className="text-[var(--color-muted)]"> — {p.translation}</span>
+              </div>
             </div>
-            <div className="mt-2 flex justify-between text-xs text-white/70">
-              <span>A2 {c.now}</span>
-              <span>C1 {c.target}</span>
-            </div>
-            <p className="mt-3 text-xs text-white/70">{c.goalHint}</p>
           </div>
+        );
+      })()}
 
-          {/* skill scores */}
-          <div className="glass rounded-3xl p-5">
-            <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.scores}</div>
-            <div className="mt-4 flex justify-between">
-              {SKILL_DOTS.map((s) => (
-                <div key={s.key} className="flex flex-col items-center gap-1.5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-black/[0.12] text-sm text-[var(--color-muted)]">—</span>
-                  <span className="text-base">{s.emoji}</span>
+      {/* ===== MY PROGRESS ===== */}
+      <h2 className="mt-8 text-lg font-semibold text-[var(--color-foreground)]">{c.myProgress}</h2>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="glass rounded-3xl p-6">
+          <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.levelCard}</div>
+          <div className="mt-2 flex items-baseline gap-2 text-2xl font-bold text-[var(--color-foreground)]">
+            {levelRaw} <span className="text-[var(--color-muted)]">→</span> <span className="text-gradient">C1</span>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/[0.06]">
+            <div className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]" style={{ width: `${Math.max(6, lvlPct)}%` }} />
+          </div>
+          <div className="mt-2 flex justify-between text-[11px] text-[var(--color-muted)]">
+            {LEVELS.map((l) => (
+              <span key={l} className={l === lvl ? "font-bold text-[var(--color-brand)]" : ""}>{l}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="glass rounded-3xl p-6">
+          <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.statsCard}</div>
+          <div className="mt-4 flex flex-col gap-3">
+            {[
+              { label: c.statTasks, value: totalTasksDone(history), icon: "✅" },
+              { label: c.statWords, value: wordsLearned(history), icon: "📚" },
+              { label: c.statDays, value: streak, icon: "🔥" },
+            ].map((s) => (
+              <div key={s.label} className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-[var(--color-muted)]"><span>{s.icon}</span>{s.label}</span>
+                <span className="text-lg font-bold text-[var(--color-foreground)]">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ===== CONTINUE ===== */}
+      {allDone && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.continueTitle}</h2>
+          <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {CONTINUE.map((item) => (
+              <Link key={item.key} href={item.href} className="glass flex flex-col items-center gap-2 rounded-2xl p-5 text-center transition-transform hover:-translate-y-0.5">
+                <span className="text-2xl">{item.emoji}</span>
+                <span className="text-sm font-medium text-[var(--color-foreground)]">{c.cont[item.key]}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* modals */}
+      <IntensityModal open={showIntensity} current={intensity} onSelect={chooseIntensity} onClose={() => setShowIntensity(false)} />
+      <AnimatePresence>
+        {activeTask && (
+          <ErrorBoundary
+            fallback={
+              <div className="fixed inset-0 z-[95] flex items-center justify-center p-4" onClick={() => setActiveTask(null)}>
+                <div className="absolute inset-0 bg-[var(--color-navy)]/40 backdrop-blur-sm" />
+                <div className="relative z-10 rounded-2xl bg-white p-6 text-center text-sm text-[var(--color-muted)]">
+                  Что-то пошло не так.{" "}
+                  <button type="button" onClick={() => setActiveTask(null)} className="font-medium text-[var(--color-brand)] underline">
+                    Закрыть
+                  </button>
                 </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-[var(--color-muted)]">{c.scoresHint}</p>
-          </div>
-
-          {/* recent tests */}
-          <div className="glass rounded-3xl p-5">
-            <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.recent}</div>
-            <p className="mt-2 text-xs text-[var(--color-muted)]">{c.recentHint}</p>
-            <Link href="/dashboard/mock" className="btn-primary mt-4 block rounded-full px-4 py-2.5 text-center text-sm">
-              {c.startPractice} →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* ---- bottom: overview ---- */}
-      <h2 className="mt-8 text-lg font-semibold text-[var(--color-foreground)]">{c.overview}</h2>
-      <div className="mt-4 grid gap-6 lg:grid-cols-2">
-        <div className="glass rounded-3xl p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[var(--color-foreground)]">{c.weekProgress}</h3>
-            <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-              <button type="button" className="hover:text-[var(--color-foreground)]">←</button>
-              <span>22 — 28</span>
-              <button type="button" className="hover:text-[var(--color-foreground)]">→</button>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-[var(--color-muted)]">
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#3b82f6]" />{c.legend.reading}</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#ef4444]" />{c.legend.listening}</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#f59e0b]" />{c.legend.writing}</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#eab308]" />{c.legend.speaking}</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded-full border-t-2 border-dashed border-[var(--color-muted)]" />{c.legend.goal}</span>
-          </div>
-          <div className="mt-4 flex h-40 flex-col items-center justify-center rounded-2xl bg-black/[0.02] text-sm text-[var(--color-muted)]">
-            <span className="text-3xl">📈</span>
-            <span className="mt-2">{c.noWeekData}</span>
-          </div>
-        </div>
-
-        <div className="glass rounded-3xl p-6">
-          <h3 className="text-sm font-semibold text-[var(--color-foreground)]">{c.accuracy}</h3>
-          <div className="mt-4 flex h-40 flex-col items-center justify-center rounded-2xl bg-black/[0.02] text-center text-sm text-[var(--color-muted)]">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full border-8 border-black/[0.06] text-xs">—</span>
-            <span className="mt-2">{c.noAccData}</span>
-          </div>
-        </div>
-      </div>
+              </div>
+            }
+          >
+            <TaskModal task={activeTask} onComplete={(r) => completeTask(activeTask, r)} onClose={() => setActiveTask(null)} />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

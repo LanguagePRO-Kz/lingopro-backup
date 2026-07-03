@@ -6,10 +6,12 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { loadPlan, type PackageId } from "@/lib/billing";
 import { planBadge } from "@/lib/dashboard";
+import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
 
 const T = {
   ru: {
     profile: "Профиль", name: "Имя", email: "Email", avatar: "Аватар", upload: "Загрузить", save: "Сохранить", saved: "Сохранено ✓",
+    city: "Город", country: "Страна", cityPh: "Например, Алматы", countryPh: "Например, Казахстан",
     exam: "Экзамен", chosenExam: "Выбранный экзамен", target: "Целевой уровень", examDate: "Дата экзамена",
     sub: "Подписка", currentPlan: "Текущий план", validUntil: "Действует до", manage: "Управлять подпиской",
     notif: "Уведомления", emailNotif: "Email уведомления", reminders: "Напоминания о занятиях", remindTime: "Время напоминания",
@@ -17,6 +19,7 @@ const T = {
   },
   en: {
     profile: "Profile", name: "Name", email: "Email", avatar: "Avatar", upload: "Upload", save: "Save", saved: "Saved ✓",
+    city: "City", country: "Country", cityPh: "e.g. Almaty", countryPh: "e.g. Kazakhstan",
     exam: "Exam", chosenExam: "Selected exam", target: "Target level", examDate: "Exam date",
     sub: "Subscription", currentPlan: "Current plan", validUntil: "Valid until", manage: "Manage subscription",
     notif: "Notifications", emailNotif: "Email notifications", reminders: "Lesson reminders", remindTime: "Reminder time",
@@ -24,6 +27,7 @@ const T = {
   },
   tr: {
     profile: "Profil", name: "Ad", email: "E-posta", avatar: "Avatar", upload: "Yükle", save: "Kaydet", saved: "Kaydedildi ✓",
+    city: "Şehir", country: "Ülke", cityPh: "örn. Almatı", countryPh: "örn. Kazakistan",
     exam: "Sınav", chosenExam: "Seçilen sınav", target: "Hedef seviye", examDate: "Sınav tarihi",
     sub: "Abonelik", currentPlan: "Mevcut plan", validUntil: "Geçerlilik", manage: "Aboneliği yönet",
     notif: "Bildirimler", emailNotif: "E-posta bildirimleri", reminders: "Ders hatırlatmaları", remindTime: "Hatırlatma saati",
@@ -31,6 +35,7 @@ const T = {
   },
   kk: {
     profile: "Профиль", name: "Аты", email: "Email", avatar: "Аватар", upload: "Жүктеу", save: "Сақтау", saved: "Сақталды ✓",
+    city: "Қала", country: "Ел", cityPh: "мыс. Алматы", countryPh: "мыс. Қазақстан",
     exam: "Емтихан", chosenExam: "Таңдалған емтихан", target: "Мақсатты деңгей", examDate: "Емтихан күні",
     sub: "Жазылым", currentPlan: "Ағымдағы жоспар", validUntil: "Дейін жарамды", manage: "Жазылымды басқару",
     notif: "Хабарламалар", emailNotif: "Email хабарламалар", reminders: "Сабақ еске салулары", remindTime: "Еске салу уақыты",
@@ -72,6 +77,8 @@ export default function SettingsPage() {
   const c = pick(locale, T);
 
   const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("");
   const [saved, setSaved] = useState(false);
   const [plan, setPlan] = useState<PackageId | null>(null);
   const [emailOn, setEmailOn] = useState(true);
@@ -82,10 +89,21 @@ export default function SettingsPage() {
   useEffect(() => {
     setName(window.localStorage.getItem("lingopro:name") || "");
     setPlan(loadPlan());
+    let active = true;
+    fetchProfileLocation().then((loc) => {
+      if (!active) return;
+      setCity(loc.city ?? "");
+      setCountry(loc.country ?? "");
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function saveName() {
     window.localStorage.setItem("lingopro:name", name.trim());
+    // persist city/country for the leaderboard scopes (best-effort)
+    void saveProfileLocation(city.trim() || null, country.trim() || null);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -112,6 +130,16 @@ export default function SettingsPage() {
           <span className="text-xs font-medium text-[var(--color-muted)]">{c.email}</span>
           <input value="student@lingopro.app" readOnly className={`${inputCls} cursor-not-allowed bg-black/[0.03] text-[var(--color-muted)]`} />
         </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-[var(--color-muted)]">{c.city}</span>
+            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={c.cityPh} className={inputCls} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-[var(--color-muted)]">{c.country}</span>
+            <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder={c.countryPh} className={inputCls} />
+          </label>
+        </div>
         <button type="button" onClick={saveName} className="btn-primary w-fit rounded-full px-5 py-2.5 text-sm">
           {saved ? c.saved : c.save}
         </button>

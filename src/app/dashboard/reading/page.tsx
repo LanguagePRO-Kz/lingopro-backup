@@ -1,11 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { READING_TASKS } from "@/data/reading-tasks";
+import { shuffleOptions } from "@/lib/shuffle";
+import { awardXp, XP } from "@/lib/xp";
 import type { Level, ReadingTask } from "@/data/types";
+
+type Shuffled = Record<string, { options: string[]; answer: number }>;
+function buildShuffled(tasks: ReadingTask[]): Shuffled {
+  const m: Shuffled = {};
+  for (const t of tasks) for (const q of t.questions) {
+    const s = shuffleOptions(q.options, q.correctAnswer);
+    m[q.id] = { options: s.shuffled, answer: s.newCorrectIndex };
+  }
+  return m;
+}
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -23,13 +35,25 @@ export default function ReadingPage() {
   const [onlyUnfinished, setOnlyUnfinished] = useState(false);
   const [active, setActive] = useState<ReadingTask | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const shuffled = useMemo(() => buildShuffled(READING_TASKS), []);
 
   const isDone = useMemo(
-    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === q.correctAnswer),
-    [answers],
+    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === shuffled[q.id].answer),
+    [answers, shuffled],
   );
 
   const doneCount = useMemo(() => READING_TASKS.filter(isDone).length, [isDone]);
+
+  // award XP once per reading text the first time it's fully answered correctly
+  const awarded = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const t of READING_TASKS) {
+      if (!awarded.current.has(t.id) && isDone(t)) {
+        awarded.current.add(t.id);
+        void awardXp("reading_test", XP.READING_TEST, { dedupKey: `reading:${t.id}`, metadata: { taskId: t.id, level: t.level } });
+      }
+    }
+  }, [isDone]);
 
   const list = useMemo(
     () =>
@@ -41,7 +65,7 @@ export default function ReadingPage() {
     [level, onlyUnfinished, isDone],
   );
 
-  if (active) return <Reader text={active} c={c} answers={answers} setAnswers={setAnswers} onBack={() => setActive(null)} />;
+  if (active) return <Reader text={active} c={c} answers={answers} setAnswers={setAnswers} shuffled={shuffled} onBack={() => setActive(null)} />;
 
   return (
     <div>
@@ -77,7 +101,7 @@ export default function ReadingPage() {
   );
 }
 
-function Reader({ text, c, answers, setAnswers, onBack }: { text: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; onBack: () => void }) {
+function Reader({ text, c, answers, setAnswers, shuffled, onBack }: { text: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; shuffled: Shuffled; onBack: () => void }) {
   return (
     <div>
       <button type="button" onClick={onBack} className="text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)]">← {c.back}</button>
@@ -105,9 +129,9 @@ function Reader({ text, c, answers, setAnswers, onBack }: { text: ReadingTask; c
             <div key={q.id} className="glass rounded-2xl p-5">
               <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
               <div className="mt-3 grid gap-2">
-                {q.options.map((opt, oi) => {
+                {shuffled[q.id].options.map((opt, oi) => {
                   let cls = "border-black/[0.08] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.16]";
-                  if (answered && oi === q.correctAnswer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
+                  if (answered && oi === shuffled[q.id].answer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
                   else if (answered && oi === sel) cls = "border-[#dc2626] bg-[#dc2626]/[0.06]";
                   return (
                     <button
@@ -125,10 +149,10 @@ function Reader({ text, c, answers, setAnswers, onBack }: { text: ReadingTask; c
               {answered && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-xs">
                   <div className="font-medium">
-                    {sel === q.correctAnswer ? (
+                    {sel === shuffled[q.id].answer ? (
                       <span className="text-[#16a34a]">✅ {c.correct}</span>
                     ) : (
-                      <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {q.options[q.correctAnswer]}</span>
+                      <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {shuffled[q.id].options[shuffled[q.id].answer]}</span>
                     )}
                   </div>
                   <p className="mt-1 leading-relaxed text-[var(--color-muted)]">{q.explanation}</p>

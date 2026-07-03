@@ -33,6 +33,23 @@ import {
 } from "@/lib/quiz";
 import { saveProfileResult } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
+import { permutation, applyPerm } from "@/lib/shuffle";
+
+/** Shuffle a diagnostic question's options (both universal + localized) once. */
+function shuffleMC(q: MCQuestion): MCQuestion {
+  const len = (q.options ?? q.opts?.ru ?? []).length;
+  if (len < 2) return q;
+  const perm = permutation(len);
+  const opts = q.opts
+    ? (Object.fromEntries(Object.entries(q.opts).map(([k, v]) => [k, applyPerm(v, perm)])) as MCQuestion["opts"])
+    : undefined;
+  return {
+    ...q,
+    options: q.options ? applyPerm(q.options, perm) : q.options,
+    opts,
+    answer: perm.indexOf(q.answer),
+  };
+}
 import { PostQuizAuth } from "@/components/PostQuizAuth";
 
 /* ------------------------------- Speech (TTS) ----------------------------- */
@@ -450,18 +467,19 @@ type ModuleProps = {
 /* ------------------------- Multiple-choice module ------------------------ */
 function MCModule({
   moduleIdx,
-  questions,
+  questions: rawQuestions,
   locale,
   hint,
   onDone,
 }: ModuleProps & { questions: MCQuestion[] }) {
+  const [qs] = useState(() => rawQuestions.map(shuffleMC));
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(questions.length).fill(null));
+  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(qs.length).fill(null));
 
-  const q = questions[step];
+  const q = qs[step];
   const selected = answers[step];
   const options = q.opts ? q.opts[locale] ?? q.opts.ru : q.options ?? [];
-  const progress = ((step + 1) / questions.length) * 100;
+  const progress = ((step + 1) / qs.length) * 100;
   const qHint = hint(q.hint);
 
   function choose(i: number) {
@@ -473,8 +491,8 @@ function MCModule({
   }
 
   function next() {
-    if (step + 1 >= questions.length) {
-      onDone(scoreMC(answers, questions));
+    if (step + 1 >= qs.length) {
+      onDone(scoreMC(answers, qs));
     } else {
       setStep((s) => s + 1);
     }
@@ -500,7 +518,7 @@ function MCModule({
           transition={{ duration: 0.22 }}
         >
           <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-            <span>{qt(locale, "question")} {step + 1}/{questions.length}</span>
+            <span>{qt(locale, "question")} {step + 1}/{qs.length}</span>
             <span className="rounded-full bg-black/[0.05] px-2 py-0.5 font-semibold text-[var(--color-brand-2)]">
               {q.level}
             </span>
@@ -539,7 +557,7 @@ function MCModule({
             onClick={next}
             className="btn-primary mt-6 w-full rounded-full px-6 py-3.5 text-sm"
           >
-            {step + 1 >= questions.length ? qt(locale, "next") + " →" : qt(locale, "next")}
+            {step + 1 >= qs.length ? qt(locale, "next") + " →" : qt(locale, "next")}
           </motion.button>
         )}
       </AnimatePresence>
@@ -549,13 +567,14 @@ function MCModule({
 
 /* ------------------------------ Reading module --------------------------- */
 function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
+  const [rq] = useState(() => READING.map(shuffleMC));
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(READING.length).fill(null));
+  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(rq.length).fill(null));
   const [left, setLeft] = useState(240); // 4 minutes
 
   const finishRef = useRef(() => {});
   useEffect(() => {
-    finishRef.current = () => onDone(scoreMC(answers, READING));
+    finishRef.current = () => onDone(scoreMC(answers, rq));
   });
 
   useEffect(() => {
@@ -572,7 +591,7 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
     return () => clearInterval(id);
   }, []);
 
-  const q = READING[step];
+  const q = rq[step];
   const selected = answers[step];
   const qHint = hint(q.hint);
 
@@ -584,7 +603,7 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
     });
   }
   function next() {
-    if (step + 1 >= READING.length) onDone(scoreMC(answers, READING));
+    if (step + 1 >= rq.length) onDone(scoreMC(answers, rq));
     else setStep((s) => s + 1);
   }
 
@@ -618,7 +637,7 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
           className="mt-5"
         >
           <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-            <span>{qt(locale, "question")} {step + 1}/{READING.length}</span>
+            <span>{qt(locale, "question")} {step + 1}/{rq.length}</span>
             <span className="rounded-full bg-black/[0.05] px-2 py-0.5 font-semibold text-[var(--color-brand-2)]">
               {q.level}
             </span>

@@ -9,11 +9,15 @@ import { createClient } from "@/lib/supabase/client";
 import type { QuizResult } from "./quiz";
 import type { Progress } from "./studyplan";
 
+/** Daily study intensity chosen on first dashboard visit. */
+export type Intensity = "light" | "medium" | "intensive";
+
 /** Plan is free-form text: a package id ("1m"|"3m"|"6m") or "trial". */
 export type Profile = {
   plan: string | null;
   quiz_result: QuizResult | null;
   plan_progress: Progress;
+  study_intensity: Intensity | null;
 };
 
 /** Read the current user's profile (null if not signed in). */
@@ -26,7 +30,7 @@ export async function fetchProfile(): Promise<Profile | null> {
 
   const { data } = await supabase
     .from("profiles")
-    .select("plan, quiz_result, plan_progress")
+    .select("plan, quiz_result, plan_progress, study_intensity")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -34,6 +38,7 @@ export async function fetchProfile(): Promise<Profile | null> {
     plan: (data?.plan as string | null) ?? null,
     quiz_result: (data?.quiz_result as QuizResult | null) ?? null,
     plan_progress: (data?.plan_progress as Progress | null) ?? {},
+    study_intensity: (data?.study_intensity as Intensity | null) ?? null,
   };
 }
 
@@ -56,3 +61,24 @@ async function upsert(patch: Record<string, unknown>) {
 export const saveProfilePlan = (plan: string) => upsert({ plan });
 export const saveProfileResult = (quiz_result: QuizResult) => upsert({ quiz_result });
 export const saveProfileProgress = (plan_progress: Progress) => upsert({ plan_progress });
+export const saveProfileIntensity = (study_intensity: Intensity) => upsert({ study_intensity });
+
+/**
+ * City / country used by the leaderboard scopes. Kept in a dedicated helper so
+ * a failed write (e.g. columns not migrated yet) can't corrupt other profile
+ * fields — this is the only upsert that touches them.
+ */
+export const saveProfileLocation = (city: string | null, country: string | null) =>
+  upsert({ city, country });
+
+/** Read the current user's city/country (error-tolerant — returns nulls if the columns don't exist yet). */
+export async function fetchProfileLocation(): Promise<{ city: string | null; country: string | null }> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { city: null, country: null };
+  const { data, error } = await supabase.from("profiles").select("city, country").eq("id", user.id).maybeSingle();
+  if (error || !data) return { city: null, country: null };
+  return { city: (data.city as string | null) ?? null, country: (data.country as string | null) ?? null };
+}
