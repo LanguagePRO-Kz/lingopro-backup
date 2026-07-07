@@ -208,9 +208,55 @@ function ModuleAccordion({
   );
 }
 
+/* --------------------------- v3 sections (/25) ---------------------------- */
+
+function SectionRow({
+  label,
+  emoji,
+  score,
+  pendingNode,
+  delay,
+}: {
+  label: string;
+  emoji: string;
+  score: number | null;
+  pendingNode?: React.ReactNode;
+  delay: number;
+}) {
+  const c = score != null ? barColor((score / 25) * 100) : null;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-sm">
+        <span className="flex items-center gap-2 text-[var(--color-foreground)]">
+          <span>{emoji}</span>
+          {label}
+        </span>
+        {score != null ? (
+          <span className="font-semibold text-[var(--color-foreground)]">{score}/25</span>
+        ) : (
+          <span className="text-xs text-[var(--color-muted)]">—/25</span>
+        )}
+      </div>
+      {score != null && c ? (
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-black/[0.05]">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: `linear-gradient(to right, ${c.from}, ${c.to})` }}
+            initial={{ width: 0 }}
+            animate={{ width: `${(score / 25) * 100}%` }}
+            transition={{ duration: 0.9, delay, ease: "easeOut" }}
+          />
+        </div>
+      ) : (
+        <div className="rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-[var(--color-muted)]">{pendingNode}</div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------ Result view ------------------------------ */
 /** The full diagnostic result UI. Shared by /results and /quiz/result. */
-export function ResultView({ result }: { result: QuizResult }) {
+export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazmaChecking?: boolean }) {
   const { exam } = useExam();
   const { locale } = useI18n();
   const router = useRouter();
@@ -226,7 +272,25 @@ export function ResultView({ result }: { result: QuizResult }) {
   const plan = PLANS[result.plan];
   const highRisk = result.overall < 65;
 
-  // ordered worst → best for the breakdown
+  const isV3 = result.version === 3 && !!result.sections;
+  const sections = result.sections;
+  const knownScores = sections
+    ? [sections.dinleme, sections.okuma, sections.yazma, sections.konusma].filter(
+        (v): v is number => typeof v === "number",
+      )
+    : [];
+  const totalKnown = knownScores.reduce((a, b) => a + b, 0);
+  const maxKnown = knownScores.length * 25;
+  const allKnown = knownScores.length === 4;
+
+  // v3 topic gap chips (all wrong tagged answers, any stage)
+  const gapTopicIds = isV3
+    ? [...new Set((result.answers ?? []).filter((a) => !a.correct && a.topic).map((a) => a.topic!))]
+    : [];
+
+  const review = result.yazmaReview;
+
+  // ordered worst → best for the breakdown (legacy view)
   const orderedSkills = result.byWeakness.map((id) => result.skills.find((s) => s.id === id)!);
 
   // comparison markers (index over A0..C1)
@@ -274,40 +338,139 @@ export function ResultView({ result }: { result: QuizResult }) {
           </div>
         </div>
         <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-black/[0.04] px-4 py-2 text-sm">
-          <span className="text-[var(--color-muted)]">{qt(locale, "predicted")} {exam.name}:</span>
-          <span className="font-bold text-[var(--color-foreground)]">
-            ≈ {Math.max(0, result.overall - 10)}–{Math.min(100, result.overall + 5)} / 100
-          </span>
+          {isV3 ? (
+            <>
+              <span className="text-[var(--color-muted)]">{exam.name}:</span>
+              <span className="font-bold text-[var(--color-foreground)]">
+                {allKnown
+                  ? `≈ ${Math.max(0, totalKnown - 7)}–${Math.min(100, totalKnown + 5)} / 100`
+                  : `${totalKnown}/${maxKnown} · ${qt(locale, "ofSections")}`}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[var(--color-muted)]">{qt(locale, "predicted")} {exam.name}:</span>
+              <span className="font-bold text-[var(--color-foreground)]">
+                ≈ {Math.max(0, result.overall - 10)}–{Math.min(100, result.overall + 5)} / 100
+              </span>
+            </>
+          )}
         </div>
         <p className="mx-auto mt-2 max-w-md text-xs text-[var(--color-muted)]">{qt(locale, "approxNote")}</p>
         <p className="mx-auto mt-1 max-w-md text-xs font-medium text-[var(--color-foreground)]">{qt(locale, "thresholdsNote")}</p>
+        {isV3 && levelIndex(result.level) >= levelIndex("B2") && (
+          <p className="mx-auto mt-1 max-w-md text-xs text-[var(--color-muted)]">{qt(locale, "cefrCapNote")}</p>
+        )}
       </motion.div>
 
-      {/* ============ 2. Skill breakdown ============ */}
-      <div className="glass mt-6 flex flex-col gap-5 rounded-3xl p-7">
-        <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "skills")}</h2>
-        {result.skills.map((s, i) => (
-          <SkillBar key={s.id} id={s.id} percent={s.percent} level={s.level} delay={i * 0.12} locale={locale} />
-        ))}
-      </div>
-
-      {/* ============ 3. Detailed breakdown ============ */}
-      <div className="mt-6">
-        <h2 className="mb-4 text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "detailTitle")}</h2>
-        <div className="flex flex-col gap-3">
-          {orderedSkills.map((s, i) => (
-            <ModuleAccordion
-              key={s.id}
-              id={s.id}
-              percent={s.percent}
-              level={s.level}
-              records={(result.answers ?? []).filter((a) => a.module === s.id)}
-              locale={locale}
-              defaultOpen={i === 0}
-            />
+      {/* ============ 2. Sections (v3) / skill bars (legacy) ============ */}
+      {isV3 && sections ? (
+        <div className="glass mt-6 flex flex-col gap-5 rounded-3xl p-7">
+          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "secTitle")}</h2>
+          <SectionRow label={qt(locale, "stDinleme")} emoji="🎧" score={sections.dinleme} delay={0} />
+          <SectionRow label={qt(locale, "stOkuma")} emoji="📖" score={sections.okuma} delay={0.12} />
+          <SectionRow
+            label={qt(locale, "stYazma")}
+            emoji="✍️"
+            score={sections.yazma}
+            delay={0.24}
+            pendingNode={
+              yazmaChecking ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--color-brand)] border-t-transparent" />
+                  {qt(locale, "yazmaChecking")}
+                </span>
+              ) : (
+                qt(locale, "yazmaPendingAuth")
+              )
+            }
+          />
+          <SectionRow
+            label={qt(locale, "stKonusma")}
+            emoji="🎤"
+            score={sections.konusma}
+            delay={0.36}
+            pendingNode={
+              <span className="flex flex-wrap items-center gap-2">
+                {qt(locale, "konusmaPending")}
+                <Link
+                  href="/dashboard/speaking/live"
+                  className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+                >
+                  {qt(locale, "konusmaCta")} →
+                </Link>
+              </span>
+            }
+          />
+        </div>
+      ) : (
+        <div className="glass mt-6 flex flex-col gap-5 rounded-3xl p-7">
+          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "skills")}</h2>
+          {result.skills.map((s, i) => (
+            <SkillBar key={s.id} id={s.id} percent={s.percent} level={s.level} delay={i * 0.12} locale={locale} />
           ))}
         </div>
-      </div>
+      )}
+
+      {/* ============ 3. Detailed breakdown ============ */}
+      {isV3 ? (
+        <>
+          {/* topic gap chips — the same map that feeds lesson focus */}
+          {gapTopicIds.length > 0 && (
+            <div className="glass mt-6 rounded-3xl p-7">
+              <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "gapsFound")}</h2>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {gapTopicIds.map((t) => {
+                  const topic = topicById(t);
+                  return topic ? (
+                    <span key={t} className="rounded-full bg-[var(--color-brand)]/[0.1] px-2.5 py-1 text-xs font-medium text-[var(--color-brand)]">
+                      {topic.label[locale]}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+              <p className="mt-3 text-xs text-[var(--color-muted)]">{qt(locale, "focusNote")}</p>
+            </div>
+          )}
+
+          {/* essay review highlights */}
+          {review?.valid && review.errors.length > 0 && (
+            <div className="glass mt-6 rounded-3xl p-7">
+              <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "mainErrors")}</h2>
+              <div className="mt-3 flex flex-col gap-2.5">
+                {review.errors.slice(0, 3).map((e, i) => (
+                  <div key={i} className="rounded-xl bg-black/[0.03] p-3 text-sm">
+                    <div>
+                      <span className="text-[#dc2626] line-through decoration-[#dc2626]/60">{e.quote}</span>{" "}
+                      → <span className="font-semibold text-[#16a34a]">{e.correction}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-[var(--color-muted)]">
+                      <b>{e.rule}</b>{e.explanation ? ` — ${e.explanation}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="mt-6">
+          <h2 className="mb-4 text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "detailTitle")}</h2>
+          <div className="flex flex-col gap-3">
+            {orderedSkills.map((s, i) => (
+              <ModuleAccordion
+                key={s.id}
+                id={s.id}
+                percent={s.percent}
+                level={s.level}
+                records={(result.answers ?? []).filter((a) => a.module === s.id)}
+                locale={locale}
+                defaultOpen={i === 0}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ============ 4. Exam forecast ============ */}
       <div className="border-gradient mt-6 rounded-3xl p-7">

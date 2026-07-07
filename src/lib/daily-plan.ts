@@ -443,9 +443,14 @@ export async function loadDashboardData(locale: Locale): Promise<{
   const date = todayISO();
   const from = addDaysISO(date, -29);
 
-  type ProfileRow = { quiz_result?: { level?: string; takenAt?: number } | null; study_intensity?: Intensity | null };
+  type ProfileRow = {
+    quiz_result?: { level?: string; takenAt?: number } | null;
+    study_intensity?: Intensity | null;
+    study_minutes_daily?: number | null;
+  };
   let profile: ProfileRow | null = null;
   let history: DayRow[] = [];
+  let derivedIntensity: Intensity | null = null;
 
   try {
     const supabase = createClient();
@@ -454,7 +459,11 @@ export async function loadDashboardData(locale: Locale): Promise<{
     } = await supabase.auth.getUser();
     if (!user) throw new Error("no user");
     const [pRes, hRes] = await Promise.all([
-      supabase.from("profiles").select("quiz_result, study_intensity").eq("id", user.id).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("quiz_result, study_intensity, study_minutes_daily")
+        .eq("id", user.id)
+        .maybeSingle(),
       supabase
         .from("daily_progress")
         .select("date, tasks, completed_count, total_count")
@@ -464,12 +473,21 @@ export async function loadDashboardData(locale: Locale): Promise<{
     ]);
     profile = (pRes.data as unknown as ProfileRow | null) ?? null;
     history = !hRes.error && hRes.data ? (hRes.data as DbRow[]).map(fromDb) : Object.values(lsAll()).filter((r) => r.date >= from);
+
+    // Diagnostic v2 asked for minutes/day: until the plan engine consumes the
+    // minutes directly, map them onto the legacy intensity so the student
+    // never sees the "pick a pace" modal twice (15→light, 30→medium, 45+→intensive).
+    if (!profile?.study_intensity && profile?.study_minutes_daily) {
+      derivedIntensity =
+        profile.study_minutes_daily <= 15 ? "light" : profile.study_minutes_daily <= 30 ? "medium" : "intensive";
+      void supabase.from("profiles").update({ study_intensity: derivedIntensity }).eq("id", user.id);
+    }
   } catch {
     history = Object.values(lsAll()).filter((r) => r.date >= from);
   }
 
   const levelRaw = profile?.quiz_result?.level ?? "A2";
-  const intensity = profile?.study_intensity ?? null;
+  const intensity = profile?.study_intensity ?? derivedIntensity;
   const level = contentLevel(levelRaw);
   const dayNumber = dayNumberFrom(profile?.quiz_result?.takenAt);
 

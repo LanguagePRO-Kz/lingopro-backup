@@ -8,89 +8,94 @@ import { useExam } from "@/lib/exam-context";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { EXAM_LIST, examLang } from "@/lib/exams";
 import {
-  GRAMMAR,
-  VOCAB,
-  READING,
-  READING_TEXT,
-  WRITING,
-  SPEAKING,
-  MODULES,
-  type MCQuestion,
-  type Localized,
-  type ModuleId,
-  computeResult,
-  saveResult,
-  saveProgress,
-  loadProgress,
   clearProgress,
-  scoreMC,
-  scoreWriting,
-  scoreSpeakingAnswer,
-  scoreSpeakingDuration,
   countWords,
+  loadProgress,
   qt,
+  saveProgress,
+  saveResult,
   type AnswerRecord,
+  type Localized,
   type QuizTKey,
+  type StageId,
 } from "@/lib/quiz";
+import {
+  dinlemeSets,
+  okumaSets,
+  yazmaByLevel,
+  type BankAudio,
+  type BankItem,
+  type BankLevel,
+  type BankText,
+  type YazmaPrompt,
+} from "@/data/diagnostic-bank";
+import {
+  applyRouterAnswer,
+  computeResultV3,
+  hashSeed,
+  initRouter,
+  nextRouterQuestion,
+  routerDone,
+  routerResult,
+  rotated,
+  ROUTER_MAX,
+  selfLevelToStart,
+  skillBlockLevel,
+  type RouterState,
+} from "@/lib/diagnostic/engine";
 import { saveProfileResult } from "@/lib/profile";
 import { stashExamPlan } from "@/lib/exam-plan";
 import { createClient } from "@/lib/supabase/client";
 import { permutation, applyPerm } from "@/lib/shuffle";
-
-/** Shuffle a diagnostic question's options (both universal + localized) once. */
-function shuffleMC(q: MCQuestion): MCQuestion {
-  const len = (q.options ?? q.opts?.ru ?? []).length;
-  if (len < 2) return q;
-  const perm = permutation(len);
-  const opts = q.opts
-    ? (Object.fromEntries(Object.entries(q.opts).map(([k, v]) => [k, applyPerm(v, perm)])) as MCQuestion["opts"])
-    : undefined;
-  return {
-    ...q,
-    options: q.options ? applyPerm(q.options, perm) : q.options,
-    opts,
-    answer: perm.indexOf(q.answer),
-  };
-}
 import { PostQuizAuth } from "@/components/PostQuizAuth";
 
-/* ------------------------------- Speech (TTS) ----------------------------- */
-/** Speak Turkish text a touch slower than normal; `onEnd` fires when done. */
-function speakTr(text: string, onEnd?: () => void) {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    onEnd?.();
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "tr-TR";
-  u.rate = 0.85;
-  if (onEnd) {
-    u.onend = onEnd;
-    u.onerror = onEnd;
-  }
-  window.speechSynthesis.speak(u);
+/**
+ * Diagnostic v2 (DESIGN-DIAGNOSTIC-V2): onboarding (5 steps) → adaptive
+ * level router → Dinleme (audio, 2 plays max) → Okuma → Yazma (essay, AI
+ * review deferred to /quiz/result). Konuşma is assessed on the first live
+ * lesson, never here. All answers are recorded per question for the honest
+ * breakdown + mastery seeding.
+ */
+
+/* ------------------------------ Shuffled item ----------------------------- */
+
+type ShuffledItem = { item: BankItem; options: string[]; answer: number };
+
+function shuffleItem(item: BankItem): ShuffledItem {
+  const perm = permutation(item.options.length);
+  return { item, options: applyPerm(item.options, perm), answer: perm.indexOf(item.answer) };
 }
 
-function micSupported() {
-  return (
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof window !== "undefined" &&
-    typeof window.MediaRecorder !== "undefined"
-  );
+function toRecord(s: ShuffledItem, module: AnswerRecord["module"], chosen: number): AnswerRecord {
+  return {
+    module,
+    prompt: s.item.prompt,
+    topic: s.item.topic !== "other" ? s.item.topic : undefined,
+    level: s.item.level,
+    correct: chosen === s.answer,
+    correctAnswer: s.options[s.answer] ?? "",
+  };
 }
 
-type SpeakStatus = "speaking" | "ready" | "recording" | "processing" | "saved";
+/* -------------------------------- Stage meta ------------------------------ */
 
-/* -------------------------------- Helpers -------------------------------- */
-function fmt(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+const STAGES: { id: StageId; emoji: string; nameKey: QuizTKey; minutes: number }[] = [
+  { id: "router", emoji: "🧭", nameKey: "stRouter", minutes: 6 },
+  { id: "dinleme", emoji: "🎧", nameKey: "stDinleme", minutes: 6 },
+  { id: "okuma", emoji: "📖", nameKey: "stOkuma", minutes: 7 },
+  { id: "yazma", emoji: "✍️", nameKey: "stYazma", minutes: 7 },
+];
 
-type Phase = "onboarding" | "transition" | "module" | "signup";
+const stageIdx = (id: StageId) => STAGES.findIndex((s) => s.id === id);
+
+/* -------------------------------- Constants ------------------------------ */
+
+const MINUTE_OPTIONS: { minutes: number; labelKey: QuizTKey }[] = [
+  { minutes: 15, labelKey: "min15" },
+  { minutes: 30, labelKey: "min30" },
+  { minutes: 45, labelKey: "min45" },
+  { minutes: 60, labelKey: "min60" },
+];
 
 const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [
   { id: "a1", label: "lvBeginner", hint: "A0–A1" },
@@ -100,6 +105,30 @@ const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [
   { id: "unknown", label: "lvUnknown", hint: "" },
 ];
 const TIMELINES: QuizTKey[] = ["tl1", "tl3", "tl6", "tlOpen"];
+const ONB_STEPS = 5;
+
+const RETAKE_KEY = "lingopro:quizRetakes";
+
+function retakeSeed(): number {
+  try {
+    return hashSeed(`retake:${window.localStorage.getItem(RETAKE_KEY) ?? "0"}`);
+  } catch {
+    return 1;
+  }
+}
+
+function bumpRetakeCount() {
+  try {
+    const n = parseInt(window.localStorage.getItem(RETAKE_KEY) ?? "0", 10) || 0;
+    window.localStorage.setItem(RETAKE_KEY, String(n + 1));
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ================================== Page ================================== */
+
+type Phase = "onboarding" | "stage" | "transition" | "signup";
 
 export default function QuizPage() {
   const router = useRouter();
@@ -108,21 +137,20 @@ export default function QuizPage() {
 
   const [phase, setPhase] = useState<Phase>("onboarding");
   const [onbStep, setOnbStep] = useState(0);
-  const [, setLevelSelf] = useState<string | null>(null);
+  const [levelSelf, setLevelSelf] = useState<string | null>(null);
   const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("B2");
   const [showDatePick, setShowDatePick] = useState(false);
   const [examDate, setExamDate] = useState("");
+  const [minutesDaily, setMinutesDaily] = useState<number | null>(null);
 
-  // index into MODULES (0..4); transition shows "module {idx} done → next"
-  const [moduleIdx, setModuleIdx] = useState(0);
-  const [scores, setScores] = useState<Partial<Record<ModuleId, number>>>({});
-  const [writingWords, setWritingWords] = useState(0);
-  // per-question answers across modules (honest breakdown + mastery seeding);
-  // a mid-quiz refresh loses earlier modules' records — the result degrades
-  // to module-level analysis for those, which the UI handles honestly
+  const [stage, setStage] = useState<StageId>("router");
+  const [routerState, setRouterState] = useState<RouterState | null>(null);
+  const [routerLevel, setRouterLevel] = useState<BankLevel | null>(null);
+  const [seed, setSeed] = useState(1);
+  const [dinlemeAgg, setDinlemeAgg] = useState<{ correct: number; total: number } | null>(null);
+  const [okumaAgg, setOkumaAgg] = useState<{ correct: number; total: number } | null>(null);
+
   const answerLogRef = useRef<AnswerRecord[]>([]);
-  // guards the progress-save effect from re-writing a snapshot once the quiz
-  // is finished (the async getUser() below yields a render mid-teardown)
   const doneRef = useRef(false);
 
   const hint = useCallback(
@@ -130,72 +158,98 @@ export default function QuizPage() {
     [locale],
   );
 
-  /** A module reports its 0–100 score and we advance the flow. */
-  const finishModule = useCallback(
-    async (score: number, meta?: { words?: number; records?: AnswerRecord[] }) => {
-      const id = MODULES[moduleIdx].id;
-      const nextScores = { ...scores, [id]: score };
-      setScores(nextScores);
-      const words = meta?.words ?? writingWords;
-      if (meta?.words !== undefined) setWritingWords(meta.words);
-      if (meta?.records?.length) answerLogRef.current = [...answerLogRef.current, ...meta.records];
-
-      if (moduleIdx + 1 >= MODULES.length) {
-        doneRef.current = true; // block any further progress snapshots
-        const result = computeResult(nextScores as Record<ModuleId, number>, {
-          writingWords: words,
-          answers: answerLogRef.current,
-        });
-        saveResult(result); // anonymous cache — survives the sign-up hop
-        clearProgress(); // quiz is done; drop the in-progress snapshot
-
-        const {
-          data: { user },
-        } = await createClient().auth.getUser();
-
-        if (user) {
-          // already signed in → persist and show the result immediately
-          void saveProfileResult(result);
-          router.push("/quiz/result");
-        } else {
-          // guest → the one and only sign-up gate, then /quiz/result
-          setPhase("signup");
-        }
-        return;
-      }
-      setPhase("transition");
-    },
-    [moduleIdx, scores, router, writingWords],
-  );
-
-  function continueFromTransition() {
-    setModuleIdx((i) => i + 1);
-    setPhase("module");
-  }
-
-  // ── refresh-safe progress ──────────────────────────────────────────────
-  // Restore the coarse snapshot on mount (before the save effect can run),
-  // then persist it whenever the flow advances. The active module restarts
-  // from its first question; completed-module scores are preserved.
+  /* ── refresh-safe progress ─────────────────────────────────────────────── */
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
+    setSeed(retakeSeed());
     const p = loadProgress();
     if (p) {
       setOnbStep(p.onbStep);
-      setModuleIdx(p.moduleIdx);
-      setScores(p.scores);
-      setWritingWords(p.writingWords);
-      setPhase(p.phase);
+      setStage(p.stage);
+      setRouterState((p.router as RouterState | null) ?? null);
+      setRouterLevel(p.routerLevel as BankLevel | null);
+      setSeed(p.seed);
+      setMinutesDaily(p.minutesDaily);
+      answerLogRef.current = p.answers ?? [];
+      setDinlemeAgg(p.dinleme);
+      setOkumaAgg(p.okuma);
+      setPhase(p.phase === "stage" ? "stage" : "onboarding");
     }
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated || doneRef.current) return;
-    if (phase === "onboarding" || phase === "module" || phase === "transition") {
-      saveProgress({ phase, onbStep, moduleIdx, scores, writingWords });
+    if (phase === "onboarding" || phase === "stage" || phase === "transition") {
+      saveProgress({
+        v: 3,
+        phase: phase === "onboarding" ? "onboarding" : "stage",
+        onbStep,
+        stage,
+        router: routerState,
+        routerLevel,
+        seed,
+        minutesDaily,
+        answers: answerLogRef.current,
+        dinleme: dinlemeAgg,
+        okuma: okumaAgg,
+      });
     }
-  }, [hydrated, phase, onbStep, moduleIdx, scores, writingWords]);
+  }, [hydrated, phase, onbStep, stage, routerState, routerLevel, seed, minutesDaily, dinlemeAgg, okumaAgg]);
+
+  /* ── stage flow ────────────────────────────────────────────────────────── */
+
+  const finishRouter = useCallback((state: RouterState, records: AnswerRecord[]) => {
+    answerLogRef.current = [...answerLogRef.current, ...records];
+    setRouterState(state);
+    setRouterLevel(routerResult(state));
+    setStage("dinleme");
+    setPhase("transition");
+  }, []);
+
+  const finishDinleme = useCallback((agg: { correct: number; total: number }, records: AnswerRecord[]) => {
+    answerLogRef.current = [...answerLogRef.current, ...records];
+    setDinlemeAgg(agg);
+    setStage("okuma");
+    setPhase("transition");
+  }, []);
+
+  const finishOkuma = useCallback((agg: { correct: number; total: number }, records: AnswerRecord[]) => {
+    answerLogRef.current = [...answerLogRef.current, ...records];
+    setOkumaAgg(agg);
+    setStage("yazma");
+    setPhase("transition");
+  }, []);
+
+  const finishYazma = useCallback(
+    async (writingText: string, promptId: string) => {
+      if (!routerState) return;
+      doneRef.current = true;
+      const result = computeResultV3({
+        routerState,
+        answers: answerLogRef.current,
+        dinleme: dinlemeAgg,
+        okuma: okumaAgg,
+        writingText,
+        yazmaPromptId: promptId,
+        minutesDaily: minutesDaily ?? 30,
+      });
+      saveResult(result); // anonymous cache — survives the sign-up hop
+      clearProgress();
+      bumpRetakeCount(); // next run rotates to different bank questions
+
+      const {
+        data: { user },
+      } = await createClient().auth.getUser();
+      if (user) {
+        void saveProfileResult(result);
+        router.push("/quiz/result");
+      } else {
+        setPhase("signup");
+      }
+    },
+    [routerState, dinlemeAgg, okumaAgg, minutesDaily, router],
+  );
 
   /* ------------------------------ Onboarding ----------------------------- */
   if (phase === "onboarding") {
@@ -204,13 +258,13 @@ export default function QuizPage() {
         <div className="w-full max-w-xl">
           <div className="mb-6">
             <div className="mb-2 flex justify-between text-xs text-[var(--color-muted)]">
-              <span>{qt(locale, "step")} {onbStep + 1} / 4</span>
-              <span>{Math.round(((onbStep + 1) / 4) * 100)}%</span>
+              <span>{qt(locale, "step")} {onbStep + 1} / {ONB_STEPS}</span>
+              <span>{Math.round(((onbStep + 1) / ONB_STEPS) * 100)}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.05]">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
-                animate={{ width: `${((onbStep + 1) / 4) * 100}%` }}
+                animate={{ width: `${((onbStep + 1) / ONB_STEPS) * 100}%` }}
                 transition={{ duration: 0.4 }}
               />
             </div>
@@ -328,7 +382,7 @@ export default function QuizPage() {
                             examDateMode: tl === "tlOpen" ? "unknown" : "approx",
                             examHorizonMonths: tl === "tl1" ? 1 : tl === "tl3" ? 3 : tl === "tl6" ? 6 : undefined,
                           });
-                          setPhase("module");
+                          setOnbStep(4);
                         }}
                         className="rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left text-sm font-medium text-[var(--color-foreground)] transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
                       >
@@ -360,7 +414,7 @@ export default function QuizPage() {
                             disabled={!examDate}
                             onClick={() => {
                               stashExamPlan({ targetLevel, examDateMode: "exact", examDate });
-                              setPhase("module");
+                              setOnbStep(4);
                             }}
                             className="btn-primary rounded-xl px-4 py-2 text-sm disabled:opacity-40"
                           >
@@ -369,6 +423,32 @@ export default function QuizPage() {
                         </div>
                       </div>
                     )}
+                  </div>
+                </>
+              )}
+
+              {onbStep === 4 && (
+                <>
+                  <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{qt(locale, "onbMinutes")}</h1>
+                  <p className="mt-2 text-sm text-[var(--color-muted)]">{qt(locale, "minutesNote")}</p>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    {MINUTE_OPTIONS.map((m) => (
+                      <button
+                        key={m.minutes}
+                        type="button"
+                        onClick={() => {
+                          setMinutesDaily(m.minutes);
+                          setStage("router");
+                          setPhase("stage");
+                        }}
+                        className="flex flex-col items-start rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
+                      >
+                        <span className="text-base font-bold text-[var(--color-foreground)]">
+                          {m.minutes === 60 ? "60+" : m.minutes} {qt(locale, "minPerDay")}
+                        </span>
+                        <span className="text-xs text-[var(--color-muted)]">{qt(locale, m.labelKey)}</span>
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
@@ -396,8 +476,8 @@ export default function QuizPage() {
 
   /* ------------------------------ Transition ----------------------------- */
   if (phase === "transition") {
-    const done = MODULES[moduleIdx];
-    const next = MODULES[moduleIdx + 1];
+    const next = STAGES[stageIdx(stage)];
+    const done = STAGES[stageIdx(stage) - 1];
     return (
       <PageShell>
         <motion.div
@@ -411,13 +491,18 @@ export default function QuizPage() {
             ✓
           </div>
           <h2 className="mt-4 text-lg font-bold tracking-tight">
-            {qt(locale, "module")} {moduleIdx + 1} {qt(locale, "moduleDone")}
+            {done ? `${qt(locale, done.nameKey)} ${qt(locale, "moduleDone")}` : qt(locale, "continue")}
           </h2>
+          {stage === "dinleme" && routerLevel && (
+            <p className="mt-2 text-sm text-[var(--color-muted)]">
+              {qt(locale, "stRouter")}: <span className="font-semibold text-[var(--color-foreground)]">{routerLevel}</span>
+            </p>
+          )}
           <div className="mt-5 rounded-2xl border border-black/[0.06] bg-black/[0.02] p-4 text-left">
             <div className="text-xs text-[var(--color-muted)]">{qt(locale, "nextModule")}</div>
             <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--color-foreground)]">
               <span>{next.emoji}</span>
-              {qt(locale, "module")} {moduleIdx + 2} · {next.name[locale]}
+              {qt(locale, next.nameKey)}
             </div>
             <div className="mt-2 text-xs text-[var(--color-muted)]">
               {qt(locale, "estTime")}: ~{next.minutes} {qt(locale, "min")}
@@ -425,172 +510,183 @@ export default function QuizPage() {
           </div>
           <button
             type="button"
-            onClick={continueFromTransition}
+            onClick={() => setPhase("stage")}
             className="btn-primary mt-6 w-full rounded-full px-6 py-3.5 text-sm"
           >
             {qt(locale, "continue")} →
           </button>
-          <p className="mt-3 text-[11px] text-[var(--color-muted)]">{done.name[locale]} ✓</p>
         </motion.div>
       </PageShell>
     );
   }
 
-  /* -------------------------------- Module ------------------------------- */
-  const current = MODULES[moduleIdx];
+  /* --------------------------------- Stage -------------------------------- */
+  const blockLevel = routerLevel ? skillBlockLevel(routerLevel) : "A2";
+  const yazmaLevel: BankLevel = routerLevel === "A1" ? "A2" : (routerLevel ?? "A2");
+
   return (
     <PageShell>
       <div className="w-full max-w-2xl">
-        <SectionProgress activeIdx={moduleIdx} doneIds={Object.keys(scores) as ModuleId[]} locale={locale} />
+        <StageProgress active={stage} locale={locale} />
 
-        {current.id === "grammar" && (
-          <MCModule
-            key="grammar"
-            moduleIdx={moduleIdx}
-            questions={GRAMMAR}
+        {stage === "router" && (
+          <RouterStage
+            key="router"
+            initial={routerState ?? initRouter(selfLevelToStart(levelSelf))}
+            seed={seed}
             locale={locale}
             hint={hint}
-            onDone={finishModule}
+            onProgress={setRouterState}
+            onDone={finishRouter}
           />
         )}
-        {current.id === "vocab" && (
-          <MCModule
-            key="vocab"
-            moduleIdx={moduleIdx}
-            questions={VOCAB}
+        {stage === "dinleme" && (
+          <SetStage
+            key="dinleme"
+            module="listening"
+            sets={dinlemeSets(blockLevel).map((s) => ({ audio: s.audio, questions: s.questions }))}
+            seed={seed}
             locale={locale}
-            hint={hint}
-            onDone={finishModule}
+            onDone={finishDinleme}
           />
         )}
-        {current.id === "reading" && (
-          <ReadingModule moduleIdx={moduleIdx} locale={locale} hint={hint} onDone={finishModule} />
+        {stage === "okuma" && (
+          <SetStage
+            key="okuma"
+            module="reading"
+            sets={okumaSets(blockLevel).map((s) => ({ text: s.text, questions: s.questions }))}
+            seed={seed}
+            locale={locale}
+            onDone={finishOkuma}
+          />
         )}
-        {current.id === "writing" && (
-          <WritingModule moduleIdx={moduleIdx} locale={locale} hint={hint} onDone={finishModule} />
-        )}
-        {current.id === "speaking" && (
-          <SpeakingModule moduleIdx={moduleIdx} locale={locale} hint={hint} onDone={finishModule} />
+        {stage === "yazma" && (
+          <YazmaStage key="yazma" level={yazmaLevel} seed={seed} locale={locale} hint={hint} onDone={finishYazma} />
         )}
       </div>
     </PageShell>
   );
 }
 
-/* ---------------------------- Top section bar ---------------------------- */
-function SectionProgress({
-  activeIdx,
-  doneIds,
-  locale,
-}: {
-  activeIdx: number;
-  doneIds: ModuleId[];
-  locale: Locale;
-}) {
+/* ------------------------------ Stage top bar ----------------------------- */
+
+function StageProgress({ active, locale }: { active: StageId; locale: Locale }) {
+  const activeIdx = stageIdx(active);
   return (
     <div className="mb-5 flex flex-wrap items-center justify-center gap-1.5">
-      {MODULES.map((m, i) => {
-        const done = doneIds.includes(m.id);
-        const active = i === activeIdx;
-        return (
-          <div
-            key={m.id}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              active
-                ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]/30"
-                : done
-                  ? "bg-[var(--color-brand-2)]/12 text-[var(--color-brand-2)]"
-                  : "bg-black/[0.04] text-[var(--color-muted)]"
-            }`}
-          >
-            <span>{done ? "✓" : m.emoji}</span>
-            <span className="hidden sm:inline">{m.name[locale]}</span>
-          </div>
-        );
-      })}
+      {STAGES.map((s, i) => (
+        <div
+          key={s.id}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            i === activeIdx
+              ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]/30"
+              : i < activeIdx
+                ? "bg-[var(--color-brand-2)]/12 text-[var(--color-brand-2)]"
+                : "bg-black/[0.04] text-[var(--color-muted)]"
+          }`}
+        >
+          <span>{i < activeIdx ? "✓" : s.emoji}</span>
+          <span className="hidden sm:inline">{qt(locale, s.nameKey)}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ----------------------------- Module header ----------------------------- */
-function ModuleHeader({
-  moduleIdx,
-  locale,
-  right,
-}: {
-  moduleIdx: number;
-  locale: Locale;
-  right?: React.ReactNode;
-}) {
-  const m = MODULES[moduleIdx];
+function StageHeader({ stage, locale, right }: { stage: StageId; locale: Locale; right?: React.ReactNode }) {
+  const s = STAGES[stageIdx(stage)];
   return (
     <div className="mb-4 flex items-center justify-between">
       <span className="inline-flex items-center gap-2 rounded-full bg-[var(--color-brand)]/10 px-3 py-1 text-xs font-semibold text-[var(--color-brand)]">
-        <span>{m.emoji}</span>
-        {qt(locale, "module")} {moduleIdx + 1}/5 · {m.name[locale]}
+        <span>{s.emoji}</span>
+        {qt(locale, "stage")} {stageIdx(stage) + 1}/4 · {qt(locale, s.nameKey)}
       </span>
       {right}
     </div>
   );
 }
 
-type ModuleProps = {
-  moduleIdx: number;
-  locale: Locale;
-  hint: (l: Localized | undefined) => string | null;
-  onDone: (score: number, meta?: { words?: number; records?: AnswerRecord[] }) => void;
-};
+/* ----------------------------- Option buttons ----------------------------- */
 
-/** Per-question records for the honest breakdown + mastery seeding. */
-function mcRecords(moduleIdx: number, qs: MCQuestion[], answers: (number | null)[], locale: Locale): AnswerRecord[] {
-  return qs.map((q, i) => ({
-    module: MODULES[moduleIdx].id,
-    prompt: q.prompt,
-    topic: q.topic,
-    tag: q.tag,
-    level: q.level,
-    correct: answers[i] === q.answer,
-    correctAnswer: (q.opts ? q.opts[locale] ?? q.opts.ru : q.options ?? [])[q.answer] ?? "",
-  }));
+function OptionList({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: string[];
+  selected: number | null;
+  onSelect: (i: number) => void;
+}) {
+  return (
+    <div className="mt-5 grid gap-3">
+      {options.map((opt, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onSelect(i)}
+          className={`rounded-2xl border px-4 py-3 text-left text-sm transition-all ${
+            selected === i
+              ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.1] text-[var(--color-foreground)]"
+              : "border-black/[0.07] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.14]"
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-/* ------------------------- Multiple-choice module ------------------------ */
-function MCModule({
-  moduleIdx,
-  questions: rawQuestions,
+/* ------------------------------ Router stage ------------------------------ */
+
+function RouterStage({
+  initial,
+  seed,
   locale,
   hint,
+  onProgress,
   onDone,
-}: ModuleProps & { questions: MCQuestion[] }) {
-  const [qs] = useState(() => rawQuestions.map(shuffleMC));
-  const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(qs.length).fill(null));
-
-  const q = qs[step];
-  const selected = answers[step];
-  const options = q.opts ? q.opts[locale] ?? q.opts.ru : q.options ?? [];
-  const progress = ((step + 1) / qs.length) * 100;
-  const qHint = hint(q.hint);
-
-  function choose(i: number) {
-    setAnswers((prev) => {
-      const n = [...prev];
-      n[step] = i;
-      return n;
-    });
-  }
+}: {
+  initial: RouterState;
+  seed: number;
+  locale: Locale;
+  hint: (l: Localized | undefined) => string | null;
+  onProgress: (s: RouterState) => void;
+  onDone: (s: RouterState, records: AnswerRecord[]) => void;
+}) {
+  const [state, setState] = useState<RouterState>(initial);
+  const [current, setCurrent] = useState<ShuffledItem | null>(() => {
+    const q = nextRouterQuestion(initial, seed);
+    return q ? shuffleItem(q) : null;
+  });
+  const [selected, setSelected] = useState<number | null>(null);
+  const recordsRef = useRef<AnswerRecord[]>([]);
 
   function next() {
-    if (step + 1 >= qs.length) {
-      onDone(scoreMC(answers, qs), { records: mcRecords(moduleIdx, qs, answers, locale) });
-    } else {
-      setStep((s) => s + 1);
+    if (!current || selected === null) return;
+    const correct = selected === current.answer;
+    recordsRef.current = [...recordsRef.current, toRecord(current, "grammar", selected)];
+    const nextState = applyRouterAnswer(state, current.item, correct);
+    onProgress(nextState);
+
+    const q = routerDone(nextState) ? null : nextRouterQuestion(nextState, seed);
+    if (!q) {
+      onDone(nextState, recordsRef.current);
+      return;
     }
+    setState(nextState);
+    setCurrent(shuffleItem(q));
+    setSelected(null);
   }
+
+  if (!current) return null;
+  const qHint = current.item.level === "A1" || current.item.level === "A2" ? hint(current.item.hint) : null;
+  const progress = Math.min(100, ((state.asked.length + 1) / ROUTER_MAX) * 100);
 
   return (
     <div className="glass-strong rounded-3xl p-6 sm:p-8">
-      <ModuleHeader moduleIdx={moduleIdx} locale={locale} />
+      <StageHeader stage="router" locale={locale} />
+      <p className="mb-4 text-xs text-[var(--color-muted)]">{qt(locale, "routerIntro")}</p>
       <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.05]">
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
@@ -601,156 +697,23 @@ function MCModule({
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={step}
+          key={current.item.id}
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.22 }}
         >
           <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-            <span>{qt(locale, "question")} {step + 1}/{qs.length}</span>
+            <span>{qt(locale, "question")} {state.asked.length + 1}</span>
             <span className="rounded-full bg-black/[0.05] px-2 py-0.5 font-semibold text-[var(--color-brand-2)]">
-              {q.level}
-            </span>
-            {q.tag && <span className="hidden sm:inline">· {q.tag[locale] ?? q.tag.ru}</span>}
-          </div>
-
-          <h2 className="mt-3 text-lg font-semibold text-[var(--color-foreground)] sm:text-xl">{q.prompt}</h2>
-          {qHint && <p className="mt-1.5 text-sm text-[var(--color-muted)]">{qHint}</p>}
-
-          <div className="mt-5 grid gap-3">
-            {options.map((opt, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => choose(i)}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm transition-all ${
-                  selected === i
-                    ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.1] text-[var(--color-foreground)]"
-                    : "border-black/[0.07] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.14]"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selected !== null && (
-          <motion.button
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            type="button"
-            onClick={next}
-            className="btn-primary mt-6 w-full rounded-full px-6 py-3.5 text-sm"
-          >
-            {step + 1 >= qs.length ? qt(locale, "next") + " →" : qt(locale, "next")}
-          </motion.button>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/* ------------------------------ Reading module --------------------------- */
-function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
-  const [rq] = useState(() => READING.map(shuffleMC));
-  const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(rq.length).fill(null));
-  const [left, setLeft] = useState(240); // 4 minutes
-
-  const finishRef = useRef(() => {});
-  useEffect(() => {
-    finishRef.current = () => onDone(scoreMC(answers, rq), { records: mcRecords(moduleIdx, rq, answers, locale) });
-  });
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) {
-          clearInterval(id);
-          finishRef.current();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const q = rq[step];
-  const selected = answers[step];
-  const qHint = hint(q.hint);
-
-  function choose(i: number) {
-    setAnswers((prev) => {
-      const n = [...prev];
-      n[step] = i;
-      return n;
-    });
-  }
-  function next() {
-    if (step + 1 >= rq.length) onDone(scoreMC(answers, rq), { records: mcRecords(moduleIdx, rq, answers, locale) });
-    else setStep((s) => s + 1);
-  }
-
-  return (
-    <div className="glass-strong rounded-3xl p-6 sm:p-8">
-      <ModuleHeader
-        moduleIdx={moduleIdx}
-        locale={locale}
-        right={
-          <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-foreground)]">
-            <span className="h-2 w-2 rounded-full bg-[var(--color-red)]" /> {fmt(left)}
-          </span>
-        }
-      />
-
-      <div className="rounded-2xl border border-black/[0.06] bg-black/[0.02] p-4 text-sm leading-relaxed text-[var(--color-foreground)]">
-        {READING_TEXT.split("\n\n").map((p, i) => (
-          <p key={i} className={i > 0 ? "mt-3" : ""}>
-            {p}
-          </p>
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.22 }}
-          className="mt-5"
-        >
-          <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-            <span>{qt(locale, "question")} {step + 1}/{rq.length}</span>
-            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 font-semibold text-[var(--color-brand-2)]">
-              {q.level}
+              {current.item.level}
             </span>
           </div>
-          <h2 className="mt-2 text-base font-semibold text-[var(--color-foreground)] sm:text-lg">{q.prompt}</h2>
+
+          <h2 className="mt-3 text-lg font-semibold text-[var(--color-foreground)] sm:text-xl">{current.item.prompt}</h2>
           {qHint && <p className="mt-1.5 text-sm text-[var(--color-muted)]">{qHint}</p>}
 
-          <div className="mt-4 grid gap-2.5">
-            {(q.options ?? []).map((opt, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => choose(i)}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm transition-all ${
-                  selected === i
-                    ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.1] text-[var(--color-foreground)]"
-                    : "border-black/[0.07] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.14]"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+          <OptionList options={current.options} selected={selected} onSelect={setSelected} />
         </motion.div>
       </AnimatePresence>
 
@@ -772,54 +735,214 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
   );
 }
 
-/* ------------------------------ Writing module --------------------------- */
-function WritingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
-  const [text, setText] = useState("");
-  const [left, setLeft] = useState(300); // 5 minutes
+/* ------------------------- Dinleme / Okuma stage -------------------------- */
+/** A sequence of sets; each set = (audio | text) + its questions. */
 
-  const finishRef = useRef(() => {});
-  useEffect(() => {
-    finishRef.current = () => onDone(scoreWriting(text), { words: countWords(text) });
-  });
+type StageSet = { audio?: BankAudio; text?: BankText; questions: BankItem[] };
+
+function SetStage({
+  module,
+  sets,
+  seed,
+  locale,
+  onDone,
+}: {
+  module: AnswerRecord["module"];
+  sets: StageSet[];
+  seed: number;
+  locale: Locale;
+  onDone: (agg: { correct: number; total: number }, records: AnswerRecord[]) => void;
+}) {
+  // seed rotates which set comes first on a retake; questions keep bank order
+  const [ordered] = useState(() => rotated(sets, seed));
+  const [shuffled] = useState(() =>
+    ordered.map((s) => s.questions.map((q) => shuffleItem(q))),
+  );
+  const [setIdx, setSetIdx] = useState(0);
+  const [qIdx, setQIdx] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const recordsRef = useRef<AnswerRecord[]>([]);
+  const correctRef = useRef(0);
+
+  const totalQuestions = shuffled.reduce((n, s) => n + s.length, 0);
+  const answered = shuffled.slice(0, setIdx).reduce((n, s) => n + s.length, 0) + qIdx;
+
+  const set = ordered[setIdx];
+  const q = shuffled[setIdx][qIdx];
+  const stage: StageId = module === "listening" ? "dinleme" : "okuma";
+
+  function next() {
+    if (selected === null) return;
+    if (selected === q.answer) correctRef.current += 1;
+    recordsRef.current = [...recordsRef.current, toRecord(q, module, selected)];
+    setSelected(null);
+
+    if (qIdx + 1 < shuffled[setIdx].length) {
+      setQIdx(qIdx + 1);
+    } else if (setIdx + 1 < ordered.length) {
+      setSetIdx(setIdx + 1);
+      setQIdx(0);
+    } else {
+      onDone({ correct: correctRef.current, total: totalQuestions }, recordsRef.current);
+    }
+  }
+
+  return (
+    <div className="glass-strong rounded-3xl p-6 sm:p-8">
+      <StageHeader stage={stage} locale={locale} />
+      <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.05]">
+        <motion.div
+          className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
+          animate={{ width: `${((answered + 1) / totalQuestions) * 100}%` }}
+          transition={{ duration: 0.4 }}
+        />
+      </div>
+
+      {set.audio && <AudioPlayer key={set.audio.id} audio={set.audio} locale={locale} />}
+      {set.text && (
+        <div className="rounded-2xl border border-black/[0.06] bg-black/[0.02] p-4 text-sm leading-relaxed text-[var(--color-foreground)]">
+          <div className="mb-2 text-xs font-semibold text-[var(--color-muted)]">{set.text.title}</div>
+          {set.text.body.split("\n\n").map((p, i) => (
+            <p key={i} className={i > 0 ? "mt-3" : ""}>
+              {p}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={q.item.id}
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.22 }}
+          className="mt-5"
+        >
+          <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
+            <span>{qt(locale, "question")} {answered + 1}/{totalQuestions}</span>
+            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 font-semibold text-[var(--color-brand-2)]">
+              {q.item.level}
+            </span>
+          </div>
+          <h2 className="mt-2 text-base font-semibold text-[var(--color-foreground)] sm:text-lg">{q.item.prompt}</h2>
+          <OptionList options={q.options} selected={selected} onSelect={setSelected} />
+        </motion.div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selected !== null && (
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={next}
+            className="btn-primary mt-6 w-full rounded-full px-6 py-3.5 text-sm"
+          >
+            {qt(locale, "next")}
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ------------------------------ Audio player ------------------------------ */
+/** Exam-honest player: play/pause only, no scrubbing, two full plays max. */
+
+function AudioPlayer({ audio, locale }: { audio: BankAudio; locale: Locale }) {
+  const ref = useRef<HTMLAudioElement | null>(null);
+  const [playsLeft, setPlaysLeft] = useState(2);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) {
-          clearInterval(id);
-          finishRef.current();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
+    const el = ref.current;
+    return () => el?.pause();
   }, []);
+
+  function play() {
+    if (playsLeft <= 0 || playing || !ref.current) return;
+    setPlaysLeft((n) => n - 1);
+    setPlaying(true);
+    ref.current.currentTime = 0;
+    void ref.current.play().catch(() => setPlaying(false));
+  }
+
+  return (
+    <div className="rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.04] p-4">
+      <audio ref={ref} src={audio.src} preload="auto" onEnded={() => setPlaying(false)} />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={play}
+          disabled={playsLeft <= 0 || playing}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)] text-white shadow-md transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {playing ? (
+            <span className="flex items-end gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="w-1 rounded-full bg-white"
+                  animate={{ height: [6, 16, 8, 14, 6] }}
+                  transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+                />
+              ))}
+            </span>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--color-foreground)]">
+            {playing ? qt(locale, "playing") : `🎧 ${qt(locale, "play")}`}
+          </div>
+          <div className="text-xs text-[var(--color-muted)]">
+            {qt(locale, "playsLeft")}: {playsLeft} · {qt(locale, "audioRule")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- Yazma stage ------------------------------ */
+
+function YazmaStage({
+  level,
+  seed,
+  locale,
+  hint,
+  onDone,
+}: {
+  level: BankLevel;
+  seed: number;
+  locale: Locale;
+  hint: (l: Localized | undefined) => string | null;
+  onDone: (text: string, promptId: string) => void;
+}) {
+  const [prompt] = useState<YazmaPrompt>(() => rotated(yazmaByLevel(level), seed)[0]);
+  const [text, setText] = useState("");
 
   const words = countWords(text);
   const sentences = (text.match(/[.!?]+/g) || []).length;
   const canNext = text.trim().length >= 20;
-  const wHint = hint(WRITING.hint);
+  const wHint = hint(prompt.hint);
 
   return (
     <div className="glass-strong rounded-3xl p-6 sm:p-8">
-      <ModuleHeader
-        moduleIdx={moduleIdx}
-        locale={locale}
-        right={
-          <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-foreground)]">
-            <span className="h-2 w-2 rounded-full bg-[var(--color-red)]" /> {fmt(left)}
-          </span>
-        }
-      />
+      <StageHeader stage="yazma" locale={locale} />
 
-      <h2 className="text-base font-semibold text-[var(--color-foreground)] sm:text-lg">{WRITING.prompt}</h2>
+      <h2 className="text-base font-semibold text-[var(--color-foreground)] sm:text-lg">{prompt.prompt}</h2>
       {wHint && <p className="mt-1.5 text-sm text-[var(--color-muted)]">{wHint}</p>}
 
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={8}
+        rows={9}
         placeholder={qt(locale, "writePlaceholder")}
         className="mt-4 w-full resize-y rounded-2xl border border-black/[0.08] bg-white/70 p-4 text-sm leading-relaxed text-[var(--color-foreground)] outline-none transition-colors focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/15"
       />
@@ -828,323 +951,22 @@ function WritingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
         <span>
           {words} {qt(locale, "wordsLabel")}
         </span>
-        <span className={sentences >= 5 ? "text-[var(--color-brand-2)]" : ""}>
-          {sentences >= 5 ? "✓ " : ""}
-          {qt(locale, "minSentences")}
+        <span className={sentences >= prompt.minSentences ? "text-[var(--color-brand-2)]" : ""}>
+          {sentences >= prompt.minSentences ? "✓ " : ""}
+          {sentences}/{prompt.minSentences}
         </span>
       </div>
+
+      <p className="mt-3 text-xs text-[var(--color-muted)]">💡 {qt(locale, "yazmaAiNote")}</p>
 
       <button
         type="button"
         disabled={!canNext}
-        onClick={() => onDone(scoreWriting(text), { words })}
+        onClick={() => onDone(text, prompt.id)}
         className="btn-primary mt-5 w-full rounded-full px-6 py-3.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {qt(locale, "next")} →
+        {qt(locale, "finish")} →
       </button>
-    </div>
-  );
-}
-
-/* --------------------- Speaking module — AI audio dialogue ---------------- */
-function SpeakingModule({ moduleIdx, locale, onDone }: ModuleProps) {
-  const [step, setStep] = useState(0);
-  const [status, setStatus] = useState<SpeakStatus>("speaking");
-  const [recSeconds, setRecSeconds] = useState(0);
-  const [durations, setDurations] = useState<number[]>(() => Array(SPEAKING.length).fill(0));
-  const [typed, setTyped] = useState<string[]>(() => Array(SPEAKING.length).fill(""));
-  const [supported, setSupported] = useState(true);
-
-  const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const startRef = useRef(0);
-
-  // detect mic support on mount (client only)
-  useEffect(() => {
-    setSupported(micSupported());
-  }, []);
-
-  // AI speaks the current question; mic unlocks when it finishes
-  useEffect(() => {
-    setStatus("speaking");
-    const t = setTimeout(() => {
-      speakTr(SPEAKING[step].prompt, () => setStatus("ready"));
-    }, 450);
-    return () => {
-      clearTimeout(t);
-      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
-    };
-  }, [step]);
-
-  // live recording counter
-  useEffect(() => {
-    if (status !== "recording") return;
-    const id = setInterval(() => setRecSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [status]);
-
-  // hard cleanup on unmount
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
-    };
-  }, []);
-
-  function replay() {
-    setStatus("speaking");
-    speakTr(SPEAKING[step].prompt, () => setStatus("ready"));
-  }
-
-  async function startRec() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const rec = new MediaRecorder(stream);
-      recorderRef.current = rec;
-      rec.start();
-      startRef.current = Date.now();
-      setRecSeconds(0);
-      setStatus("recording");
-    } catch {
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      setSupported(false);
-      setStatus("ready");
-    }
-  }
-
-  function stopRec() {
-    const secs = (Date.now() - startRef.current) / 1000;
-    recorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
-    streamRef.current = null;
-    setStatus("processing");
-    setTimeout(() => {
-      setDurations((prev) => {
-        const n = [...prev];
-        n[step] = secs;
-        return n;
-      });
-      setStatus("saved");
-    }, 800);
-  }
-
-  function next() {
-    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
-    if (step + 1 >= SPEAKING.length) {
-      const arr = SPEAKING.map((_, i) => {
-        const d = durations[i];
-        if (d && d > 0) return scoreSpeakingDuration(d);
-        return scoreSpeakingAnswer(countWords(typed[i] || ""));
-      });
-      onDone(Math.round(arr.reduce((a, b) => a + b, 0) / arr.length));
-    } else {
-      setRecSeconds(0);
-      setStep((s) => s + 1);
-    }
-  }
-
-  const statusKey: QuizTKey =
-    status === "speaking"
-      ? "aiSpeaking"
-      : status === "recording"
-        ? "listeningYou"
-        : status === "processing"
-          ? "processing"
-          : status === "saved"
-            ? "answerSaved"
-            : "tapAnswer";
-
-  const speaking = status === "speaking";
-  const recording = status === "recording";
-  const answered = supported ? status === "saved" : typed[step].trim().length >= 2;
-  const micDisabled = speaking || status === "processing";
-
-  return (
-    <div
-      className="relative overflow-hidden rounded-3xl p-6 text-white sm:p-9"
-      style={{ background: "linear-gradient(165deg,#1b1640 0%,#141233 55%,#0d1030 100%)" }}
-    >
-      {/* soft glow accents */}
-      <div className="pointer-events-none absolute -left-10 -top-10 h-48 w-48 rounded-full bg-[var(--color-brand)]/25 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-12 -right-8 h-48 w-48 rounded-full bg-[var(--color-brand-2)]/20 blur-3xl" />
-
-      {/* header */}
-      <div className="relative mb-5 flex items-center justify-between">
-        <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
-          🎤 {qt(locale, "module")} {moduleIdx + 1}/5 · {MODULES[moduleIdx].name[locale]}
-        </span>
-        <span className="text-xs font-medium text-white/60">
-          {qt(locale, "question")} {step + 1}/{SPEAKING.length}
-        </span>
-      </div>
-      <div className="relative mb-8 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-        <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
-          animate={{ width: `${((step + 1) / SPEAKING.length) * 100}%` }}
-          transition={{ duration: 0.4 }}
-        />
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -16 }}
-          transition={{ duration: 0.35 }}
-          className="relative flex flex-col items-center"
-        >
-          {/* AI avatar */}
-          <div className="relative flex h-[120px] w-[120px] items-center justify-center">
-            {speaking && (
-              <motion.span
-                className="absolute inset-0 rounded-full"
-                style={{ border: "2px solid rgba(109,91,255,0.5)" }}
-                animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
-              />
-            )}
-            <div
-              className="flex h-[120px] w-[120px] items-center justify-center rounded-full"
-              style={{
-                background: "radial-gradient(circle at 35% 30%, #9c8fff, #6d5bff 46%, #3a1d9c 88%)",
-                boxShadow: "0 0 60px -8px rgba(109,91,255,0.75)",
-              }}
-            >
-              {speaking ? (
-                <div className="flex items-end gap-1.5">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <motion.span
-                      key={i}
-                      className="w-1.5 rounded-full bg-white"
-                      animate={{ height: [10, 34, 14, 28, 10] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" className="text-white">
-                  <rect x="5" y="7" width="14" height="11" rx="3.5" stroke="currentColor" strokeWidth="1.6" />
-                  <path d="M12 4v3M9 12h.01M15 12h.01M9.5 15.5c.7.6 3.3.6 4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              )}
-            </div>
-          </div>
-
-          {/* status */}
-          <div className="mt-5 h-5 text-sm font-medium text-white/80">
-            {qt(locale, statusKey)}
-            {status === "saved" && " ✓"}
-          </div>
-
-          {/* "listen again" — only once AI is done and we're not recording */}
-          {!speaking && supported && (
-            <button
-              type="button"
-              onClick={replay}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/15"
-            >
-              🔊 {qt(locale, "listenAgain")}
-            </button>
-          )}
-
-          {/* mic / fallback */}
-          {supported ? (
-            <div className="mt-7 flex flex-col items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  if (recording) stopRec();
-                  else if (!micDisabled) startRec();
-                }}
-                disabled={micDisabled}
-                className="relative flex h-20 w-20 items-center justify-center rounded-full text-white shadow-[0_14px_44px_-8px_rgba(109,91,255,0.7)] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                style={{
-                  background: recording
-                    ? "linear-gradient(135deg,#ef4444,#b91c1c)"
-                    : "linear-gradient(135deg,var(--color-brand),var(--color-brand-2))",
-                }}
-              >
-                {recording && (
-                  <motion.span
-                    className="absolute inset-0 rounded-full"
-                    style={{ border: "2px solid rgba(239,68,68,0.6)" }}
-                    animate={{ scale: [1, 1.45], opacity: [0.7, 0] }}
-                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeOut" }}
-                  />
-                )}
-                {recording ? (
-                  <span className="h-6 w-6 rounded-md bg-white" />
-                ) : (
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 4a3 3 0 013 3v4a3 3 0 11-6 0V7a3 3 0 013-3zM5 11a7 7 0 0014 0M12 18v3"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                )}
-              </button>
-
-              {/* student waveform while recording */}
-              <div className="mt-4 flex h-7 items-end gap-1">
-                {recording
-                  ? [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                      <motion.span
-                        key={i}
-                        className="w-1.5 rounded-full"
-                        style={{ background: "linear-gradient(to top,var(--color-brand),var(--color-brand-2))" }}
-                        animate={{ height: [6, 26, 6] }}
-                        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.07, ease: "easeInOut" }}
-                      />
-                    ))
-                  : null}
-              </div>
-
-              <div className="mt-1 text-xs font-medium text-white/60">
-                {recording ? fmt(recSeconds) : status === "ready" ? qt(locale, "tapAnswer") : ""}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-7 w-full text-left">
-              <p className="mb-2 text-xs text-white/70">{qt(locale, "speakNoMic")}</p>
-              <textarea
-                value={typed[step]}
-                onChange={(e) =>
-                  setTyped((prev) => {
-                    const n = [...prev];
-                    n[step] = e.target.value;
-                    return n;
-                  })
-                }
-                rows={5}
-                placeholder={qt(locale, "writePlaceholder")}
-                className="w-full resize-y rounded-2xl border border-white/15 bg-white/5 p-4 text-sm leading-relaxed text-white outline-none transition-colors placeholder:text-white/40 focus:border-[var(--color-brand-2)] focus:ring-2 focus:ring-[var(--color-brand-2)]/25"
-              />
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {/* on the last question the "see result" button is always available so
-            the diagnostic can be finished even if the recording didn't register */}
-        {(answered || step + 1 >= SPEAKING.length) && (
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            type="button"
-            onClick={next}
-            className="relative mt-8 w-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_36px_-10px_rgba(109,91,255,0.8)] transition-transform active:scale-[0.99]"
-          >
-            {step + 1 >= SPEAKING.length ? qt(locale, "finish") : qt(locale, "nextQuestion")} →
-          </motion.button>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
