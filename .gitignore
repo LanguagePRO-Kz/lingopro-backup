@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# generated audio samples (recon artifacts, not source)
+/docs/voice-samples/
 
 # vercel
 .vercel
