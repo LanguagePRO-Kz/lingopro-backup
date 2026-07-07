@@ -12,10 +12,12 @@ import { TaskModal } from "@/components/TaskModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
+  generateDailyPlan,
   loadDashboardData,
   loadDailyState,
   saveDay,
   saveTaskResult,
+  todayISO,
   SKILL_META,
   skillLabel,
   taskDescription,
@@ -141,8 +143,24 @@ export default function DashboardHome() {
       setHistory(h);
       setLoading(false);
       window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: t.completedCount, total: t.total } }));
+      return;
     }
-    // if changed later, the new intensity applies to the next day's plan
+    if (i === intensity) return;
+    // pace change rebuilds TODAY too (not silently tomorrow); finished tasks keep credit
+    const tasks = generateDailyPlan(level, i, dayNumber, locale).map((t) => ({
+      ...t,
+      completed: !!today?.tasks.some((p) => p.skill === t.skill && p.completed),
+    }));
+    const row: DayRow = {
+      date: todayISO(),
+      tasks,
+      completedCount: tasks.filter((t) => t.completed).length,
+      total: tasks.length,
+    };
+    setToday(row);
+    setHistory((h) => [...h.filter((r) => r.date !== row.date), row].sort((a, b) => a.date.localeCompare(b.date)));
+    void saveDay(row);
+    window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: row.completedCount, total: row.total } }));
   }
 
   function completeTask(task: DailyTask, result: { score: number; maxScore: number; answers: unknown }) {
