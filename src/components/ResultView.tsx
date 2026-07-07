@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useExam } from "@/lib/exam-context";
 import { useI18n, type Locale } from "@/lib/i18n";
-import { pick, plural } from "@/lib/localized";
+import { pick } from "@/lib/localized";
 import {
-  ANALYSIS,
   LEVEL_ORDER,
   MODULES,
   PLANS,
@@ -16,9 +15,11 @@ import {
   qt,
   clearProgress,
   clearResult,
+  type AnswerRecord,
   type ModuleId,
   type QuizResult,
 } from "@/lib/quiz";
+import { topicById } from "@/lib/ai/topics";
 
 function barColor(percent: number) {
   if (percent >= 70) return { from: "#16a34a", to: "#22c55e" };
@@ -71,32 +72,31 @@ function SkillBar({
 }
 
 /* ------------------------------- Accordion -------------------------------- */
+/** Fact-based per-module breakdown: built ONLY from the student's answers. */
 function ModuleAccordion({
   id,
   percent,
   level,
-  words,
+  records,
   locale,
   defaultOpen,
 }: {
   id: ModuleId;
   percent: number;
   level: string;
-  words: number;
+  records: AnswerRecord[];
   locale: Locale;
   defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const m = moduleMeta(id);
-  const a = ANALYSIS[id];
   const c = barColor(percent);
 
-  // RU needs proper numeral agreement ("232 слова", not "232 слов");
-  // other locales don't inflect the noun after a number here.
-  const inject = (t: string) =>
-    locale === "ru"
-      ? t.replace("{words} слов", plural(words, "слово", "слова", "слов")).replace("{words}", String(words))
-      : t.replace("{words}", String(words));
+  const knows = records.filter((r) => r.correct);
+  const gaps = records.filter((r) => !r.correct);
+  const gapTopics = [...new Set(gaps.map((g) => g.topic).filter(Boolean))] as string[];
+  const label = (r: AnswerRecord) => (r.tag ? r.tag[locale] ?? r.tag.ru : r.prompt);
+  const isOpenSkill = id === "writing" || id === "speaking";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-black/[0.07] bg-white/60">
@@ -134,50 +134,72 @@ function ModuleAccordion({
             className="overflow-hidden"
           >
             <div className="flex flex-col gap-4 border-t border-black/[0.06] px-5 py-5">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-brand-2)]">
-                  {qt(locale, "knowsTitle")}
-                </div>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {a.knows.map((k) => (
-                    <li key={k.ru} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
-                      <span className="text-[var(--color-brand-2)]">✅</span>
-                      {k[locale]}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {isOpenSkill ? (
+                // open-ended skills: the diagnostic only sizes the answer —
+                // say so honestly and point to where the real assessment lives
+                <p className="rounded-xl bg-black/[0.03] p-4 text-sm leading-relaxed text-[var(--color-foreground)]">
+                  {qt(locale, id === "writing" ? "prelimWriting" : "prelimSpeaking")}
+                </p>
+              ) : records.length === 0 ? (
+                <p className="text-sm text-[var(--color-muted)]">{qt(locale, "noDetail")}</p>
+              ) : (
+                <>
+                  {knows.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-brand-2)]">
+                        {qt(locale, "knowsTitle")}
+                      </div>
+                      <ul className="mt-2 flex flex-col gap-1.5">
+                        {knows.map((k, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
+                            <span className="text-[var(--color-brand-2)]">✅</span>
+                            <span>{label(k)} <span className="text-xs text-[var(--color-muted)]">· {k.level}</span></span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-[#d97706]">
-                  {qt(locale, "gapsTitle")}
-                </div>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {a.gaps.map((g) => (
-                    <li key={g.ru} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
-                      <span>❌</span>
-                      {inject(g[locale])}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#d97706]">
+                      {qt(locale, "gapsTitle")}
+                    </div>
+                    {gaps.length === 0 ? (
+                      <p className="mt-2 text-sm text-[#16a34a]">✅</p>
+                    ) : (
+                      <ul className="mt-2 flex flex-col gap-2">
+                        {gaps.map((g, i) => (
+                          <li key={i} className="rounded-xl bg-black/[0.03] p-3 text-sm text-[var(--color-foreground)]">
+                            <div className="flex items-start gap-2">
+                              <span>❌</span>
+                              <span>{label(g)} <span className="text-xs text-[var(--color-muted)]">· {g.level}</span></span>
+                            </div>
+                            <div className="mt-1 pl-6 text-xs text-[var(--color-muted)]">
+                              «{g.prompt}» — {qt(locale, "correctAnswerWord")}: <b className="text-[var(--color-foreground)]">{g.correctAnswer}</b>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
 
-              <div className="rounded-xl bg-[var(--color-brand)]/[0.05] p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-brand)]">
-                  {qt(locale, "todoTitle")}
-                </div>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {a.todo.map((d) => (
-                    <li key={d.ru} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
-                      <span className="text-[var(--color-brand)]">→</span>
-                      {d[locale]}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-3 inline-block rounded-full bg-[var(--color-brand)]/12 px-3 py-1 text-xs font-semibold text-[var(--color-brand)]">
-                  {a.progress[locale]}
-                </div>
-              </div>
+                  {gapTopics.length > 0 && (
+                    <div className="rounded-xl bg-[var(--color-brand)]/[0.05] p-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {gapTopics.map((t) => {
+                          const topic = topicById(t);
+                          return topic ? (
+                            <span key={t} className="rounded-full bg-[var(--color-brand)]/[0.1] px-2.5 py-1 text-xs font-medium text-[var(--color-brand)]">
+                              {topic.label[locale]}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-[var(--color-muted)]">{qt(locale, "focusNote")}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </motion.div>
         )}
@@ -253,8 +275,12 @@ export function ResultView({ result }: { result: QuizResult }) {
         </div>
         <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-black/[0.04] px-4 py-2 text-sm">
           <span className="text-[var(--color-muted)]">{qt(locale, "predicted")} {exam.name}:</span>
-          <span className="font-bold text-[var(--color-foreground)]">≈ {result.predictedScore} / 100</span>
+          <span className="font-bold text-[var(--color-foreground)]">
+            ≈ {Math.max(0, result.overall - 10)}–{Math.min(100, result.overall + 5)} / 100
+          </span>
         </div>
+        <p className="mx-auto mt-2 max-w-md text-xs text-[var(--color-muted)]">{qt(locale, "approxNote")}</p>
+        <p className="mx-auto mt-1 max-w-md text-xs font-medium text-[var(--color-foreground)]">{qt(locale, "thresholdsNote")}</p>
       </motion.div>
 
       {/* ============ 2. Skill breakdown ============ */}
@@ -275,7 +301,7 @@ export function ResultView({ result }: { result: QuizResult }) {
               id={s.id}
               percent={s.percent}
               level={s.level}
-              words={result.writingWords}
+              records={(result.answers ?? []).filter((a) => a.module === s.id)}
               locale={locale}
               defaultOpen={i === 0}
             />
@@ -308,7 +334,7 @@ export function ResultView({ result }: { result: QuizResult }) {
             <div className="mt-2 flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />
               <span className="text-sm text-[var(--color-foreground)]">
-                {qt(locale, "expectedResult")}: <span className="font-bold">C1</span>
+                {qt(locale, "expectedResult")}: <span className="font-bold">B2 / C1</span>
               </span>
             </div>
             <div className="mt-2 text-xs text-[var(--color-muted)]">
@@ -396,15 +422,6 @@ export function ResultView({ result }: { result: QuizResult }) {
             <div className="mx-auto h-2 w-0.5 bg-[var(--color-brand)]" />
           </div>
 
-          {/* average student (below) */}
-          <div
-            className="absolute top-7 -translate-x-1/2 whitespace-nowrap text-center"
-            style={{ left: `${pct(2)}%` }}
-          >
-            <div className="mx-auto h-2 w-0.5 bg-[var(--color-muted)]" />
-            <div className="mt-0.5 text-[10px] text-[var(--color-muted)]">{qt(locale, "avgStudent")}</div>
-          </div>
-
           {/* needed for exam (below, right) */}
           <div
             className="absolute top-7 -translate-x-1/2 whitespace-nowrap text-center"
@@ -418,7 +435,7 @@ export function ResultView({ result }: { result: QuizResult }) {
         </div>
 
         <p className="rounded-xl bg-[var(--color-brand)]/[0.05] px-4 py-3 text-sm text-[var(--color-foreground)]">
-          {qt(locale, "compareNote")}
+          {qt(locale, "thresholdsNote")}
         </p>
       </div>
 

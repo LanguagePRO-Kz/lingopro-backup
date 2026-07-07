@@ -7,12 +7,14 @@ import { pick } from "@/lib/localized";
 import { loadPlan, type PackageId } from "@/lib/billing";
 import { planBadge } from "@/lib/dashboard";
 import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
+import { fetchExamPlan, saveExamPlanToProfile, type ExamDateMode } from "@/lib/exam-plan";
 
 const T = {
   ru: {
     profile: "Профиль", name: "Имя", email: "Email", avatar: "Аватар", upload: "Загрузить", save: "Сохранить", saved: "Сохранено ✓",
     city: "Город", country: "Страна", cityPh: "Например, Алматы", countryPh: "Например, Казахстан",
     exam: "Экзамен", chosenExam: "Выбранный экзамен", target: "Целевой уровень", examDate: "Дата экзамена",
+    dateExact: "Точная дата", dateApprox: "Примерно", dateUnknown: "Не знаю", months: "мес", examSaved: "Сохранено ✓", saveExam: "Сохранить",
     sub: "Подписка", currentPlan: "Текущий план", validUntil: "Действует до", manage: "Управлять подпиской",
     notif: "Уведомления", emailNotif: "Email уведомления", reminders: "Напоминания о занятиях", remindTime: "Время напоминания",
     lang: "Язык интерфейса", delete: "Удалить аккаунт",
@@ -21,6 +23,7 @@ const T = {
     profile: "Profile", name: "Name", email: "Email", avatar: "Avatar", upload: "Upload", save: "Save", saved: "Saved ✓",
     city: "City", country: "Country", cityPh: "e.g. Almaty", countryPh: "e.g. Kazakhstan",
     exam: "Exam", chosenExam: "Selected exam", target: "Target level", examDate: "Exam date",
+    dateExact: "Exact date", dateApprox: "Approx.", dateUnknown: "Not sure", months: "mo", examSaved: "Saved ✓", saveExam: "Save",
     sub: "Subscription", currentPlan: "Current plan", validUntil: "Valid until", manage: "Manage subscription",
     notif: "Notifications", emailNotif: "Email notifications", reminders: "Lesson reminders", remindTime: "Reminder time",
     lang: "Interface language", delete: "Delete account",
@@ -29,6 +32,7 @@ const T = {
     profile: "Profil", name: "Ad", email: "E-posta", avatar: "Avatar", upload: "Yükle", save: "Kaydet", saved: "Kaydedildi ✓",
     city: "Şehir", country: "Ülke", cityPh: "örn. Almatı", countryPh: "örn. Kazakistan",
     exam: "Sınav", chosenExam: "Seçilen sınav", target: "Hedef seviye", examDate: "Sınav tarihi",
+    dateExact: "Kesin tarih", dateApprox: "Yaklaşık", dateUnknown: "Bilmiyorum", months: "ay", examSaved: "Kaydedildi ✓", saveExam: "Kaydet",
     sub: "Abonelik", currentPlan: "Mevcut plan", validUntil: "Geçerlilik", manage: "Aboneliği yönet",
     notif: "Bildirimler", emailNotif: "E-posta bildirimleri", reminders: "Ders hatırlatmaları", remindTime: "Hatırlatma saati",
     lang: "Arayüz dili", delete: "Hesabı sil",
@@ -37,6 +41,7 @@ const T = {
     profile: "Профиль", name: "Аты", email: "Email", avatar: "Аватар", upload: "Жүктеу", save: "Сақтау", saved: "Сақталды ✓",
     city: "Қала", country: "Ел", cityPh: "мыс. Алматы", countryPh: "мыс. Қазақстан",
     exam: "Емтихан", chosenExam: "Таңдалған емтихан", target: "Мақсатты деңгей", examDate: "Емтихан күні",
+    dateExact: "Нақты күн", dateApprox: "Шамамен", dateUnknown: "Білмеймін", months: "ай", examSaved: "Сақталды ✓", saveExam: "Сақтау",
     sub: "Жазылым", currentPlan: "Ағымдағы жоспар", validUntil: "Дейін жарамды", manage: "Жазылымды басқару",
     notif: "Хабарламалар", emailNotif: "Email хабарламалар", reminders: "Сабақ еске салулары", remindTime: "Еске салу уақыты",
     lang: "Интерфейс тілі", delete: "Аккаунтты жою",
@@ -84,7 +89,13 @@ export default function SettingsPage() {
   const [emailOn, setEmailOn] = useState(true);
   const [remindOn, setRemindOn] = useState(true);
   const [remindTime, setRemindTime] = useState("10:00");
-  const [examDate, setExamDate] = useState("2026-09-19");
+
+  // exam plan (block D): real values from the profile, editable
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
+  const [dateMode, setDateMode] = useState<ExamDateMode>("unknown");
+  const [examDate, setExamDate] = useState("");
+  const [horizon, setHorizon] = useState<1 | 3 | 6>(3);
+  const [examSaved, setExamSaved] = useState(false);
 
   useEffect(() => {
     setName(window.localStorage.getItem("lingopro:name") || "");
@@ -95,10 +106,28 @@ export default function SettingsPage() {
       setCity(loc.city ?? "");
       setCountry(loc.country ?? "");
     });
+    fetchExamPlan().then((p) => {
+      if (!active || !p) return;
+      setTargetLevel(p.targetLevel);
+      setDateMode(p.examDateMode);
+      setExamDate(p.examDate ?? "");
+      if (p.examHorizonMonths) setHorizon(p.examHorizonMonths);
+    });
     return () => {
       active = false;
     };
   }, []);
+
+  async function saveExam() {
+    await saveExamPlanToProfile({
+      targetLevel,
+      examDateMode: dateMode,
+      examDate: dateMode === "exact" && examDate ? examDate : undefined,
+      examHorizonMonths: dateMode === "approx" ? horizon : undefined,
+    });
+    setExamSaved(true);
+    setTimeout(() => setExamSaved(false), 1500);
+  }
 
   function saveName() {
     window.localStorage.setItem("lingopro:name", name.trim());
@@ -145,7 +174,7 @@ export default function SettingsPage() {
         </button>
       </Section>
 
-      {/* exam */}
+      {/* exam (block D: real profile values, editable) */}
       <Section title={c.exam}>
         <div className="flex items-center justify-between">
           <span className="text-sm text-[var(--color-muted)]">{c.chosenExam}</span>
@@ -153,12 +182,54 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-[var(--color-muted)]">{c.target}</span>
-          <span className="rounded-full bg-[var(--color-brand)]/10 px-3 py-1 text-sm font-semibold text-[var(--color-brand)]">C1</span>
+          <div className="flex gap-1.5">
+            {(["B2", "C1"] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setTargetLevel(g)}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${targetLevel === g ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
         </div>
-        <label className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-2">
           <span className="text-sm text-[var(--color-muted)]">{c.examDate}</span>
-          <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className={inputCls} />
-        </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(["exact", "approx", "unknown"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDateMode(m)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${dateMode === m ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)]" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}
+              >
+                {m === "exact" ? c.dateExact : m === "approx" ? c.dateApprox : c.dateUnknown}
+              </button>
+            ))}
+          </div>
+          {dateMode === "exact" && (
+            <input type="date" value={examDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setExamDate(e.target.value)} className={inputCls} />
+          )}
+          {dateMode === "approx" && (
+            <div className="flex gap-1.5">
+              {([1, 3, 6] as const).map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setHorizon(h)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${horizon === h ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)]" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}
+                >
+                  ~{h} {c.months}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" onClick={saveExam} className="btn-primary w-fit rounded-full px-5 py-2.5 text-sm">
+          {examSaved ? c.examSaved : c.saveExam}
+        </button>
       </Section>
 
       {/* subscription */}

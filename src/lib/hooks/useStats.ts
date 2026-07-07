@@ -87,7 +87,7 @@ export function useStats(period: Period): StatsData {
       }
 
       const [profileRes, daysRes, resultsRes] = await Promise.all([
-        supabase.from("profiles").select("quiz_result").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("quiz_result, target_level").eq("id", user.id).maybeSingle(),
         supabase
           .from("daily_progress")
           .select("date, tasks, completed_count, total_count")
@@ -135,11 +135,12 @@ export function useStats(period: Period): StatsData {
         reading: avg(acc.reading), listening: avg(acc.listening), writing: avg(acc.writing), speaking: avg(acc.speaking),
       };
 
-      // --- profile → level + goal progress ---
+      // --- profile → level + goal progress (goal is the student's B2/C1 choice) ---
       const quiz = (profileRes.data?.quiz_result as QuizResult) ?? null;
+      const targetLevel = profileRes.data?.target_level === "B2" ? "B2" : TARGET_LEVEL;
       const currentLevel = quiz?.level && LEVELS.includes(quiz.level as (typeof LEVELS)[number]) ? quiz.level : null;
       const goalProgressPct = currentLevel
-        ? Math.max(0, Math.min(100, Math.round(((CEFR[currentLevel] ?? 0) / CEFR[TARGET_LEVEL]) * 100)))
+        ? Math.max(0, Math.min(100, Math.round(((CEFR[currentLevel] ?? 0) / CEFR[targetLevel]) * 100)))
         : 0;
 
       setState({
@@ -147,7 +148,7 @@ export function useStats(period: Period): StatsData {
         streakDays,
         weekDone,
         currentLevel,
-        targetLevel: TARGET_LEVEL,
+        targetLevel,
         goalProgressPct,
         scores,
         counts,

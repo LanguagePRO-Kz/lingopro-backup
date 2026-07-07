@@ -29,9 +29,11 @@ import {
   scoreSpeakingDuration,
   countWords,
   qt,
+  type AnswerRecord,
   type QuizTKey,
 } from "@/lib/quiz";
 import { saveProfileResult } from "@/lib/profile";
+import { stashExamPlan } from "@/lib/exam-plan";
 import { createClient } from "@/lib/supabase/client";
 import { permutation, applyPerm } from "@/lib/shuffle";
 
@@ -107,12 +109,18 @@ export default function QuizPage() {
   const [phase, setPhase] = useState<Phase>("onboarding");
   const [onbStep, setOnbStep] = useState(0);
   const [, setLevelSelf] = useState<string | null>(null);
-  const [, setTimeline] = useState<string | null>(null);
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("B2");
+  const [showDatePick, setShowDatePick] = useState(false);
+  const [examDate, setExamDate] = useState("");
 
   // index into MODULES (0..4); transition shows "module {idx} done → next"
   const [moduleIdx, setModuleIdx] = useState(0);
   const [scores, setScores] = useState<Partial<Record<ModuleId, number>>>({});
   const [writingWords, setWritingWords] = useState(0);
+  // per-question answers across modules (honest breakdown + mastery seeding);
+  // a mid-quiz refresh loses earlier modules' records — the result degrades
+  // to module-level analysis for those, which the UI handles honestly
+  const answerLogRef = useRef<AnswerRecord[]>([]);
   // guards the progress-save effect from re-writing a snapshot once the quiz
   // is finished (the async getUser() below yields a render mid-teardown)
   const doneRef = useRef(false);
@@ -124,16 +132,20 @@ export default function QuizPage() {
 
   /** A module reports its 0–100 score and we advance the flow. */
   const finishModule = useCallback(
-    async (score: number, meta?: { words?: number }) => {
+    async (score: number, meta?: { words?: number; records?: AnswerRecord[] }) => {
       const id = MODULES[moduleIdx].id;
       const nextScores = { ...scores, [id]: score };
       setScores(nextScores);
       const words = meta?.words ?? writingWords;
       if (meta?.words !== undefined) setWritingWords(meta.words);
+      if (meta?.records?.length) answerLogRef.current = [...answerLogRef.current, ...meta.records];
 
       if (moduleIdx + 1 >= MODULES.length) {
         doneRef.current = true; // block any further progress snapshots
-        const result = computeResult(nextScores as Record<ModuleId, number>, { writingWords: words });
+        const result = computeResult(nextScores as Record<ModuleId, number>, {
+          writingWords: words,
+          answers: answerLogRef.current,
+        });
         saveResult(result); // anonymous cache — survives the sign-up hop
         clearProgress(); // quiz is done; drop the in-progress snapshot
 
@@ -192,13 +204,13 @@ export default function QuizPage() {
         <div className="w-full max-w-xl">
           <div className="mb-6">
             <div className="mb-2 flex justify-between text-xs text-[var(--color-muted)]">
-              <span>{qt(locale, "step")} {onbStep + 1} / 3</span>
-              <span>{Math.round(((onbStep + 1) / 3) * 100)}%</span>
+              <span>{qt(locale, "step")} {onbStep + 1} / 4</span>
+              <span>{Math.round(((onbStep + 1) / 4) * 100)}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.05]">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
-                animate={{ width: `${((onbStep + 1) / 3) * 100}%` }}
+                animate={{ width: `${((onbStep + 1) / 4) * 100}%` }}
                 transition={{ duration: 0.4 }}
               />
             </div>
@@ -275,6 +287,33 @@ export default function QuizPage() {
 
               {onbStep === 2 && (
                 <>
+                  <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{qt(locale, "onbGoal")}</h1>
+                  <div className="mt-5 grid gap-3">
+                    {(["B2", "C1"] as const).map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => {
+                          setTargetLevel(g);
+                          setOnbStep(3);
+                        }}
+                        className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
+                      >
+                        <span className="flex flex-col">
+                          <span className="text-base font-bold text-[var(--color-foreground)]">{g}</span>
+                          <span className="text-xs text-[var(--color-muted)]">{qt(locale, g === "B2" ? "goalB2" : "goalC1")}</span>
+                        </span>
+                        <span className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)]">
+                          {qt(locale, "goalThreshold")}: {g === "B2" ? 60 : 75}/100
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {onbStep === 3 && (
+                <>
                   <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                     {qt(locale, "onbWhen")} {exam.name}?
                   </h1>
@@ -284,7 +323,11 @@ export default function QuizPage() {
                         key={tl}
                         type="button"
                         onClick={() => {
-                          setTimeline(tl);
+                          stashExamPlan({
+                            targetLevel,
+                            examDateMode: tl === "tlOpen" ? "unknown" : "approx",
+                            examHorizonMonths: tl === "tl1" ? 1 : tl === "tl3" ? 3 : tl === "tl6" ? 6 : undefined,
+                          });
                           setPhase("module");
                         }}
                         className="rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left text-sm font-medium text-[var(--color-foreground)] transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
@@ -292,6 +335,40 @@ export default function QuizPage() {
                         {qt(locale, tl)}
                       </button>
                     ))}
+
+                    {!showDatePick ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowDatePick(true)}
+                        className="rounded-2xl border border-[var(--color-brand)]/40 bg-[var(--color-brand)]/[0.05] px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-brand)] transition-all hover:border-[var(--color-brand)]"
+                      >
+                        📅 {qt(locale, "tlExact")}
+                      </button>
+                    ) : (
+                      <div className="rounded-2xl border border-[var(--color-brand)]/40 bg-[var(--color-brand)]/[0.05] p-4">
+                        <div className="text-xs font-medium text-[var(--color-muted)]">{qt(locale, "tlPickDate")}</div>
+                        <div className="mt-2 flex gap-2">
+                          <input
+                            type="date"
+                            value={examDate}
+                            min={new Date().toISOString().slice(0, 10)}
+                            onChange={(e) => setExamDate(e.target.value)}
+                            className="flex-1 rounded-xl border border-black/[0.1] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-brand)]"
+                          />
+                          <button
+                            type="button"
+                            disabled={!examDate}
+                            onClick={() => {
+                              stashExamPlan({ targetLevel, examDateMode: "exact", examDate });
+                              setPhase("module");
+                            }}
+                            className="btn-primary rounded-xl px-4 py-2 text-sm disabled:opacity-40"
+                          >
+                            {qt(locale, "tlConfirm")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -461,8 +538,21 @@ type ModuleProps = {
   moduleIdx: number;
   locale: Locale;
   hint: (l: Localized | undefined) => string | null;
-  onDone: (score: number, meta?: { words?: number }) => void;
+  onDone: (score: number, meta?: { words?: number; records?: AnswerRecord[] }) => void;
 };
+
+/** Per-question records for the honest breakdown + mastery seeding. */
+function mcRecords(moduleIdx: number, qs: MCQuestion[], answers: (number | null)[], locale: Locale): AnswerRecord[] {
+  return qs.map((q, i) => ({
+    module: MODULES[moduleIdx].id,
+    prompt: q.prompt,
+    topic: q.topic,
+    tag: q.tag,
+    level: q.level,
+    correct: answers[i] === q.answer,
+    correctAnswer: (q.opts ? q.opts[locale] ?? q.opts.ru : q.options ?? [])[q.answer] ?? "",
+  }));
+}
 
 /* ------------------------- Multiple-choice module ------------------------ */
 function MCModule({
@@ -492,7 +582,7 @@ function MCModule({
 
   function next() {
     if (step + 1 >= qs.length) {
-      onDone(scoreMC(answers, qs));
+      onDone(scoreMC(answers, qs), { records: mcRecords(moduleIdx, qs, answers, locale) });
     } else {
       setStep((s) => s + 1);
     }
@@ -574,7 +664,7 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
 
   const finishRef = useRef(() => {});
   useEffect(() => {
-    finishRef.current = () => onDone(scoreMC(answers, rq));
+    finishRef.current = () => onDone(scoreMC(answers, rq), { records: mcRecords(moduleIdx, rq, answers, locale) });
   });
 
   useEffect(() => {
@@ -603,7 +693,7 @@ function ReadingModule({ moduleIdx, locale, hint, onDone }: ModuleProps) {
     });
   }
   function next() {
-    if (step + 1 >= rq.length) onDone(scoreMC(answers, rq));
+    if (step + 1 >= rq.length) onDone(scoreMC(answers, rq), { records: mcRecords(moduleIdx, rq, answers, locale) });
     else setStep((s) => s + 1);
   }
 

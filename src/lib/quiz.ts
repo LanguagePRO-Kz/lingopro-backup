@@ -19,6 +19,8 @@ export type MCQuestion = {
   hint?: Localized;
   /** Short skill tag (e.g. "Present tense") */
   tag?: Localized;
+  /** Topic id from src/lib/ai/topics.ts — links the answer to mastery */
+  topic?: string;
   /** Turkish/universal options; ignored if `opts` is given */
   options?: string[];
   /** Locale-specific options (used for translation questions) */
@@ -45,6 +47,7 @@ export const GRAMMAR: MCQuestion[] = [
       kk: "Ахмет күн сайын жетіде ___ (тұрады).",
     },
     tag: { ru: "Настоящее время", en: "Present tense", tr: "Şimdiki zaman", kk: "Осы шақ" },
+    topic: "present_iyor",
     options: ["kalkıyor", "kalktı", "kalkacak", "kalkmış"],
     answer: 0,
   },
@@ -58,6 +61,7 @@ export const GRAMMAR: MCQuestion[] = [
       kk: "Кеше кешке киноға ___ (бардым).",
     },
     tag: { ru: "Прошедшее время -di", en: "Past tense -di", tr: "Görülen geçmiş zaman", kk: "Өткен шақ -di" },
+    topic: "past_di_mis",
     options: ["gidiyorum", "gideceğim", "gittim", "gidiyordum"],
     answer: 2,
   },
@@ -71,6 +75,7 @@ export const GRAMMAR: MCQuestion[] = [
       kk: "Бір сөйлемге біріктіріңіз: «Үйге барамын. Тамақ пісіремін.»",
     },
     tag: { ru: "Объединение предложений", en: "Joining clauses", tr: "Cümle birleştirme", kk: "Сөйлемдерді біріктіру" },
+    topic: "converbs",
     options: [
       "Eve giderken yemek pişireceğim",
       "Eve gidince yemek pişireceğim",
@@ -89,6 +94,7 @@ export const GRAMMAR: MCQuestion[] = [
       kk: "Сельма сағат төртте жұмыстан шығады.",
     },
     tag: { ru: "Суффиксы падежей", en: "Case suffixes", tr: "Hâl ekleri", kk: "Септік жалғаулары" },
+    topic: "ablative",
     options: ["-e / -ıyorum", "-te / -ıyor", "-ten / -ıyor", "-den / -mıyor"],
     answer: 2,
   },
@@ -102,6 +108,7 @@ export const GRAMMAR: MCQuestion[] = [
       kk: "Естуімше, Бұрак пен Аслы ұрысып қалыпты.",
     },
     tag: { ru: "Косвенная речь", en: "Reported speech", tr: "Dolaylı anlatım", kk: "Жанама сөз" },
+    topic: "reported_speech",
     options: ["ait / kavga etti", "göre / kavga etmiş", "ki / kavga edecek", "kadar / kavga ediyor"],
     answer: 1,
   },
@@ -149,6 +156,8 @@ export const VOCAB: MCQuestion[] = [
   {
     level: "B2",
     prompt: "Yarınki maçı izlemeyi ___",
+    topic: "collocations",
+    tag: { ru: "Идиомы", en: "Idioms", tr: "Deyimler", kk: "Идиомалар" },
     hint: { ru: "Завтрашний матч жду с нетерпением (подберите идиому).", en: "I'm looking forward to tomorrow's match (pick the idiom).", tr: "", kk: "Ертеңгі матчты асыға күтемін (идиоманы таңдаңыз)." },
     options: ["can kulağıyla dinliyorum", "dört gözle bekliyorum", "can çekişiyorum", "eteklerim tutuşuyor"],
     answer: 1,
@@ -307,9 +316,23 @@ export function scoreSpeakingDuration(seconds: number): number {
 
 export type SkillScore = { id: ModuleId; percent: number; level: Level };
 
+/** One answered question — the raw material for an honest breakdown. */
+export type AnswerRecord = {
+  module: ModuleId;
+  prompt: string;
+  /** Topic id from src/lib/ai/topics.ts, when the question is tagged */
+  topic?: string;
+  tag?: Localized;
+  level: Level;
+  correct: boolean;
+  /** The correct option's text (locale-resolved at answer time) */
+  correctAnswer: string;
+};
+
 export type QuizResult = {
   level: Level;
   overall: number;
+  /** Honest ballpark (= overall); the UI presents it as a range, not a promise */
   predictedScore: number;
   skills: SkillScore[];
   strengths: ModuleId[];
@@ -319,12 +342,14 @@ export type QuizResult = {
   plan: "beginner" | "a2" | "advanced";
   writingWords: number;
   takenAt: number;
+  /** Per-question answers (absent on results saved before this field existed) */
+  answers?: AnswerRecord[];
 };
 
 /** Build the full result from each module's 0–100 score. */
 export function computeResult(
   scores: Record<ModuleId, number>,
-  extras?: { writingWords?: number },
+  extras?: { writingWords?: number; answers?: AnswerRecord[] },
 ): QuizResult {
   const skills: SkillScore[] = MODULES.map((m) => ({
     id: m.id,
@@ -346,7 +371,9 @@ export function computeResult(
   return {
     level,
     overall,
-    predictedScore: Math.round(40 + overall * 0.55),
+    // no invented formula: the share of correct answers is the only honest
+    // ballpark we have before the first real mock exam
+    predictedScore: overall,
     skills,
     strengths: strengths.length ? strengths : [sorted[0].id],
     weaknesses,
@@ -354,6 +381,7 @@ export function computeResult(
     plan,
     writingWords: extras?.writingWords ?? 0,
     takenAt: Date.now(),
+    answers: extras?.answers,
   };
 }
 
@@ -449,11 +477,19 @@ const T = {
   lvMid: { ru: "Средний", en: "Intermediate", tr: "Orta", kk: "Орта" },
   lvAdvanced: { ru: "Продвинутый", en: "Advanced", tr: "İleri", kk: "Жоғары" },
   lvUnknown: { ru: "Не знаю — определите за меня", en: "Not sure — assess me", tr: "Bilmiyorum — siz belirleyin", kk: "Білмеймін — өзіңіз анықтаңыз" },
+  // goal (B2 / C1 — the only two TÖMER certificate levels)
+  onbGoal: { ru: "Какой сертификат тебе нужен?", en: "Which certificate do you need?", tr: "Hangi sertifikaya ihtiyacın var?", kk: "Саған қай сертификат керек?" },
+  goalB2: { ru: "Для учёбы и работы — самый частый выбор", en: "For study and work — the most common choice", tr: "Eğitim ve iş için — en yaygın seçim", kk: "Оқу мен жұмысқа — ең жиі таңдау" },
+  goalC1: { ru: "Максимальный уровень — медицина, академия", en: "The top level — medicine, academia", tr: "En üst seviye — tıp, akademi", kk: "Ең жоғары деңгей — медицина, академия" },
+  goalThreshold: { ru: "порог", en: "threshold", tr: "baraj", kk: "шек" },
   // timeline
-  tl1: { ru: "Через 1 месяц", en: "In 1 month", tr: "1 ay içinde", kk: "1 айдан кейін" },
-  tl3: { ru: "Через 3 месяца", en: "In 3 months", tr: "3 ay içinde", kk: "3 айдан кейін" },
-  tl6: { ru: "Через 6 месяцев", en: "In 6 months", tr: "6 ay içinde", kk: "6 айдан кейін" },
+  tl1: { ru: "Через ~1 месяц", en: "In ~1 month", tr: "~1 ay içinde", kk: "~1 айдан кейін" },
+  tl3: { ru: "Через ~3 месяца", en: "In ~3 months", tr: "~3 ay içinde", kk: "~3 айдан кейін" },
+  tl6: { ru: "Через ~6 месяцев", en: "In ~6 months", tr: "~6 ay içinde", kk: "~6 айдан кейін" },
   tlOpen: { ru: "Пока не решил", en: "Not decided yet", tr: "Henüz kararsızım", kk: "Әлі шешкен жоқпын" },
+  tlExact: { ru: "Знаю точную дату", en: "I know the exact date", tr: "Kesin tarihi biliyorum", kk: "Нақты күнін білемін" },
+  tlPickDate: { ru: "Выбери дату экзамена", en: "Pick your exam date", tr: "Sınav tarihini seç", kk: "Емтихан күнін таңда" },
+  tlConfirm: { ru: "Подтвердить", en: "Confirm", tr: "Onayla", kk: "Растау" },
   // transition
   moduleDone: { ru: "завершён", en: "completed", tr: "tamamlandı", kk: "аяқталды" },
   nextModule: { ru: "Следующий", en: "Next", tr: "Sıradaki", kk: "Келесі" },
@@ -520,16 +556,48 @@ const T = {
   planToC1: { ru: "Твой персональный план до C1", en: "Your personal plan to C1", tr: "C1'e kadar kişisel planın", kk: "C1-ге дейінгі жеке жоспарың" },
   stagesTitle: { ru: "Этапы", en: "Stages", tr: "Aşamalar", kk: "Кезеңдер" },
   // comparison
-  compareTitle: { ru: "Как ты выглядишь на фоне других", en: "How you compare to others", tr: "Diğerlerine göre durumun", kk: "Басқалармен салыстырғанда" },
+  compareTitle: { ru: "Твой уровень на шкале TÖMER", en: "Your level on the TÖMER scale", tr: "TÖMER ölçeğindeki seviyeniz", kk: "TÖMER шәкіліндегі деңгейің" },
   youHere: { ru: "Ты здесь", en: "You", tr: "Sen", kk: "Сен" },
-  avgStudent: { ru: "Средний студент", en: "Average student", tr: "Ortalama öğrenci", kk: "Орташа студент" },
   neededFor: { ru: "Нужно для", en: "Needed for", tr: "Gereken:", kk: "Қажет:" },
-  compareNote: {
-    ru: "68% студентов начинают с похожего уровня и достигают C1 за 4 месяца подготовки",
-    en: "68% of students start at a similar level and reach C1 within 4 months of prep",
-    tr: "Öğrencilerin %68'i benzer seviyeden başlayıp 4 ayda C1'e ulaşıyor",
-    kk: "Студенттердің 68%-ы ұқсас деңгейден бастап, 4 айда C1-ге жетеді",
+  // honest breakdown / forecast
+  approxNote: {
+    ru: "Ориентировочная оценка по короткой диагностике. Точный балл покажет первый пробный экзамен.",
+    en: "A ballpark based on a short diagnostic. Your first mock exam will show the precise score.",
+    tr: "Kısa teşhise dayalı yaklaşık değerlendirme. Kesin puanı ilk deneme sınavı gösterir.",
+    kk: "Қысқа диагностикаға негізделген шамамен баға. Нақты баллды алғашқы сынақ емтиханы көрсетеді.",
   },
+  thresholdsNote: {
+    ru: "Порог сертификата TÖMER: 60/100 — B2, 75/100 — C1.",
+    en: "TÖMER certificate thresholds: 60/100 — B2, 75/100 — C1.",
+    tr: "TÖMER sertifika barajı: 60/100 — B2, 75/100 — C1.",
+    kk: "TÖMER сертификат шегі: 60/100 — B2, 75/100 — C1.",
+  },
+  prelimWriting: {
+    ru: "Предварительная оценка по объёму и структуре ответа. Точную проверку по критериям TÖMER сделает AI-преподаватель в кабинете (раздел «Письмо»).",
+    en: "A preliminary estimate from answer length and structure. The AI teacher gives a precise TÖMER-criteria review in the Writing section.",
+    tr: "Cevabın uzunluğuna ve yapısına dayalı ön değerlendirme. Kesin TÖMER ölçütlü incelemeyi panelde AI öğretmen yapar (Yazma bölümü).",
+    kk: "Жауап көлемі мен құрылымына негізделген алдын ала баға. Нақты TÖMER өлшемді тексеруді кабинетте AI ұстаз жасайды (Жазу бөлімі).",
+  },
+  prelimSpeaking: {
+    ru: "Предварительная оценка. Точный уровень говорения определит первый живой урок с AI-преподавателем.",
+    en: "A preliminary estimate. Your first live lesson with the AI teacher will assess speaking precisely.",
+    tr: "Ön değerlendirme. Konuşma seviyeni ilk canlı AI dersi kesin olarak belirler.",
+    kk: "Алдын ала баға. Сөйлеу деңгейіңді AI ұстазбен алғашқы жанды сабақ нақты анықтайды.",
+  },
+  noDetail: {
+    ru: "Детальный разбор появится после следующего прохождения диагностики.",
+    en: "A detailed breakdown will appear after your next diagnostic run.",
+    tr: "Ayrıntılı analiz bir sonraki teşhiste görünecek.",
+    kk: "Толық талдау келесі диагностикадан кейін шығады.",
+  },
+  correctAnswerWord: { ru: "правильный ответ", en: "correct answer", tr: "doğru cevap", kk: "дұрыс жауап" },
+  focusNote: {
+    ru: "Эти темы автоматически попадут в фокус твоих уроков с AI-преподавателем.",
+    en: "These topics automatically become the focus of your AI-teacher lessons.",
+    tr: "Bu konular AI öğretmen derslerinin odağına otomatik eklenir.",
+    kk: "Бұл тақырыптар AI ұстаз сабақтарының фокусына автоматты түрде қосылады.",
+  },
+  targetRange: { ru: "После подготовки", en: "After preparation", tr: "Hazırlıktan sonra", kk: "Дайындықтан кейін" },
   // CTA note
   discountNote: {
     ru: "Пройди диагностику → получи скидку 30% на любой пакет",
@@ -602,95 +670,5 @@ export const PLANS: Record<
       { ru: "Неделя 3–4: Интенсив по слабым навыкам", en: "Week 3–4: Intensive on weak skills", tr: "Hafta 3–4: Zayıf becerilerde yoğunlaşma", kk: "3–4 апта: Әлсіз дағдыларға интенсив" },
       { ru: "Неделя 5–6: Финальные пробники, отработка тайминга", en: "Week 5–6: Final mocks, timing practice", tr: "Hafta 5–6: Son denemeler, zamanlama pratiği", kk: "5–6 апта: Қорытынды сынақтар, тайминг жаттығуы" },
     ],
-  },
-};
-
-/* ---------------------- Per-module detailed analysis ---------------------- */
-export type AnalysisBlock = {
-  knows: Localized[];
-  gaps: Localized[];
-  todo: Localized[];
-  progress: Localized;
-};
-
-export const ANALYSIS: Record<ModuleId, AnalysisBlock> = {
-  grammar: {
-    knows: [
-      { ru: "Настоящее время (-yor) — правильно", en: "Present tense (-yor) — correct", tr: "Şimdiki zaman (-yor) — doğru", kk: "Осы шақ (-yor) — дұрыс" },
-      { ru: "Прошедшее время (-di) — правильно", en: "Past tense (-di) — correct", tr: "Görülen geçmiş zaman (-di) — doğru", kk: "Өткен шақ (-di) — дұрыс" },
-    ],
-    gaps: [
-      { ru: "Суффиксы падежей (-den, -ten, -e, -a) — путаешь исходный и дательный падежи. Одна из самых частых ошибок на TÖMER.", en: "Case suffixes (-den, -ten, -e, -a) — you confuse the ablative and dative. One of the most common TÖMER mistakes.", tr: "Hâl ekleri (-den, -ten, -e, -a) — ayrılma ve yönelme hâlini karıştırıyorsun. TÖMER'de en sık yapılan hatalardan.", kk: "Септік жалғаулары (-den, -ten, -e, -a) — шығыс пен барыс септігін шатастырасың. TÖMER-дегі ең жиі қателердің бірі." },
-      { ru: "Косвенная речь (göre, -miş) — нужно разобрать конструкции пересказа.", en: "Reported speech (göre, -miş) — you need to study retelling constructions.", tr: "Dolaylı anlatım (göre, -miş) — aktarma yapılarını çalışman gerek.", kk: "Жанама сөз (göre, -miş) — баяндау құрылымдарын талдау керек." },
-    ],
-    todo: [
-      { ru: "Пройди тему «Падежи в турецком» — 3 урока", en: "Study the “Turkish cases” topic — 3 lessons", tr: "«Türkçe hâller» konusunu çalış — 3 ders", kk: "«Түрік септіктері» тақырыбын өт — 3 сабақ" },
-      { ru: "Сделай 20 упражнений на суффиксы", en: "Do 20 suffix exercises", tr: "20 ek alıştırması yap", kk: "Жалғауларға 20 жаттығу жаса" },
-    ],
-    progress: { ru: "Ожидаемый прогресс: +15% за 2 недели", en: "Expected progress: +15% in 2 weeks", tr: "Beklenen ilerleme: 2 haftada +%15", kk: "Күтілетін ілгерілеу: 2 аптада +15%" },
-  },
-  vocab: {
-    knows: [
-      { ru: "Базовые слова (A1–A2) — хорошая база", en: "Basic words (A1–A2) — a good base", tr: "Temel kelimeler (A1–A2) — iyi bir temel", kk: "Негізгі сөздер (A1–A2) — жақсы база" },
-      { ru: "Дни недели, еда, бытовые слова", en: "Days of the week, food, everyday words", tr: "Haftanın günleri, yemek, günlük kelimeler", kk: "Апта күндері, тамақ, тұрмыстық сөздер" },
-    ],
-    gaps: [
-      { ru: "Абстрактная лексика (başvuru, karar) — не хватает словаря уровня B1+", en: "Abstract vocabulary (başvuru, karar) — missing B1+ level words", tr: "Soyut kelimeler (başvuru, karar) — B1+ seviye kelime eksik", kk: "Абстрактты лексика (başvuru, karar) — B1+ деңгейіндегі сөздер жетіспейді" },
-      { ru: "Идиомы и устойчивые выражения — часто встречаются в секции чтения TÖMER", en: "Idioms and set phrases — common in the TÖMER reading section", tr: "Deyimler ve kalıp ifadeler — TÖMER okuma bölümünde sık çıkar", kk: "Идиомалар мен тұрақты тіркестер — TÖMER оқу бөлімінде жиі кездеседі" },
-    ],
-    todo: [
-      { ru: "Учи 15 новых слов в день по карточкам", en: "Learn 15 new words a day with flashcards", tr: "Kartlarla günde 15 yeni kelime öğren", kk: "Карточкамен күніне 15 жаңа сөз үйрен" },
-      { ru: "Фокус: слова уровня B1 из топ-500", en: "Focus: B1-level words from the top 500", tr: "Odak: top-500 içindeki B1 seviye kelimeler", kk: "Назар: топ-500 ішіндегі B1 деңгейлі сөздер" },
-    ],
-    progress: { ru: "Ожидаемый прогресс: +20% за 3 недели", en: "Expected progress: +20% in 3 weeks", tr: "Beklenen ilerleme: 3 haftada +%20", kk: "Күтілетін ілгерілеу: 3 аптада +20%" },
-  },
-  reading: {
-    knows: [
-      { ru: "Понимание основной мысли текста", en: "Grasping the main idea of a text", tr: "Metnin ana fikrini anlama", kk: "Мәтіннің негізгі ойын түсіну" },
-      { ru: "Поиск конкретной информации", en: "Finding specific information", tr: "Belirli bilgiyi bulma", kk: "Нақты ақпаратты табу" },
-    ],
-    gaps: [
-      { ru: "Интерпретация — не можешь определить скрытый смысл выражений", en: "Interpretation — you miss the hidden meaning of phrases", tr: "Yorumlama — ifadelerin gizli anlamını yakalayamıyorsun", kk: "Интерпретация — тіркестердің астарлы мағынасын аша алмайсың" },
-      { ru: "Сложные конструкции — теряешься в длинных предложениях с причастными оборотами", en: "Complex structures — you get lost in long sentences with participle clauses", tr: "Karmaşık yapılar — ortaçlı uzun cümlelerde kayboluyorsun", kk: "Күрделі құрылымдар — есімшелі ұзын сөйлемдерде шатасасың" },
-    ],
-    todo: [
-      { ru: "Читай 1 статью на турецком в день", en: "Read 1 Turkish article a day", tr: "Günde 1 Türkçe makale oku", kk: "Күніне 1 түрік мақаласын оқы" },
-      { ru: "После прочтения отвечай на 3 вопроса по содержанию", en: "After reading, answer 3 comprehension questions", tr: "Okuduktan sonra 3 anlama sorusu cevapla", kk: "Оқығаннан кейін 3 мазмұндық сұраққа жауап бер" },
-    ],
-    progress: { ru: "Ожидаемый прогресс: +10% за 2 недели", en: "Expected progress: +10% in 2 weeks", tr: "Beklenen ilerleme: 2 haftada +%10", kk: "Күтілетін ілгерілеу: 2 аптада +10%" },
-  },
-  writing: {
-    knows: [
-      { ru: "Можешь составить простые предложения", en: "You can form simple sentences", tr: "Basit cümleler kurabiliyorsun", kk: "Қарапайым сөйлемдер құра аласың" },
-      { ru: "Используешь базовую структуру", en: "You use a basic structure", tr: "Temel yapıyı kullanıyorsun", kk: "Негізгі құрылымды қолданасың" },
-    ],
-    gaps: [
-      { ru: "Объём — для TÖMER нужно минимум 250 слов, ты написал {words} слов", en: "Length — TÖMER needs at least 250 words; you wrote {words}", tr: "Uzunluk — TÖMER en az 250 kelime ister; sen {words} kelime yazdın", kk: "Көлем — TÖMER үшін кемінде 250 сөз қажет, сен {words} сөз жаздың" },
-      { ru: "Структура эссе — введение, аргументы, заключение", en: "Essay structure — intro, arguments, conclusion", tr: "Kompozisyon yapısı — giriş, gelişme, sonuç", kk: "Эссе құрылымы — кіріспе, дәйектер, қорытынды" },
-      { ru: "Связующие слова (çünkü, ancak, ayrıca, bu nedenle) — не используешь", en: "Linking words (çünkü, ancak, ayrıca, bu nedenle) — you don't use them", tr: "Bağlaçlar (çünkü, ancak, ayrıca, bu nedenle) — kullanmıyorsun", kk: "Жалғаулық сөздер (çünkü, ancak, ayrıca, bu nedenle) — қолданбайсың" },
-    ],
-    todo: [
-      { ru: "Пиши 1 мини-эссе в день (100+ слов)", en: "Write 1 mini-essay a day (100+ words)", tr: "Günde 1 mini kompozisyon yaz (100+ kelime)", kk: "Күніне 1 шағын эссе жаз (100+ сөз)" },
-      { ru: "Используй шаблон: тезис → 2 аргумента → вывод", en: "Use the template: thesis → 2 arguments → conclusion", tr: "Şablon kullan: tez → 2 argüman → sonuç", kk: "Үлгіні қолдан: тезис → 2 дәйек → қорытынды" },
-      { ru: "Выучи 10 связующих слов", en: "Learn 10 linking words", tr: "10 bağlaç öğren", kk: "10 жалғаулық сөз үйрен" },
-    ],
-    progress: { ru: "Ожидаемый прогресс: +25% за 3 недели", en: "Expected progress: +25% in 3 weeks", tr: "Beklenen ilerleme: 3 haftada +%25", kk: "Күтілетін ілгерілеу: 3 аптада +25%" },
-  },
-  speaking: {
-    knows: [
-      { ru: "Можешь отвечать на простые вопросы", en: "You can answer simple questions", tr: "Basit sorulara cevap verebiliyorsun", kk: "Қарапайым сұрақтарға жауап бере аласың" },
-      { ru: "Базовое произношение понятно", en: "Your basic pronunciation is clear", tr: "Temel telaffuzun anlaşılır", kk: "Негізгі айтылымың түсінікті" },
-    ],
-    gaps: [
-      { ru: "Длина ответов — на TÖMER нужно говорить 1–2 минуты на каждый вопрос", en: "Answer length — TÖMER expects 1–2 minutes per question", tr: "Cevap uzunluğu — TÖMER her soru için 1–2 dakika ister", kk: "Жауап ұзақтығы — TÖMER әр сұраққа 1–2 минут талап етеді" },
-      { ru: "Аргументация — не объясняешь «почему»", en: "Reasoning — you don't explain “why”", tr: "Gerekçelendirme — «neden» açıklamıyorsun", kk: "Дәйектеу — «неге» екенін түсіндірмейсің" },
-      { ru: "Сложная лексика в речи — используешь только базовые слова", en: "Advanced vocabulary in speech — you use only basic words", tr: "Konuşmada ileri kelime — sadece temel kelimeler kullanıyorsun", kk: "Сөйлеудегі күрделі лексика — тек негізгі сөздерді қолданасың" },
-    ],
-    todo: [
-      { ru: "Говори вслух 10 минут в день на турецком", en: "Speak Turkish out loud 10 minutes a day", tr: "Günde 10 dakika sesli Türkçe konuş", kk: "Күніне 10 минут түрікше дауыстап сөйле" },
-      { ru: "Отвечай: ответ → объясни почему → приведи пример", en: "Answer: response → explain why → give an example", tr: "Cevapla: cevap → nedenini açıkla → örnek ver", kk: "Жауап бер: жауап → себебін түсіндір → мысал келтір" },
-      { ru: "Записывай себя и слушай", en: "Record yourself and listen back", tr: "Kendini kaydet ve dinle", kk: "Өзіңді жазып ал да тыңда" },
-    ],
-    progress: { ru: "Ожидаемый прогресс: +15% за 4 недели", en: "Expected progress: +15% in 4 weeks", tr: "Beklenen ilerleme: 4 haftada +%15", kk: "Күтілетін ілгерілеу: 4 аптада +15%" },
   },
 };

@@ -7,6 +7,8 @@ import { ResultView } from "@/components/ResultView";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, saveProfileResult } from "@/lib/profile";
 import { loadResult, saveResult, type QuizResult } from "@/lib/quiz";
+import { seedMasteryFromDiagnostic } from "@/lib/ai/diagnostic-seed";
+import { clearStashedExamPlan, loadStashedExamPlan, saveExamPlanToProfile } from "@/lib/exam-plan";
 import { awardXp, XP } from "@/lib/xp";
 
 /**
@@ -47,6 +49,15 @@ export default function QuizResultPage() {
         saveResult(final); // keep the fast localStorage cache warm
         // one-time XP for completing the diagnostic (dedup_key → never doubles)
         void awardXp("diagnostic", XP.DIAGNOSTIC, { dedupKey: "diagnostic", metadata: { level: final.level } });
+        // seed the error memory so the first voice lesson has a personal focus
+        void seedMasteryFromDiagnostic(final);
+      }
+
+      // persist the onboarding goal/date choice (block D)
+      const stashed = loadStashedExamPlan();
+      if (stashed) {
+        await saveExamPlanToProfile(stashed);
+        clearStashedExamPlan();
       }
 
       if (cancelled) return;
