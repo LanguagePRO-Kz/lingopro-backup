@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { callAI, isConfigured, type ChatMessage } from "@/lib/ai";
+import { consumeQuota } from "@/lib/ai/quota";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -52,17 +54,9 @@ function chatFallback(messages: ChatMsg[]) {
   };
 }
 
-async function callClaude(system: string, messages: ChatMsg[], key: string): Promise<string | null> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1024, system, messages }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return Array.isArray(data?.content)
-    ? data.content.filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("\n").trim()
-    : null;
+async function callSpeakingAI(system: string, messages: ChatMessage[]): Promise<string | null> {
+  const result = await callAI({ task: "speaking_chat", system, messages, maxTokens: 1024 });
+  return result?.text ?? null;
 }
 
 export async function POST(req: Request) {
@@ -80,25 +74,32 @@ export async function POST(req: Request) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const mode: Mode = body.mode ?? "free";
   const kind: Kind = body.kind ?? "chat";
-  const key = process.env.ANTHROPIC_API_KEY;
+
+  // session + server-side quota (30/day, 500/month — src/lib/ai/limits.ts)
+  const quota = await consumeQuota("speaking");
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.reason }, { status: quota.status });
+  }
+
+  const configured = isConfigured("speaking_chat");
 
   // ---- hint / summary: plain text ----
   if (kind === "hint" || kind === "summary") {
-    if (!key) {
+    if (!configured) {
       const offline =
         kind === "hint"
           ? "Bugün hava nasıl? (Какая сегодня погода?)"
           : "Хорошая практика! Продолжай заниматься каждый день. (AI офлайн — нужен API-ключ.)";
       return NextResponse.json({ text: offline, offline: true });
     }
-    const text = await callClaude(kind === "hint" ? HINT_SYSTEM : SUMMARY_SYSTEM, messages.length ? messages : [{ role: "user", content: "..." }], key);
+    const text = await callSpeakingAI(kind === "hint" ? HINT_SYSTEM : SUMMARY_SYSTEM, messages.length ? messages : [{ role: "user", content: "..." }]);
     return NextResponse.json({ text: text ?? "…" });
   }
 
   // ---- chat: JSON {reply, correction, newWord, note} ----
-  if (!key) return NextResponse.json({ ...chatFallback(messages), offline: true });
+  if (!configured) return NextResponse.json({ ...chatFallback(messages), offline: true });
 
-  const raw = await callClaude(CHAT_SYSTEM(mode), messages, key);
+  const raw = await callSpeakingAI(CHAT_SYSTEM(mode), messages);
   if (!raw) return NextResponse.json({ ...chatFallback(messages), offline: true });
 
   try {
