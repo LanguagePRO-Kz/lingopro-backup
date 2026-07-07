@@ -30,6 +30,13 @@ export interface DailyTask {
   estimatedMinutes: number;
   completed: boolean;
   order: number;
+  /* ----- plan-engine extensions (DESIGN-PLAN-ENGINE §4); absent = regular ----- */
+  kind?: "regular" | "voice_lesson" | "mock_section" | "mock_full";
+  /** registry topic ids this task targets (voice lesson focus / spaced review) */
+  focusTopics?: string[];
+  /** voice lesson mode for /dashboard/speaking/live?mode=… */
+  voiceMode?: "bolum1" | "bolum2" | "bolum3";
+  mockSection?: "dinleme" | "okuma" | "yazma" | "konusma";
 }
 
 export type DayRow = {

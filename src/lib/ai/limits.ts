@@ -11,10 +11,12 @@ export const AI_LIMITS = {
   speaking: { daily: 30, monthly: 500 },
   /** Diagnostic Yazma review — separate feature so retakes can't drain the cabinet writing quota. */
   diagnostic: { daily: 2, monthly: 10 },
+  /** Study-route generation — event-driven only (settings change / big mock gap). */
+  route: { daily: 3, monthly: 10 },
   voice: { dailyBaseMinutes: 10 },
 } as const;
 
-export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic";
+export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic" | "route";
 
 /**
  * Unit-cost estimates for budget accounting (worst-case, USD).
@@ -25,6 +27,7 @@ export const AI_COST_ESTIMATE_USD: Record<QuotaFeature, number> & { voiceMinute:
   tutor: 0.006,
   speaking: 0.006,
   diagnostic: 0.03, // same task class as writing
+  route: 0.05, // Sonnet + full registry in the prompt (cached)
   voiceMinute: 0.13,
 };
 
