@@ -1,0 +1,51 @@
+/**
+ * THE single place for AI limit numbers (founder's final P0 decisions).
+ * Server enforcement happens in quota.ts → consume_ai_quota RPC; clients may
+ * read ai_usage to render honest counters, but can never bypass these.
+ */
+
+export const AI_LIMITS = {
+  writing: { daily: 3, monthly: 60 },
+  tutor: { daily: 30, monthly: 500 },
+  /** Push-to-talk text coach (/api/speaking) — same class as the tutor. */
+  speaking: { daily: 30, monthly: 500 },
+  voice: { dailyBaseMinutes: 10 },
+} as const;
+
+export type QuotaFeature = "writing" | "tutor" | "speaking";
+
+/**
+ * Unit-cost estimates for budget accounting (worst-case, USD).
+ * Sources: bake-off actuals (RECON-2 §2.3) and voice pricing (RECON-1 §4).
+ */
+export const AI_COST_ESTIMATE_USD: Record<QuotaFeature, number> & { voiceMinute: number } = {
+  writing: 0.03, // Sonnet path (KK); DeepSeek path is ~$0.004
+  tutor: 0.006,
+  speaking: 0.006,
+  voiceMinute: 0.13,
+};
+
+/**
+ * Per-user monthly budget stop, founder's formula:
+ * max($10, cost of the base voice quota + purchased minutes).
+ * The stop catches anomalies — it must never cut into promised quotas.
+ */
+export function userMonthBudgetUsd(referenceDay: Date, purchasedMinutes = 0): number {
+  const daysInMonth = new Date(referenceDay.getFullYear(), referenceDay.getMonth() + 1, 0).getDate();
+  const baseQuotaCost = AI_LIMITS.voice.dailyBaseMinutes * daysInMonth * AI_COST_ESTIMATE_USD.voiceMinute;
+  return Math.max(10, baseQuotaCost + purchasedMinutes * AI_COST_ESTIMATE_USD.voiceMinute);
+}
+
+/** Current date (YYYY-MM-DD) in the user's timezone — per-user midnight reset. */
+export function todayInTimezone(tz?: string | null): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10); // unknown tz string → UTC
+  }
+}
