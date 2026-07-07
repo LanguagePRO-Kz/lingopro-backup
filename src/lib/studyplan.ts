@@ -13,6 +13,7 @@ const META: Record<ModuleId, { emoji: string; href: string; minutes: number; xp:
   grammar: { emoji: "📝", href: "/dashboard/grammar", minutes: 15, xp: 10 },
   vocab: { emoji: "📚", href: "/dashboard/vocabulary", minutes: 10, xp: 8 },
   reading: { emoji: "📖", href: "/dashboard/reading", minutes: 12, xp: 10 },
+  listening: { emoji: "🎧", href: "/dashboard/listening", minutes: 10, xp: 10 },
   writing: { emoji: "✍️", href: "/dashboard/writing", minutes: 15, xp: 12 },
   speaking: { emoji: "🎙", href: "/dashboard/speaking", minutes: 10, xp: 12 },
 };
@@ -32,6 +33,11 @@ const TITLES: Record<ModuleId, Localized[]> = {
     { ru: "Прочитай текст уровня A2", en: "Read an A2-level text", tr: "A2 seviye metin oku", kk: "A2 деңгейлі мәтін оқы" },
     { ru: "Текст B1 + 3 вопроса", en: "B1 text + 3 questions", tr: "B1 metni + 3 soru", kk: "B1 мәтіні + 3 сұрақ" },
     { ru: "Понимание скрытого смысла", en: "Inference practice", tr: "Çıkarım pratiği", kk: "Астарлы мағынаны түсіну" },
+  ],
+  listening: [
+    { ru: "Аудио A2 + вопросы", en: "A2 audio + questions", tr: "A2 ses kaydı + sorular", kk: "A2 аудио + сұрақтар" },
+    { ru: "Диалог B1 на слух", en: "B1 dialogue by ear", tr: "B1 diyaloğu dinle", kk: "B1 диалогын тыңдап түсін" },
+    { ru: "Новость на турецком (1 мин)", en: "Turkish news clip (1 min)", tr: "Türkçe haber (1 dk)", kk: "Түрікше жаңалық (1 мин)" },
   ],
   writing: [
     { ru: "Мини-эссе о своём городе", en: "Mini-essay about your city", tr: "Şehrin hakkında mini kompozisyon", kk: "Қалаң туралы шағын эссе" },

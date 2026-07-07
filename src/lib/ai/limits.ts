@@ -9,10 +9,12 @@ export const AI_LIMITS = {
   tutor: { daily: 30, monthly: 500 },
   /** Push-to-talk text coach (/api/speaking) — same class as the tutor. */
   speaking: { daily: 30, monthly: 500 },
+  /** Diagnostic Yazma review — separate feature so retakes can't drain the cabinet writing quota. */
+  diagnostic: { daily: 2, monthly: 10 },
   voice: { dailyBaseMinutes: 10 },
 } as const;
 
-export type QuotaFeature = "writing" | "tutor" | "speaking";
+export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic";
 
 /**
  * Unit-cost estimates for budget accounting (worst-case, USD).
@@ -22,6 +24,7 @@ export const AI_COST_ESTIMATE_USD: Record<QuotaFeature, number> & { voiceMinute:
   writing: 0.03, // Sonnet path (KK); DeepSeek path is ~$0.004
   tutor: 0.006,
   speaking: 0.006,
+  diagnostic: 0.03, // same task class as writing
   voiceMinute: 0.13,
 };
 

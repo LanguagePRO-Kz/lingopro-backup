@@ -1,15 +1,19 @@
 /**
- * TÖMER (TDYS) diagnostic — 5 skill modules, ~20 minutes total.
- * Grammar + Vocabulary (MC), Reading (text + MC), Writing (free text, client
- * scoring) and Speaking (mic/text, client scoring). Each module yields a 0–100
- * score; the overall level is the honest average of the five.
+ * Diagnostic shared types, scoring thresholds and quiz UI translations.
+ *
+ * v3 (DESIGN-DIAGNOSTIC-V2): the flow lives in src/app/quiz/page.tsx on top
+ * of src/data/diagnostic-bank.ts + src/lib/diagnostic/engine.ts. QuizResult
+ * carries honest /25 sections; Konuşma stays pending until the first live
+ * lesson. The old GRAMMAR/VOCAB/READING banks below are kept ONLY for the
+ * public /mock page and older saved results.
  */
 
 import type { Locale } from "./i18n";
+import type { WritingReview } from "./ai/prompts/writing-review";
 
 export type Localized = Record<Locale, string>;
 export type Level = "A0" | "A1" | "A2" | "B1" | "B2" | "C1";
-export type ModuleId = "grammar" | "vocab" | "reading" | "writing" | "speaking";
+export type ModuleId = "grammar" | "vocab" | "reading" | "listening" | "writing" | "speaking";
 
 export type MCQuestion = {
   level: Level;
@@ -28,13 +32,9 @@ export type MCQuestion = {
   answer: number;
 };
 
-export type SpeakingPrompt = {
-  level: Level;
-  prompt: string;
-  hint: Localized;
-};
-
-/* ----------------------------- Module content ----------------------------- */
+/* ------------------------- Legacy module content -------------------------- */
+/* Used only by the public /mock page now; the diagnostic reads
+   src/data/diagnostic-bank.ts. */
 
 export const GRAMMAR: MCQuestion[] = [
   {
@@ -203,51 +203,13 @@ export const READING: MCQuestion[] = [
   },
 ];
 
-export const WRITING = {
-  prompt:
-    "Türkiye'de hangi şehirde yaşamak istersiniz? Neden? Bu şehri neden seçtiniz? En az 5 cümle yazınız.",
-  hint: {
-    ru: "В каком городе Турции хотели бы жить? Почему? Напишите минимум 5 предложений.",
-    en: "Which city in Turkey would you like to live in? Why? Write at least 5 sentences.",
-    tr: "",
-    kk: "Түркияның қай қаласында тұрғыңыз келеді? Неліктен? Кемінде 5 сөйлем жазыңыз.",
-  } as Localized,
-};
-
-export const SPEAKING: SpeakingPrompt[] = [
-  {
-    level: "A1",
-    prompt: "Bugün ne yediniz? Kahvaltıda ne vardı?",
-    hint: { ru: "Что вы сегодня ели? Что было на завтрак?", en: "What did you eat today? What was for breakfast?", tr: "", kk: "Бүгін не жедіңіз? Таңғы асқа не болды?" },
-  },
-  {
-    level: "A2",
-    prompt: "Hafta sonu genellikle ne yapıyorsunuz? Bize anlatın.",
-    hint: { ru: "Что обычно делаете на выходных? Расскажите.", en: "What do you usually do on weekends? Tell us.", tr: "", kk: "Демалыс күндері әдетте не істейсіз? Айтып беріңіз." },
-  },
-  {
-    level: "B1",
-    prompt: "Türkiye'de hangi şehirde yaşamak istersiniz? Neden?",
-    hint: { ru: "В каком городе Турции хотели бы жить? Почему?", en: "Which city in Turkey would you like to live in? Why?", tr: "", kk: "Түркияның қай қаласында тұрғыңыз келеді? Неліктен?" },
-  },
-  {
-    level: "B1",
-    prompt: "Sizce online eğitim mi, geleneksel eğitim mi daha iyi? Nedenini açıklayın.",
-    hint: { ru: "Онлайн или традиционное образование лучше? Объясните почему.", en: "Online or traditional education — which is better? Explain why.", tr: "", kk: "Онлайн оқу ма, дәстүрлі оқу ма? Себебін түсіндіріңіз." },
-  },
-  {
-    level: "B2",
-    prompt: "Ülkenizdeki bir problemi anlatın ve bu probleme çözüm öneriniz nedir?",
-    hint: { ru: "Опишите проблему в вашей стране и предложите решение.", en: "Describe a problem in your country and suggest a solution.", tr: "", kk: "Еліңіздегі бір мәселені сипаттаңыз және оған шешім ұсыныңыз." },
-  },
-];
-
 /* ------------------------------- Modules meta ------------------------------ */
 
 export const MODULES: { id: ModuleId; emoji: string; name: Localized; minutes: number }[] = [
   { id: "grammar", emoji: "📝", name: { ru: "Грамматика", en: "Grammar", tr: "Dil bilgisi", kk: "Грамматика" }, minutes: 3 },
   { id: "vocab", emoji: "📚", name: { ru: "Лексика", en: "Vocabulary", tr: "Kelime", kk: "Лексика" }, minutes: 3 },
   { id: "reading", emoji: "📖", name: { ru: "Чтение", en: "Reading", tr: "Okuma", kk: "Оқу" }, minutes: 4 },
+  { id: "listening", emoji: "🎧", name: { ru: "Аудирование", en: "Listening", tr: "Dinleme", kk: "Тыңдалым" }, minutes: 4 },
   { id: "writing", emoji: "✍️", name: { ru: "Письмо", en: "Writing", tr: "Yazma", kk: "Жазу" }, minutes: 5 },
   { id: "speaking", emoji: "🎤", name: { ru: "Говорение", en: "Speaking", tr: "Konuşma", kk: "Сөйлеу" }, minutes: 5 },
 ];
@@ -263,53 +225,8 @@ export function levelFromScore(n: number): Level {
   return "C1";
 }
 
-/** Percent of correct MC answers (each question weighed equally). */
-export function scoreMC(answers: (number | null)[], questions: MCQuestion[]): number {
-  const correct = questions.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
-  return Math.round((correct / questions.length) * 100);
-}
-
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-/** Writing score from word count + small bonuses for punctuation / TR letters. */
-export function scoreWriting(text: string): number {
-  const words = countWords(text);
-  let base: number;
-  if (words <= 5) base = 10;
-  else if (words <= 15) base = 30;
-  else if (words <= 30) base = 50;
-  else if (words <= 50) base = 70;
-  else if (words <= 80) base = 85;
-  else base = 95;
-
-  let bonus = 0;
-  if (/[.!?]/.test(text)) bonus += 5;
-  if (/[A-ZÇĞİÖŞÜ]/.test(text)) bonus += 5;
-  if (/[şçğıöüŞÇĞİÖÜ]/.test(text)) bonus += 5;
-
-  return Math.min(100, base + bonus);
-}
-
-/** Score one spoken answer from its recognised word count (text fallback). */
-export function scoreSpeakingAnswer(words: number): number {
-  if (words <= 3) return 10;
-  if (words <= 8) return 30;
-  if (words <= 15) return 50;
-  if (words <= 25) return 70;
-  if (words <= 40) return 85;
-  return 95;
-}
-
-/** Score one spoken answer from its recorded duration in seconds. */
-export function scoreSpeakingDuration(seconds: number): number {
-  if (seconds < 3) return 10;
-  if (seconds < 8) return 30;
-  if (seconds < 15) return 50;
-  if (seconds < 25) return 70;
-  if (seconds < 40) return 85;
-  return 95;
 }
 
 /* -------------------------------- Result ---------------------------------- */
@@ -329,61 +246,46 @@ export type AnswerRecord = {
   correctAnswer: string;
 };
 
+/** Honest /25 section scores; null = not measured yet (Yazma → AI, Konuşma → first live lesson). */
+export type ResultSections = {
+  dinleme: number | null;
+  okuma: number | null;
+  yazma: number | null;
+  konusma: number | null;
+};
+
 export type QuizResult = {
   level: Level;
+  /** Share of correct answers across the KNOWN sections, 0–100 */
   overall: number;
   /** Honest ballpark (= overall); the UI presents it as a range, not a promise */
   predictedScore: number;
+  /** Legacy per-module bars; on v3 results an approximation for old consumers */
   skills: SkillScore[];
   strengths: ModuleId[];
   weaknesses: ModuleId[];
-  /** Module ids sorted worst → best, for the detailed breakdown order */
+  /** Module ids sorted worst → best, for the plan/breakdown order */
   byWeakness: ModuleId[];
   plan: "beginner" | "a2" | "advanced";
   writingWords: number;
   takenAt: number;
   /** Per-question answers (absent on results saved before this field existed) */
   answers?: AnswerRecord[];
+
+  /* ----- v3 (DESIGN-DIAGNOSTIC-V2 §5); absent on older saved results ----- */
+  version?: 3;
+  /** Working level found by the adaptive staircase */
+  routerLevel?: Level;
+  sections?: ResultSections;
+  /** Sum of the non-null sections (max 25 × known count) */
+  totalKnown?: number;
+  /** Yazma essay text, kept until the deferred AI review runs post-login */
+  writingText?: string;
+  yazmaPromptId?: string;
+  yazmaReview?: WritingReview;
+  /** Daily study minutes chosen in onboarding (15/30/45/60) */
+  minutesDaily?: number;
 };
-
-/** Build the full result from each module's 0–100 score. */
-export function computeResult(
-  scores: Record<ModuleId, number>,
-  extras?: { writingWords?: number; answers?: AnswerRecord[] },
-): QuizResult {
-  const skills: SkillScore[] = MODULES.map((m) => ({
-    id: m.id,
-    percent: Math.round(scores[m.id] ?? 0),
-    level: levelFromScore(scores[m.id] ?? 0),
-  }));
-
-  const overall = Math.round(skills.reduce((s, k) => s + k.percent, 0) / skills.length);
-  const level = levelFromScore(overall);
-
-  const sorted = [...skills].sort((a, b) => b.percent - a.percent);
-  const byWeakness = [...skills].sort((a, b) => a.percent - b.percent).map((s) => s.id);
-  const strengths = sorted.filter((s) => s.percent >= 50).slice(0, 2).map((s) => s.id);
-  const weaknesses = byWeakness.slice(0, 2);
-
-  const plan: QuizResult["plan"] =
-    overall < 30 ? "beginner" : overall <= 60 ? "a2" : "advanced";
-
-  return {
-    level,
-    overall,
-    // no invented formula: the share of correct answers is the only honest
-    // ballpark we have before the first real mock exam
-    predictedScore: overall,
-    skills,
-    strengths: strengths.length ? strengths : [sorted[0].id],
-    weaknesses,
-    byWeakness,
-    plan,
-    writingWords: extras?.writingWords ?? 0,
-    takenAt: Date.now(),
-    answers: extras?.answers,
-  };
-}
 
 export const LEVEL_ORDER: Level[] = ["A0", "A1", "A2", "B1", "B2", "C1"];
 export function levelIndex(level: Level): number {
@@ -421,16 +323,27 @@ export function clearResult() {
 /* --------------------------- In-progress persistence --------------------- */
 /**
  * Coarse quiz progress so a page refresh doesn't drop the user back to the
- * landing / onboarding. We restore the phase, module index and per-module
- * scores; the active module restarts from its first question (module internals
- * — answers, timers — aren't lifted here).
+ * onboarding. Completed stages keep their aggregates; the ACTIVE stage
+ * restarts from its first question (stage internals — selected options,
+ * audio play counts — aren't lifted here). The router state is fully
+ * serializable, so a refresh mid-router resumes exactly where it stopped.
  */
+export type StageId = "router" | "dinleme" | "okuma" | "yazma";
+
 export type QuizProgress = {
-  phase: "onboarding" | "module" | "transition";
+  v: 3;
+  phase: "onboarding" | "stage";
   onbStep: number;
-  moduleIdx: number;
-  scores: Partial<Record<ModuleId, number>>;
-  writingWords: number;
+  stage: StageId;
+  /** Serialized staircase (see src/lib/diagnostic/engine.ts RouterState) */
+  router: unknown | null;
+  /** Set once the router stage completes */
+  routerLevel: Level | null;
+  seed: number;
+  minutesDaily: number | null;
+  answers: AnswerRecord[];
+  dinleme: { correct: number; total: number } | null;
+  okuma: { correct: number; total: number } | null;
 };
 
 const PROGRESS_KEY = "lingopro:quizProgress";
@@ -446,7 +359,9 @@ export function saveProgress(p: QuizProgress) {
 export function loadProgress(): QuizProgress | null {
   try {
     const raw = window.localStorage.getItem(PROGRESS_KEY);
-    return raw ? (JSON.parse(raw) as QuizProgress) : null;
+    const p = raw ? (JSON.parse(raw) as QuizProgress) : null;
+    // pre-v3 snapshots (module-based flow) can't be resumed — start fresh
+    return p && p.v === 3 ? p : null;
   } catch {
     return null;
   }
@@ -490,6 +405,74 @@ const T = {
   tlExact: { ru: "Знаю точную дату", en: "I know the exact date", tr: "Kesin tarihi biliyorum", kk: "Нақты күнін білемін" },
   tlPickDate: { ru: "Выбери дату экзамена", en: "Pick your exam date", tr: "Sınav tarihini seç", kk: "Емтихан күнін таңда" },
   tlConfirm: { ru: "Подтвердить", en: "Confirm", tr: "Onayla", kk: "Растау" },
+  // minutes per day (onboarding)
+  onbMinutes: { ru: "Сколько минут в день готов заниматься?", en: "How many minutes a day can you study?", tr: "Günde kaç dakika çalışabilirsin?", kk: "Күніне қанша минут айналыса аласың?" },
+  minutesNote: {
+    ru: "От этого зависит длина дневного плана. Можно изменить в настройках в любой момент.",
+    en: "This sets the length of your daily plan. You can change it in settings anytime.",
+    tr: "Günlük planın uzunluğu buna göre belirlenir. Ayarlardan istediğin zaman değiştirebilirsin.",
+    kk: "Күнделікті жоспардың ұзақтығы осыған байланысты. Баптаулардан кез келген уақытта өзгертуге болады.",
+  },
+  min15: { ru: "Лёгкий", en: "Light", tr: "Hafif", kk: "Жеңіл" },
+  min30: { ru: "Стабильный", en: "Steady", tr: "Düzenli", kk: "Тұрақты" },
+  min45: { ru: "Уверенный", en: "Confident", tr: "Yoğun", kk: "Сенімді" },
+  min60: { ru: "Интенсив", en: "Intensive", tr: "Çok yoğun", kk: "Интенсив" },
+  minPerDay: { ru: "мин/день", en: "min/day", tr: "dk/gün", kk: "мин/күн" },
+  // v3 stages
+  stRouter: { ru: "Определение уровня", en: "Level check", tr: "Seviye belirleme", kk: "Деңгейді анықтау" },
+  stDinleme: { ru: "Аудирование", en: "Listening", tr: "Dinleme", kk: "Тыңдалым" },
+  stOkuma: { ru: "Чтение", en: "Reading", tr: "Okuma", kk: "Оқылым" },
+  stYazma: { ru: "Письмо", en: "Writing", tr: "Yazma", kk: "Жазылым" },
+  stKonusma: { ru: "Говорение", en: "Speaking", tr: "Konuşma", kk: "Сөйлесім" },
+  stage: { ru: "Этап", en: "Stage", tr: "Aşama", kk: "Кезең" },
+  routerIntro: {
+    ru: "Адаптивный тест: вопросы подстраиваются под твои ответы. Отвечай честно — «не знаю» лучше угадывания.",
+    en: "Adaptive test: questions adjust to your answers. Answer honestly — skipping beats guessing.",
+    tr: "Uyarlanabilir test: sorular cevaplarına göre ayarlanır. Dürüst cevapla.",
+    kk: "Бейімделгіш тест: сұрақтар жауаптарыңа қарай өзгереді. Шынайы жауап бер.",
+  },
+  // dinleme audio player
+  play: { ru: "Прослушать", en: "Play", tr: "Dinle", kk: "Тыңдау" },
+  playing: { ru: "Играет…", en: "Playing…", tr: "Çalıyor…", kk: "Ойнап тұр…" },
+  playsLeft: { ru: "Осталось прослушиваний", en: "Plays left", tr: "Kalan dinleme hakkı", kk: "Қалған тыңдау саны" },
+  audioRule: {
+    ru: "Как на экзамене: максимум два прослушивания",
+    en: "Exam rules: two plays maximum",
+    tr: "Sınavdaki gibi: en fazla iki dinleme",
+    kk: "Емтихандағыдай: ең көбі екі рет тыңдау",
+  },
+  // yazma
+  yazmaAiNote: {
+    ru: "Эссе проверит AI-экзаменатор по критериям TÖMER — балл появится на странице результата.",
+    en: "An AI examiner will review the essay against TÖMER criteria — the score appears on the result page.",
+    tr: "Kompozisyonu yapay zekâ TÖMER ölçütlerine göre değerlendirecek — puan sonuç sayfasında görünecek.",
+    kk: "Эссені AI-емтихан алушы TÖMER өлшемдері бойынша тексереді — балл нәтиже бетінде шығады.",
+  },
+  // v3 result view
+  secTitle: { ru: "Секции TÖMER", en: "TÖMER sections", tr: "TÖMER bölümleri", kk: "TÖMER бөлімдері" },
+  ofSections: { ru: "по секциям", en: "across sections", tr: "bölüm toplamı", kk: "бөлімдер бойынша" },
+  konusmaPending: {
+    ru: "Оценим на первом живом уроке с AI-преподавателем",
+    en: "Assessed on your first live lesson with the AI teacher",
+    tr: "İlk canlı AI dersinde değerlendirilecek",
+    kk: "AI ұстазбен алғашқы жанды сабақта бағаланады",
+  },
+  konusmaCta: { ru: "Пройти первый урок", en: "Take the first lesson", tr: "İlk derse başla", kk: "Алғашқы сабақтан өту" },
+  yazmaChecking: { ru: "AI-экзаменатор проверяет эссе…", en: "The AI examiner is reviewing the essay…", tr: "Yapay zekâ kompozisyonu değerlendiriyor…", kk: "AI эссені тексеріп жатыр…" },
+  yazmaPendingAuth: {
+    ru: "Балл за письмо появится после проверки AI-экзаменатором",
+    en: "The writing score appears after the AI review",
+    tr: "Yazma puanı yapay zekâ incelemesinden sonra görünecek",
+    kk: "Жазылым баллы AI тексерісінен кейін шығады",
+  },
+  cefrCapNote: {
+    ru: "Уровень C1 подтверждается только пробным экзаменом — диагностика показывает до B2+.",
+    en: "C1 is confirmed only by a mock exam — the diagnostic measures up to B2+.",
+    tr: "C1 seviyesi yalnızca deneme sınavıyla doğrulanır — teşhis en çok B2+ gösterir.",
+    kk: "C1 деңгейі тек сынақ емтиханмен расталады — диагностика B2+ дейін көрсетеді.",
+  },
+  gapsFound: { ru: "Найденные пробелы по темам", en: "Topic gaps found", tr: "Tespit edilen konu eksikleri", kk: "Табылған тақырып олқылықтары" },
+  mainErrors: { ru: "Главные ошибки в эссе", en: "Key essay errors", tr: "Kompozisyondaki ana hatalar", kk: "Эссенің негізгі қателері" },
   // transition
   moduleDone: { ru: "завершён", en: "completed", tr: "tamamlandı", kk: "аяқталды" },
   nextModule: { ru: "Следующий", en: "Next", tr: "Sıradaki", kk: "Келесі" },
@@ -617,6 +600,7 @@ const STRENGTH: Record<ModuleId, Localized> = {
   grammar: { ru: "Грамматика — уверенная база времён и падежей", en: "Grammar — solid tenses and cases", tr: "Dil bilgisi — sağlam zaman ve hâl bilgisi", kk: "Грамматика — шақтар мен септіктер мықты" },
   vocab: { ru: "Лексика — хороший словарный запас", en: "Vocabulary — good range of words", tr: "Kelime — geniş kelime dağarcığı", kk: "Лексика — сөздік қоры жақсы" },
   reading: { ru: "Чтение — хорошо понимаешь тексты", en: "Reading — strong text comprehension", tr: "Okuma — metinleri iyi anlıyorsun", kk: "Оқу — мәтінді жақсы түсінесің" },
+  listening: { ru: "Аудирование — хорошо понимаешь на слух", en: "Listening — strong aural comprehension", tr: "Dinleme — dinlediğini iyi anlıyorsun", kk: "Тыңдалым — естігеніңді жақсы түсінесің" },
   writing: { ru: "Письмо — складно строишь предложения", en: "Writing — coherent sentences", tr: "Yazma — tutarlı cümleler", kk: "Жазу — сөйлемдерді жатық құрасың" },
   speaking: { ru: "Говорение — уверенно отвечаешь устно", en: "Speaking — confident spoken answers", tr: "Konuşma — akıcı sözlü cevaplar", kk: "Сөйлеу — ауызша сенімді жауап бересің" },
 };
@@ -625,6 +609,7 @@ const WEAKNESS: Record<ModuleId, Localized> = {
   grammar: { ru: "Грамматика — повтори времена и падежные окончания", en: "Grammar — review tenses and case endings", tr: "Dil bilgisi — zaman ve hâl eklerini tekrar et", kk: "Грамматика — шақтар мен септіктерді қайтала" },
   vocab: { ru: "Лексика — расширяй активный словарь", en: "Vocabulary — grow your active vocabulary", tr: "Kelime — kelime dağarcığını genişlet", kk: "Лексика — белсенді сөздігіңді кеңейт" },
   reading: { ru: "Чтение — тренируй понимание текстов", en: "Reading — practise comprehension", tr: "Okuma — anlama pratiği yap", kk: "Оқу — мәтінді түсінуді жаттық" },
+  listening: { ru: "Аудирование — тренируй понимание на слух", en: "Listening — practise aural comprehension", tr: "Dinleme — dinleme pratiği yap", kk: "Тыңдалым — естіп түсінуді жаттық" },
   writing: { ru: "Письмо — тренируй структуру предложений", en: "Writing — work on sentence structure", tr: "Yazma — cümle yapısı üzerine çalış", kk: "Жазу — сөйлем құрылымын жаттық" },
   speaking: { ru: "Говорение — нужна разговорная практика", en: "Speaking — needs more practice", tr: "Konuşma — daha çok pratik gerek", kk: "Сөйлеу — сөйлеу тәжірибесі қажет" },
 };
