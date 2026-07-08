@@ -127,9 +127,10 @@ export default function DashboardHome() {
         window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: data.today.completedCount, total: data.today.total } }));
       }
 
-      // plan engine: no study route yet → generate once (AI or honest fallback),
-      // then rebuild today from it. Session-guarded so quota errors don't loop.
-      if (!data.hasRoute && !window.sessionStorage.getItem("lp:route-requested")) {
+      // plan engine: no route yet → generate once; stale route (built with
+      // different minutes, e.g. a lost write) → regenerate with the real
+      // inputs. Session-guarded so quota errors don't loop.
+      if ((!data.hasRoute || data.routeStale) && !window.sessionStorage.getItem("lp:route-requested")) {
         window.sessionStorage.setItem("lp:route-requested", "1");
         void fetch("/api/ai/route", { method: "POST" })
           .then(async (r) => {
@@ -310,11 +311,14 @@ export default function DashboardHome() {
           </div>
           <div className="text-right text-sm">
             <div className="font-medium text-[var(--color-foreground)]">
-              {minutesLabel(totalMin, locale)} · {intensityLabel(intensity, locale)}
+              {minutesLabel(totalMin, locale)}{!hasRoute && ` · ${intensityLabel(intensity, locale)}`}
             </div>
-            <button type="button" onClick={() => setShowIntensity(true)} className="text-xs font-medium text-[var(--color-brand)] hover:underline">
-              {c.change}
-            </button>
+            {/* route-driven pace is edited in settings (minutes/day), not here */}
+            {!hasRoute && (
+              <button type="button" onClick={() => setShowIntensity(true)} className="text-xs font-medium text-[var(--color-brand)] hover:underline">
+                {c.change}
+              </button>
+            )}
           </div>
         </div>
 

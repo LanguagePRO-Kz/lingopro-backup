@@ -55,20 +55,25 @@ export default function QuizResultPage() {
         await saveProfileResult(local);
       }
 
-      if (final) {
-        saveResult(final); // keep the fast localStorage cache warm
-        // one-time XP for completing the diagnostic (dedup_key → never doubles)
-        void awardXp("diagnostic", XP.DIAGNOSTIC, { dedupKey: "diagnostic", metadata: { level: final.level } });
-        // seed the error memory so the first voice lesson has a personal focus
-        void seedMasteryFromDiagnostic(final);
+      if (!final) {
+        // no result in the profile OR locally → the diagnostic wasn't finished
+        router.replace("/quiz");
+        return;
+      }
 
-        // v3: onboarding minutes → profile (plan engine input)
-        if (final.version === 3 && final.minutesDaily) {
-          void supabase
-            .from("profiles")
-            .update({ study_minutes_daily: final.minutesDaily })
-            .eq("id", user.id);
-        }
+      saveResult(final); // keep the fast localStorage cache warm
+      // one-time XP for completing the diagnostic (dedup_key → never doubles)
+      void awardXp("diagnostic", XP.DIAGNOSTIC, { dedupKey: "diagnostic", metadata: { level: final.level } });
+      // seed the error memory so the first voice lesson has a personal focus
+      void seedMasteryFromDiagnostic(final);
+
+      // v3: onboarding minutes → profile BEFORE the dashboard can generate a
+      // route (awaited: the route inputs must see the real minutes, not 30)
+      if (final.version === 3 && final.minutesDaily) {
+        await supabase
+          .from("profiles")
+          .update({ study_minutes_daily: final.minutesDaily })
+          .eq("id", user.id);
       }
 
       // persist the onboarding goal/date choice (block D)
@@ -82,7 +87,7 @@ export default function QuizResultPage() {
       setResult(final);
       setStatus("ready");
 
-      if (!final || final.version !== 3) return;
+      if (final.version !== 3) return;
 
       // Konuşma: attach from the first reviewed live lesson (retake visits)
       if (final.sections?.konusma == null) {
@@ -125,17 +130,9 @@ export default function QuizResultPage() {
     };
   }, [router, locale]);
 
-  if (status === "loading") {
-    return (
-      <PageShell>
-        <div className="h-8 w-8 animate-spin-slow rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
-      </PageShell>
-    );
-  }
-
-  if (!result) {
-    // authed but no result anywhere → send them to take the diagnostic
-    router.replace("/quiz");
+  // while loading OR while the effect redirects (no result) — just a spinner;
+  // navigation happens in the effect, never during render
+  if (status === "loading" || !result) {
     return (
       <PageShell>
         <div className="h-8 w-8 animate-spin-slow rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />

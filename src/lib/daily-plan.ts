@@ -451,12 +451,14 @@ export async function loadDashboardData(locale: Locale): Promise<{
   history: DayRow[];
   /** false → the dashboard should trigger POST /api/ai/route once */
   hasRoute: boolean;
+  /** route inputs no longer match the profile minutes → regenerate once */
+  routeStale: boolean;
 }> {
   const date = todayISO();
   const from = addDaysISO(date, -29);
 
   type ProfileRow = {
-    quiz_result?: { level?: string; takenAt?: number } | null;
+    quiz_result?: { level?: string; takenAt?: number; minutesDaily?: number } | null;
     study_intensity?: Intensity | null;
     study_minutes_daily?: number | null;
     study_route?: unknown;
@@ -465,6 +467,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
   let history: DayRow[] = [];
   let derivedIntensity: Intensity | null = null;
   let mastery: MasteryRow[] = [];
+  let minutesDaily: number | null = null;
 
   try {
     const supabase = createClient();
@@ -496,12 +499,19 @@ export async function loadDashboardData(locale: Locale): Promise<{
     history = !hRes.error && hRes.data ? (hRes.data as DbRow[]).map(fromDb) : Object.values(lsAll()).filter((r) => r.date >= from);
     mastery = (mRes.data as MasteryRow[] | null) ?? [];
 
-    // Diagnostic v2 asked for minutes/day: until the plan engine consumes the
-    // minutes directly, map them onto the legacy intensity so the student
-    // never sees the "pick a pace" modal twice (15→light, 30→medium, 45+→intensive).
-    if (!profile?.study_intensity && profile?.study_minutes_daily) {
-      derivedIntensity =
-        profile.study_minutes_daily <= 15 ? "light" : profile.study_minutes_daily <= 30 ? "medium" : "intensive";
+    // Diagnostic v2 asked for minutes/day. Source of truth is the profile
+    // column, but the quiz result carries the onboarding choice too — heal
+    // the column if a write was lost (bug: 45 min chosen, plan built on 30).
+    minutesDaily = profile?.study_minutes_daily ?? profile?.quiz_result?.minutesDaily ?? null;
+    if (!profile?.study_minutes_daily && minutesDaily) {
+      await supabase.from("profiles").update({ study_minutes_daily: minutesDaily }).eq("id", user.id);
+    }
+
+    // Until the plan engine fully replaces intensity, map minutes onto it so
+    // the student never sees the "pick a pace" modal twice (15→light,
+    // 30→medium, 45+→intensive).
+    if (!profile?.study_intensity && minutesDaily) {
+      derivedIntensity = minutesDaily <= 15 ? "light" : minutesDaily <= 30 ? "medium" : "intensive";
       void supabase.from("profiles").update({ study_intensity: derivedIntensity }).eq("id", user.id);
     }
   } catch {
@@ -516,6 +526,9 @@ export async function loadDashboardData(locale: Locale): Promise<{
   // plan engine: an AI/fallback route turns the day into a route-driven layout
   const routeRaw = profile?.study_route as StudyRoute | null | undefined;
   const route = routeRaw && routeRaw.version === 1 && Array.isArray(routeRaw.weeks) && routeRaw.weeks.length > 0 ? routeRaw : null;
+  // route built with different minutes (lost write / settings change) → the
+  // dashboard regenerates it once, then rebuilds today
+  const routeStale = !!route && minutesDaily != null && route.inputs.minutesDaily !== minutesDaily;
 
   let today: DayRow | null = null;
   if (intensity) {
@@ -523,9 +536,9 @@ export async function loadDashboardData(locale: Locale): Promise<{
     // regenerate when the stored day predates the route (no `kind` fields yet)
     const preRoute = !!route && !!today && isPlanValid(today) && !today.tasks.some((t) => t.kind);
     if (!isPlanValid(today ?? undefined) || preRoute) {
-      const minutesDaily = profile?.study_minutes_daily ?? INTENSITY_MINUTES[intensity];
+      const budget = minutesDaily ?? INTENSITY_MINUTES[intensity];
       const tasks = route
-        ? buildDay({ route, date, dayNumber, mastery, history, minutesDaily, locale })
+        ? buildDay({ route, date, dayNumber, mastery, history, minutesDaily: budget, locale })
         : generateDailyPlan(level, intensity, dayNumber, locale);
       // keep credit for anything already completed today (same-skill match)
       if (today && isPlanValid(today)) {
@@ -538,7 +551,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
     }
   }
 
-  return { intensity, levelRaw, level, dayNumber, today, history, hasRoute: !!route };
+  return { intensity, levelRaw, level, dayNumber, today, history, hasRoute: !!route, routeStale };
 }
 
 export async function peekToday(): Promise<{ completed: number; total: number } | null> {

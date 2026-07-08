@@ -849,21 +849,47 @@ function SetStage({
 }
 
 /* ------------------------------ Audio player ------------------------------ */
-/** Exam-honest player: play/pause only, no scrubbing, two full plays max. */
+/** Exam-honest player: play only, no scrubbing, two full plays max. The
+ *  counter lives in sessionStorage keyed by audio id, so neither re-renders,
+ *  refreshes nor stage restarts can hand out extra plays. */
+
+const MAX_PLAYS = 2;
+
+function playsUsed(audioId: string): number {
+  try {
+    return parseInt(window.sessionStorage.getItem(`lingopro:plays:${audioId}`) ?? "0", 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function recordPlay(audioId: string): number {
+  const used = playsUsed(audioId) + 1;
+  try {
+    window.sessionStorage.setItem(`lingopro:plays:${audioId}`, String(used));
+  } catch {
+    /* ignore */
+  }
+  return used;
+}
 
 function AudioPlayer({ audio, locale }: { audio: BankAudio; locale: Locale }) {
   const ref = useRef<HTMLAudioElement | null>(null);
-  const [playsLeft, setPlaysLeft] = useState(2);
+  const [playsLeft, setPlaysLeft] = useState(() => Math.max(0, MAX_PLAYS - playsUsed(audio.id)));
   const [playing, setPlaying] = useState(false);
 
+  // re-sync when the set (audio id) changes and stop playback on unmount
   useEffect(() => {
+    setPlaysLeft(Math.max(0, MAX_PLAYS - playsUsed(audio.id)));
     const el = ref.current;
     return () => el?.pause();
-  }, []);
+  }, [audio.id]);
 
   function play() {
-    if (playsLeft <= 0 || playing || !ref.current) return;
-    setPlaysLeft((n) => n - 1);
+    // storage is the source of truth — state is only the display
+    if (playsUsed(audio.id) >= MAX_PLAYS || playing || !ref.current) return;
+    const used = recordPlay(audio.id);
+    setPlaysLeft(Math.max(0, MAX_PLAYS - used));
     setPlaying(true);
     ref.current.currentTime = 0;
     void ref.current.play().catch(() => setPlaying(false));

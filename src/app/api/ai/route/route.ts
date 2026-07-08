@@ -53,8 +53,16 @@ export async function POST(req: Request) {
   ]);
 
   const p = profileRes.data ?? {};
-  const quiz = (p as { quiz_result?: { level?: string } | null }).quiz_result;
+  const quiz = (p as { quiz_result?: { level?: string; minutesDaily?: number } | null }).quiz_result;
   const weakDetails = ((masteryRes.data ?? []) as { topic: string; strength: number }[]);
+
+  // minutes: profile column first, then the onboarding choice stored in the
+  // quiz result (heals a lost write so the route never falls back to 30)
+  const storedMinutes = (p as { study_minutes_daily?: number | null }).study_minutes_daily ?? null;
+  const minutesDaily = storedMinutes ?? quiz?.minutesDaily ?? 30;
+  if (!storedMinutes && quiz?.minutesDaily) {
+    await supabase.from("profiles").update({ study_minutes_daily: quiz.minutesDaily }).eq("id", quota.userId);
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const inputs: Omit<RouteInputs, "routeStartedAt"> = {
@@ -68,7 +76,7 @@ export async function POST(req: Request) {
       (p as { exam_date_mode?: string }).exam_date_mode === "approx"
         ? ((p as { exam_horizon_months?: number | null }).exam_horizon_months ?? undefined)
         : undefined,
-    minutesDaily: (p as { study_minutes_daily?: number | null }).study_minutes_daily ?? 30,
+    minutesDaily,
     weakTopics: weakDetails.map((w) => w.topic),
   };
   const fullInputs: RouteInputs = { ...inputs, routeStartedAt: today };

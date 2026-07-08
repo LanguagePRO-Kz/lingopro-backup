@@ -370,6 +370,11 @@ export function loadProgress(): QuizProgress | null {
 export function clearProgress() {
   try {
     window.localStorage.removeItem(PROGRESS_KEY);
+    // a fresh run gets fresh audio plays; WITHIN a run the counters survive
+    // any refresh (exam honesty — see AudioPlayer in quiz/page.tsx)
+    for (const key of Object.keys(window.sessionStorage)) {
+      if (key.startsWith("lingopro:plays:")) window.sessionStorage.removeItem(key);
+    }
   } catch {
     /* ignore storage errors */
   }

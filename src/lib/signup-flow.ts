@@ -39,11 +39,13 @@ export async function signUpAndSync(
 
   if (!session) return { ok: false, error: "No session after sign up" };
 
-  // Persist the diagnostic result to the profile, then drop the local cache.
+  // Persist the diagnostic result to the profile. The local cache is dropped
+  // ONLY after a confirmed write — otherwise /quiz/result keeps the fallback
+  // copy and retries the migration itself (losing both = onboarding kick-out).
   const local = loadResult();
   if (local) {
-    await saveProfileResult(local);
-    clearResult();
+    const saved = await saveProfileResult(local);
+    if (saved) clearResult();
   }
 
   return { ok: true };

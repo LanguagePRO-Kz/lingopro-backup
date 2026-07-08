@@ -42,20 +42,23 @@ export async function fetchProfile(): Promise<Profile | null> {
   };
 }
 
-async function upsert(patch: Record<string, unknown>) {
+/** @returns true when the write reached the DB — callers may drop local caches only then */
+async function upsert(patch: Record<string, unknown>): Promise<boolean> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return false;
 
-  await supabase.from("profiles").upsert({
+  const { error } = await supabase.from("profiles").upsert({
     id: user.id,
     email: user.email,
     full_name: (user.user_metadata?.full_name as string) ?? null,
     ...patch,
     updated_at: new Date().toISOString(),
   });
+  if (error) console.error("[profile] upsert failed:", error.message);
+  return !error;
 }
 
 export const saveProfilePlan = (plan: string) => upsert({ plan });
