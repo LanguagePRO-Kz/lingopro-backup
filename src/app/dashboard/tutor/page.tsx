@@ -136,21 +136,36 @@ export default function TutorPage() {
     setMessages(nextMessages);
     setThinking(true);
     try {
+      // the greeting is UI chrome — the model only needs the dialogue.
+      // Consecutive teacher bubbles (one reply split for the messenger feel)
+      // merge back into a single assistant turn: the API expects alternation.
+      const history: { role: "assistant" | "user"; content: string }[] = [];
+      for (const m of nextMessages.slice(1)) {
+        const role = m.role === "ai" ? ("assistant" as const) : ("user" as const);
+        const last = history[history.length - 1];
+        if (last && last.role === role) last.content += "\n\n" + m.text;
+        else history.push({ role, content: m.text });
+      }
       const res = await fetch("/api/ai/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feedbackLang: locale,
-          // the greeting is UI chrome — the model only needs the dialogue
-          messages: nextMessages.slice(1).map((m) => ({
-            role: m.role === "ai" ? "assistant" : "user",
-            content: m.text,
-          })),
-        }),
+        body: JSON.stringify({ feedbackLang: locale, messages: history }),
       });
       if (res.ok) {
         const data = (await res.json()) as { text?: string };
-        setMessages((m) => [...m, { role: "ai", text: data.text ? deMarkdown(data.text) : c.errGeneric }]);
+        // one reply → several short bubbles (blank-line separated), delivered
+        // with a typing pause like a real teacher texting
+        const parts = data.text
+          ? deMarkdown(data.text).split(/\n{2,}/).map((t) => t.trim()).filter(Boolean).slice(0, 4)
+          : [];
+        if (parts.length === 0) {
+          setMessages((m) => [...m, { role: "ai", text: c.errGeneric }]);
+        }
+        for (let i = 0; i < parts.length; i++) {
+          if (i > 0) await new Promise((r) => setTimeout(r, 500 + Math.min(900, parts[i].length * 12)));
+          const part = parts[i];
+          setMessages((m) => [...m, { role: "ai", text: part }]);
+        }
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         const msg =
