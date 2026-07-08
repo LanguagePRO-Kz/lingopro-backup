@@ -29,62 +29,46 @@ const T = {
   ru: {
     online: "Онлайн",
     greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
-    greet2: "Привет! Я твой персональный учитель турецкого. Чем могу помочь?",
+    greet2: "Привет! Я твой персональный учитель турецкого. Спроси про грамматику, слово, план подготовки — или пришли предложение на проверку.",
     placeholder: "Напиши сообщение…",
     quick: ["Объясни грамматику", "Проверь предложение", "Подготовка к TÖMER", "Разговорная практика", "Переведи текст"],
-    fallback: "Отличный вопрос! Давай разберём это вместе. [AI-ответы будут доступны после подключения Claude API]",
-    answers: {
-      "Объясни грамматику": "С удовольствием! В турецком 6 падежей: основной, винительный (-i), дательный (-e), местный (-de), исходный (-den) и родительный (-in). Какую тему разберём?",
-      "Проверь предложение": "Пришли предложение, которое хочешь проверить, — я подсвечу ошибки и объясню правила.",
-      "Подготовка к TÖMER": "TÖMER состоит из 4 секций: грамматика, чтение, аудирование и письмо. С какой начнём?",
-      "Разговорная практика": "Süper! Hadi Türkçe konuşalım. Bugün nasılsın? (Отлично! Давай говорить по-турецки. Как ты сегодня?)",
-      "Переведи текст": "Вставь текст на турецком или русском — я переведу и объясню сложные слова.",
-    } as Record<string, string>,
+    errGeneric: "Не получилось получить ответ — проверь соединение и попробуй ещё раз.",
+    errDaily: "Дневной лимит вопросов тьютору исчерпан. Завтра лимит обновится.",
+    errMonthly: "Месячный лимит вопросов тьютору исчерпан.",
+    errUnavailable: "AI-тьютор временно недоступен. Попробуй чуть позже.",
   },
   en: {
     online: "Online",
     greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
-    greet2: "Hi! I'm your personal Turkish teacher. How can I help?",
+    greet2: "Hi! I'm your personal Turkish teacher. Ask about grammar, a word, your prep plan — or send a sentence to check.",
     placeholder: "Type a message…",
     quick: ["Explain grammar", "Check a sentence", "TÖMER prep", "Speaking practice", "Translate text"],
-    fallback: "Great question! Let's work through it together. [AI answers will be available once the Claude API is connected]",
-    answers: {
-      "Explain grammar": "Sure! Turkish has 6 cases: nominative, accusative (-i), dative (-e), locative (-de), ablative (-den) and genitive (-in). Which one shall we cover?",
-      "Check a sentence": "Send the sentence you want checked — I'll highlight mistakes and explain the rules.",
-      "TÖMER prep": "TÖMER has 4 sections: grammar, reading, listening and writing. Which one first?",
-      "Speaking practice": "Süper! Let's speak Turkish. Bugün nasılsın? (How are you today?)",
-      "Translate text": "Paste text in Turkish or English — I'll translate and explain the tricky words.",
-    } as Record<string, string>,
+    errGeneric: "Couldn't get a reply — check your connection and try again.",
+    errDaily: "Today's tutor limit is used up. It resets tomorrow.",
+    errMonthly: "This month's tutor limit is used up.",
+    errUnavailable: "The AI tutor is temporarily unavailable. Try again shortly.",
   },
   tr: {
     online: "Çevrimiçi",
     greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
-    greet2: "Bugün hangi konuda yardımcı olabilirim?",
+    greet2: "Dil bilgisi, kelime, hazırlık planı sor — ya da kontrol için bir cümle gönder.",
     placeholder: "Bir mesaj yaz…",
     quick: ["Dil bilgisi açıkla", "Cümle kontrol et", "TÖMER hazırlık", "Konuşma pratiği", "Metin çevir"],
-    fallback: "Harika soru! Birlikte çözelim. [AI cevapları Claude API bağlandığında gelecek]",
-    answers: {
-      "Dil bilgisi açıkla": "Tabii! Türkçede 6 hâl var: yalın, belirtme (-i), yönelme (-e), bulunma (-de), ayrılma (-den) ve tamlayan (-in). Hangisini görelim?",
-      "Cümle kontrol et": "Kontrol etmek istediğin cümleyi gönder — hataları işaretleyip kuralları açıklayayım.",
-      "TÖMER hazırlık": "TÖMER 4 bölümden oluşur: dil bilgisi, okuma, dinleme ve yazma. Hangisiyle başlayalım?",
-      "Konuşma pratiği": "Süper! Türkçe konuşalım. Bugün nasılsın?",
-      "Metin çevir": "Türkçe veya İngilizce metni yapıştır — çevirip zor kelimeleri açıklayayım.",
-    } as Record<string, string>,
+    errGeneric: "Cevap alınamadı — bağlantını kontrol edip tekrar dene.",
+    errDaily: "Bugünkü soru limitin doldu. Yarın yenilenir.",
+    errMonthly: "Bu ayki soru limitin doldu.",
+    errUnavailable: "AI öğretmen geçici olarak kullanılamıyor. Az sonra tekrar dene.",
   },
   kk: {
     online: "Желіде",
     greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
-    greet2: "Сәлем! Мен сенің жеке түрік тілі мұғаліміңмін. Қалай көмектесе аламын?",
+    greet2: "Сәлем! Мен сенің жеке түрік тілі мұғаліміңмін. Грамматика, сөз, дайындық жоспары туралы сұра — немесе тексеруге сөйлем жібер.",
     placeholder: "Хабарлама жаз…",
     quick: ["Грамматиканы түсіндір", "Сөйлемді тексер", "TÖMER дайындық", "Сөйлеу практикасы", "Мәтінді аудар"],
-    fallback: "Тамаша сұрақ! Бірге талдайық. [AI жауаптары Claude API қосылғанда қолжетімді болады]",
-    answers: {
-      "Грамматиканы түсіндір": "Әрине! Түрік тілінде 6 септік бар: атау, табыс (-i), барыс (-e), жатыс (-de), шығыс (-den) және ілік (-in). Қайсысын қарайық?",
-      "Сөйлемді тексер": "Тексергің келетін сөйлемді жібер — қателерді белгілеп, ережелерді түсіндіремін.",
-      "TÖMER дайындық": "TÖMER 4 бөлімнен тұрады: грамматика, оқу, тыңдалым, жазу. Қайсысынан бастаймыз?",
-      "Сөйлеу практикасы": "Süper! Түрікше сөйлесейік. Bugün nasılsın? (Бүгін қалайсың?)",
-      "Мәтінді аудар": "Түрікше не орысша мәтінді қой — аударып, қиын сөздерді түсіндіремін.",
-    } as Record<string, string>,
+    errGeneric: "Жауап алынбады — байланысты тексеріп, қайта көр.",
+    errDaily: "Бүгінгі сұрақ лимиті таусылды. Ертең жаңарады.",
+    errMonthly: "Осы айдағы сұрақ лимиті таусылды.",
+    errUnavailable: "AI ұстаз уақытша қолжетімсіз. Сәлден соң қайта көр.",
   },
 };
 
@@ -104,7 +88,7 @@ export default function TutorPage() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  });
 
   useEffect(() => () => recRef.current?.stop(), []);
 
@@ -136,16 +120,52 @@ export default function TutorPage() {
     setRecording(true);
   }
 
-  function reply(userText: string, aiText: string) {
-    setMessages((m) => [...m, { role: "user", text: userText }]);
-    setTimeout(() => setMessages((m) => [...m, { role: "ai", text: aiText }]), 500);
+  const [thinking, setThinking] = useState(false);
+
+  /** Real chat: send the visible history to /api/ai/tutor (quota `tutor`). */
+  async function ask(userText: string) {
+    const text = userText.trim();
+    if (!text || thinking) return;
+    const nextMessages: Msg[] = [...messages, { role: "user", text }];
+    setMessages(nextMessages);
+    setThinking(true);
+    try {
+      const res = await fetch("/api/ai/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackLang: locale,
+          // greetings are UI chrome — the model only needs the dialogue
+          messages: nextMessages.slice(2).map((m) => ({
+            role: m.role === "ai" ? "assistant" : "user",
+            content: m.text,
+          })),
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { text?: string };
+        setMessages((m) => [...m, { role: "ai", text: data.text || c.errGeneric }]);
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const msg =
+          data.error === "daily_limit" ? c.errDaily
+          : data.error === "monthly_limit" ? c.errMonthly
+          : data.error === "ai_unavailable" || data.error?.includes("budget") ? c.errUnavailable
+          : c.errGeneric;
+        setMessages((m) => [...m, { role: "ai", text: msg }]);
+      }
+    } catch {
+      setMessages((m) => [...m, { role: "ai", text: c.errGeneric }]);
+    } finally {
+      setThinking(false);
+    }
   }
 
   function send() {
     const text = input.trim();
     if (!text) return;
     setInput("");
-    reply(text, c.fallback);
+    void ask(text);
   }
 
   return (
@@ -179,18 +199,31 @@ export default function TutorPage() {
               {m.text}
             </motion.div>
           ))}
+          {thinking && (
+            <div className="flex items-center gap-1.5 self-start rounded-2xl bg-black/[0.04] px-4 py-3">
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-[var(--color-muted)]"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                />
+              ))}
+            </div>
+          )}
           <div ref={endRef} />
         </div>
       </div>
 
-      {/* quick replies */}
+      {/* quick replies — real prompts to the AI, not canned answers */}
       <div className="flex gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {c.quick.map((q) => (
           <button
             key={q}
             type="button"
-            onClick={() => reply(q, c.answers[q] ?? c.fallback)}
-            className="shrink-0 rounded-full border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/[0.06] px-3 py-1.5 text-xs font-medium text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/12"
+            disabled={thinking}
+            onClick={() => void ask(q)}
+            className="shrink-0 rounded-full border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/[0.06] px-3 py-1.5 text-xs font-medium text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/12 disabled:opacity-40"
           >
             {q}
           </button>

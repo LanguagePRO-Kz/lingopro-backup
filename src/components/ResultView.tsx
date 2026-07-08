@@ -254,6 +254,170 @@ function SectionRow({
   );
 }
 
+/* --------------------- v3 per-section breakdown (§ bug 4) ----------------- */
+/* The diagnostic must not only measure but point the way: every section gets
+   its wrong answers + 2 concrete, score-banded recommendations. */
+
+type Band = "weak" | "mid" | "strong";
+const bandOf = (score: number | null): Band | null =>
+  score == null ? null : score < 15 ? "weak" : score < 20 ? "mid" : "strong";
+
+type Loc = Record<Locale, string>;
+const SECTION_RECS: Record<"dinleme" | "okuma" | "yazma" | "konusma", Record<Band, Loc[]>> = {
+  dinleme: {
+    weak: [
+      { ru: "Каждый день 10 минут аудирования в кабинете — короткие диалоги твоего уровня.", en: "10 minutes of listening daily — short dialogues at your level.", tr: "Her gün 10 dakika dinleme — seviyene uygun kısa diyaloglar.", kk: "Күн сайын 10 минут тыңдалым — деңгейіңе сай қысқа диалогтар." },
+      { ru: "Слушай в два подхода: первый раз — общий смысл, второй — детали (числа, время, имена).", en: "Listen twice: first for gist, then for details (numbers, times, names).", tr: "İki kez dinle: önce genel anlam, sonra ayrıntılar (sayılar, saatler, isimler).", kk: "Екі рет тыңда: алдымен жалпы мағына, сосын детальдар (сандар, уақыт, есімдер)." },
+    ],
+    mid: [
+      { ru: "3–4 аудирования в неделю; особое внимание числам, датам и ценам — на них чаще всего ловят.", en: "3–4 listening sets a week; watch numbers, dates and prices — the classic traps.", tr: "Haftada 3–4 dinleme; sayılara, tarihlere ve fiyatlara dikkat — klasik tuzaklar.", kk: "Аптасына 3–4 тыңдалым; сандарға, күндерге, бағаларға мұқият бол — жиі қақпан осында." },
+      { ru: "После прослушивания перескажи услышанное вслух в 2–3 предложениях.", en: "After listening, retell what you heard aloud in 2–3 sentences.", tr: "Dinledikten sonra duyduklarını 2–3 cümleyle sesli anlat.", kk: "Тыңдағаннан кейін естігеніңді 2–3 сөйлеммен дауыстап айтып бер." },
+    ],
+    strong: [
+      { ru: "Держи форму: 1–2 аудио в неделю уровнем выше (подкасты, новости на турецком).", en: "Stay sharp: 1–2 audios a week one level up (Turkish podcasts, news).", tr: "Formda kal: haftada 1–2 üst seviye ses (Türkçe podcast, haber).", kk: "Форманы сақта: аптасына 1–2 жоғарырақ деңгейдегі аудио (түрікше подкаст, жаңалық)." },
+    ],
+  },
+  okuma: {
+    weak: [
+      { ru: "Читай короткий текст каждый день в кабинете Чтения; незнакомые слова — сразу в словарь.", en: "Read a short text daily in the Reading section; new words go straight to your vocabulary.", tr: "Her gün Okuma bölümünde kısa bir metin oku; bilmediğin kelimeleri hemen sözlüğe ekle.", kk: "Күн сайын Оқылым бөлімінде қысқа мәтін оқы; бейтаныс сөздерді бірден сөздікке қос." },
+      { ru: "Ответ всегда ищи В ТЕКСТЕ, а не по памяти — подчёркивай место, где он написан.", en: "Always find the answer IN the text, not from memory — underline where it's stated.", tr: "Cevabı hafızadan değil METİNDEN bul — geçtiği yeri işaretle.", kk: "Жауапты жадыңнан емес, МӘТІННЕН тап — жазылған жерін белгіле." },
+    ],
+    mid: [
+      { ru: "Тренируйся с таймером: 5 вопросов за ~7 минут, как на экзамене.", en: "Practise against the clock: 5 questions in ~7 minutes, exam pace.", tr: "Süre tutarak çalış: sınav temposunda ~7 dakikada 5 soru.", kk: "Таймермен жаттық: емтихан қарқынымен ~7 минутта 5 сұрақ." },
+      { ru: "Отрабатывай вопросы-ловушки «что верно/неверно по тексту» — сверяй каждый вариант с текстом.", en: "Drill the “which is true/false” traps — check every option against the text.", tr: "«Hangisi doğru/yanlış» tuzaklarını çalış — her şıkkı metinle karşılaştır.", kk: "«Қайсысы дұрыс/бұрыс» қақпан сұрақтарын жаттық — әр нұсқаны мәтінмен салыстыр." },
+    ],
+    strong: [
+      { ru: "Переходи на тексты уровнем выше: статьи и колонки — именно они на B2/C1.", en: "Move to texts one level up: articles and columns — that's what B2/C1 tests.", tr: "Bir üst seviye metinlere geç: makaleler ve köşe yazıları — B2/C1 bunları sorar.", kk: "Бір деңгей жоғары мәтіндерге көш: мақалалар мен колонкалар — B2/C1 осыны сұрайды." },
+    ],
+  },
+  yazma: {
+    weak: [
+      { ru: "Пиши в кабинете Письма 2–3 раза в неделю по 5–8 предложений — AI-экзаменатор разберёт каждую ошибку.", en: "Write 2–3 times a week (5–8 sentences) in the Writing section — the AI examiner reviews every error.", tr: "Haftada 2–3 kez Yazma bölümünde 5–8 cümle yaz — yapay zekâ her hatayı inceler.", kk: "Аптасына 2–3 рет Жазылым бөлімінде 5–8 сөйлем жаз — AI әр қатені талдайды." },
+      { ru: "Держи каркас: вступление → 2 аргумента с примерами → вывод. Это половина балла за задание.", en: "Keep the frame: intro → 2 arguments with examples → conclusion. That's half the task score.", tr: "İskeleti koru: giriş → örnekli 2 argüman → sonuç. Görev puanının yarısı budur.", kk: "Қаңқаны ұста: кіріспе → мысалды 2 дәлел → қорытынды. Тапсырма баллының жартысы осы." },
+    ],
+    mid: [
+      { ru: "Работай над связками (ancak, üstelik, dolayısıyla, buna rağmen) — они дают баллы за связность.", en: "Work on connectors (ancak, üstelik, dolayısıyla, buna rağmen) — they earn coherence points.", tr: "Bağlaçlara çalış (ancak, üstelik, dolayısıyla, buna rağmen) — tutarlılık puanı kazandırır.", kk: "Жалғаулықтармен жұмыс істе (ancak, üstelik, dolayısıyla) — байланыстылыққа балл береді." },
+      { ru: "Перечитывай написанное один раз только на предмет окончаний падежей — самая частая потеря баллов.", en: "Re-read once checking case endings only — the most common point loss.", tr: "Yazdığını bir kez SADECE hâl ekleri için oku — en sık puan kaybı budur.", kk: "Жазғаныңды бір рет тек септік жалғауларын тексеріп оқы — балл көбіне осында кетеді." },
+    ],
+    strong: [
+      { ru: "Тренируй полноформатные эссе 180+ слов с контраргументом — формат C1.", en: "Practise full essays of 180+ words with a counter-argument — the C1 format.", tr: "Karşı argümanlı 180+ kelimelik tam kompozisyonlar yaz — C1 formatı.", kk: "Қарсы дәлелі бар 180+ сөздік толық эссе жаз — C1 форматы." },
+    ],
+  },
+  konusma: {
+    weak: [
+      { ru: "Проходи голосовые уроки 3 раза в неделю — Ahu ведёт урок по твоим слабым темам и разбирает ошибки.", en: "Take voice lessons 3× a week — Ahu teaches to your weak topics and reviews your errors.", tr: "Haftada 3 kez sesli ders yap — Ahu zayıf konularına göre ders işler, hatalarını inceler.", kk: "Аптасына 3 рет дауыстық сабақ өт — Ahu әлсіз тақырыптарың бойынша сабақ жүргізіп, қателеріңді талдайды." },
+      { ru: "Отвечай развёрнуто: минимум 3–4 предложения на вопрос, даже простыми конструкциями.", en: "Answer at length: 3–4 sentences minimum per question, even with simple structures.", tr: "Uzun cevap ver: soru başına en az 3–4 cümle, basit yapılarla bile olur.", kk: "Толық жауап бер: әр сұраққа кемінде 3–4 сөйлем, қарапайым құрылыммен болса да." },
+    ],
+    mid: [
+      { ru: "На уроках проси Ahu исправлять тебя сразу — и повторяй исправленную фразу вслух.", en: "Ask Ahu to correct you immediately — and repeat the corrected phrase aloud.", tr: "Ahu'dan seni hemen düzeltmesini iste — düzeltilmiş cümleyi sesli tekrar et.", kk: "Ahu-дан бірден түзетуін сұра — түзетілген сөйлемді дауыстап қайтала." },
+    ],
+    strong: [
+      { ru: "Переходи на режимы Bölüm 2–3 (описание и аргументация) — это формат экзамена.", en: "Move to Bölüm 2–3 modes (description and argumentation) — the exam format.", tr: "Bölüm 2–3 modlarına geç (betimleme ve savunma) — sınav formatı budur.", kk: "Bölüm 2–3 режимдеріне көш (сипаттау және дәйектеу) — емтихан форматы осы." },
+    ],
+  },
+};
+
+function V3SectionAccordion({
+  emoji,
+  label,
+  score,
+  records,
+  recs,
+  locale,
+  defaultOpen,
+  children,
+}: {
+  emoji: string;
+  label: string;
+  score: number | null;
+  records: AnswerRecord[];
+  recs: Loc[];
+  locale: Locale;
+  defaultOpen: boolean;
+  children?: React.ReactNode; // extra section-specific content (yazma subscores, konusma CTA)
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const gaps = records.filter((r) => !r.correct);
+  const c = score != null ? barColor((score / 25) * 100) : null;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-black/[0.07] bg-white/60">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-black/[0.02]"
+      >
+        <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--color-foreground)] sm:text-base">
+          <span>{emoji}</span>
+          {label}
+          {score != null && c ? (
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
+              style={{ background: `linear-gradient(to right, ${c.from}, ${c.to})` }}
+            >
+              {score}/25
+            </span>
+          ) : (
+            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-xs font-semibold text-[var(--color-muted)]">—/25</span>
+          )}
+        </span>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }} className="shrink-0 text-[var(--color-muted)]">
+          ▾
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-4 border-t border-black/[0.06] px-5 py-5">
+              {children}
+
+              {gaps.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[#d97706]">{qt(locale, "gapsTitle")}</div>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {gaps.map((g, i) => (
+                      <li key={i} className="rounded-xl bg-black/[0.03] p-3 text-sm text-[var(--color-foreground)]">
+                        <div className="flex items-start gap-2">
+                          <span>❌</span>
+                          <span>{g.prompt}</span>
+                        </div>
+                        <div className="mt-1 pl-6 text-xs text-[var(--color-muted)]">
+                          {qt(locale, "correctAnswerWord")}: <b className="text-[var(--color-foreground)]">{g.correctAnswer}</b>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {recs.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-brand-2)]">{qt(locale, "todoTitle")}</div>
+                  <ul className="mt-2 flex flex-col gap-1.5">
+                    {recs.map((r, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
+                        <span className="text-[var(--color-brand)]">→</span>
+                        <span>{r[locale] ?? r.ru}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* ------------------------------ Result view ------------------------------ */
 /** The full diagnostic result UI. Shared by /results and /quiz/result. */
 export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazmaChecking?: boolean }) {
@@ -433,25 +597,104 @@ export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazm
             </div>
           )}
 
-          {/* essay review highlights */}
-          {review?.valid && review.errors.length > 0 && (
-            <div className="glass mt-6 rounded-3xl p-7">
-              <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "mainErrors")}</h2>
-              <div className="mt-3 flex flex-col gap-2.5">
-                {review.errors.slice(0, 3).map((e, i) => (
-                  <div key={i} className="rounded-xl bg-black/[0.03] p-3 text-sm">
-                    <div>
-                      <span className="text-[#dc2626] line-through decoration-[#dc2626]/60">{e.quote}</span>{" "}
-                      → <span className="font-semibold text-[#16a34a]">{e.correction}</span>
-                    </div>
-                    <div className="mt-1 text-xs text-[var(--color-muted)]">
-                      <b>{e.rule}</b>{e.explanation ? ` — ${e.explanation}` : ""}
+          {/* per-section breakdown: gaps + concrete recommendations */}
+          <div className="mt-6">
+            <h2 className="mb-4 text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "detailTitle")}</h2>
+            <div className="flex flex-col gap-3">
+              <V3SectionAccordion
+                emoji="🎧"
+                label={qt(locale, "stDinleme")}
+                score={sections!.dinleme}
+                records={(result.answers ?? []).filter((a) => a.module === "listening")}
+                recs={SECTION_RECS.dinleme[bandOf(sections!.dinleme) ?? "weak"]}
+                locale={locale}
+                defaultOpen={bandOf(sections!.dinleme) === "weak"}
+              />
+              <V3SectionAccordion
+                emoji="📖"
+                label={qt(locale, "stOkuma")}
+                score={sections!.okuma}
+                records={(result.answers ?? []).filter((a) => a.module === "reading")}
+                recs={SECTION_RECS.okuma[bandOf(sections!.okuma) ?? "weak"]}
+                locale={locale}
+                defaultOpen={bandOf(sections!.okuma) === "weak"}
+              />
+              <V3SectionAccordion
+                emoji="✍️"
+                label={qt(locale, "stYazma")}
+                score={sections!.yazma}
+                records={[]}
+                recs={SECTION_RECS.yazma[bandOf(sections!.yazma) ?? "weak"]}
+                locale={locale}
+                defaultOpen={false}
+              >
+                {sections!.yazma == null && (
+                  <p className="rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-[var(--color-muted)]">
+                    {yazmaChecking ? qt(locale, "yazmaChecking") : qt(locale, "yazmaPendingAuth")}
+                  </p>
+                )}
+                {review?.valid && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(["task", "coherence", "grammar", "vocab"] as const).map((k) => (
+                      <div key={k} className="rounded-xl bg-black/[0.03] px-3 py-2 text-center">
+                        <div className="text-sm font-bold text-[var(--color-foreground)]">{review.subscores[k]}</div>
+                        <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted)]">{k}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {review?.valid && review.errors.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#d97706]">{qt(locale, "mainErrors")}</div>
+                    <div className="mt-2 flex flex-col gap-2.5">
+                      {review.errors.slice(0, 3).map((e, i) => (
+                        <div key={i} className="rounded-xl bg-black/[0.03] p-3 text-sm">
+                          <div>
+                            <span className="text-[#dc2626] line-through decoration-[#dc2626]/60">{e.quote}</span>{" "}
+                            → <span className="font-semibold text-[#16a34a]">{e.correction}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-[var(--color-muted)]">
+                            <b>{e.rule}</b>{e.explanation ? ` — ${e.explanation}` : ""}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+                {review?.valid && review.advice.length > 0 && (
+                  <ul className="flex flex-col gap-1.5">
+                    {review.advice.slice(0, 3).map((a, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-foreground)]">
+                        <span className="text-[var(--color-brand)]">💡</span>
+                        <span>{a}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </V3SectionAccordion>
+              <V3SectionAccordion
+                emoji="🎤"
+                label={qt(locale, "stKonusma")}
+                score={sections!.konusma}
+                records={[]}
+                recs={SECTION_RECS.konusma[bandOf(sections!.konusma) ?? "weak"]}
+                locale={locale}
+                defaultOpen={false}
+              >
+                {sections!.konusma == null && (
+                  <p className="flex flex-wrap items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-[var(--color-muted)]">
+                    {qt(locale, "konusmaPending")}
+                    <Link
+                      href="/dashboard/speaking/live"
+                      className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+                    >
+                      {qt(locale, "konusmaCta")} →
+                    </Link>
+                  </p>
+                )}
+              </V3SectionAccordion>
             </div>
-          )}
+          </div>
         </>
       ) : (
         <div className="mt-6">
