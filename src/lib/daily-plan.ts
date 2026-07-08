@@ -15,7 +15,7 @@ import { createClient } from "./supabase/client";
 // they stay out of the dashboard bundle.
 import { LEVELS, type Level } from "@/data/types";
 import { buildDay, type MasteryRow } from "./plan/layout";
-import type { StudyRoute } from "./plan/route";
+import { needsRegen, type StudyRoute } from "./plan/route";
 
 export type Intensity = "light" | "medium" | "intensive";
 export type Skill = "grammar" | "reading" | "listening" | "writing" | "speaking" | "vocabulary";
@@ -462,6 +462,10 @@ export async function loadDashboardData(locale: Locale): Promise<{
     study_intensity?: Intensity | null;
     study_minutes_daily?: number | null;
     study_route?: unknown;
+    target_level?: string | null;
+    exam_date?: string | null;
+    exam_date_mode?: string | null;
+    exam_horizon_months?: number | null;
   };
   let profile: ProfileRow | null = null;
   let history: DayRow[] = [];
@@ -478,7 +482,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
     const [pRes, hRes, mRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("quiz_result, study_intensity, study_minutes_daily, study_route")
+        .select("quiz_result, study_intensity, study_minutes_daily, study_route, target_level, exam_date, exam_date_mode, exam_horizon_months")
         .eq("id", user.id)
         .maybeSingle(),
       supabase
@@ -499,17 +503,22 @@ export async function loadDashboardData(locale: Locale): Promise<{
     history = !hRes.error && hRes.data ? (hRes.data as DbRow[]).map(fromDb) : Object.values(lsAll()).filter((r) => r.date >= from);
     mastery = (mRes.data as MasteryRow[] | null) ?? [];
 
-    // Diagnostic v2 asked for minutes/day. Source of truth is the profile
-    // column, but the quiz result carries the onboarding choice too — heal
-    // the column if a write was lost (bug: 45 min chosen, plan built on 30).
+    // Minutes/day are THE pace (asked once in the diagnostic, edited in
+    // settings). Source order: profile column → onboarding choice inside the
+    // quiz result (heals a lost write) → legacy intensity for pre-v2 accounts
+    // → an honest steady 30. The founder killed the intensity modal — no
+    // account may be left without a pace.
     minutesDaily = profile?.study_minutes_daily ?? profile?.quiz_result?.minutesDaily ?? null;
     if (!profile?.study_minutes_daily && minutesDaily) {
       await supabase.from("profiles").update({ study_minutes_daily: minutesDaily }).eq("id", user.id);
     }
+    if (minutesDaily == null && profile?.study_intensity) {
+      minutesDaily =
+        profile.study_intensity === "light" ? 15 : profile.study_intensity === "medium" ? 30 : 45;
+    }
+    if (minutesDaily == null && profile) minutesDaily = 30;
 
-    // Until the plan engine fully replaces intensity, map minutes onto it so
-    // the student never sees the "pick a pace" modal twice (15→light,
-    // 30→medium, 45+→intensive).
+    // keep the legacy column in sync while pre-route code paths still read it
     if (!profile?.study_intensity && minutesDaily) {
       derivedIntensity = minutesDaily <= 15 ? "light" : minutesDaily <= 30 ? "medium" : "intensive";
       void supabase.from("profiles").update({ study_intensity: derivedIntensity }).eq("id", user.id);
@@ -526,9 +535,18 @@ export async function loadDashboardData(locale: Locale): Promise<{
   // plan engine: an AI/fallback route turns the day into a route-driven layout
   const routeRaw = profile?.study_route as StudyRoute | null | undefined;
   const route = routeRaw && routeRaw.version === 1 && Array.isArray(routeRaw.weeks) && routeRaw.weeks.length > 0 ? routeRaw : null;
-  // route built with different minutes (lost write / settings change) → the
-  // dashboard regenerates it once, then rebuilds today
-  const routeStale = !!route && minutesDaily != null && route.inputs.minutesDaily !== minutesDaily;
+  // route inputs no longer match the profile (settings change / lost write /
+  // retake) → the dashboard regenerates it once, then rebuilds today
+  const routeStale =
+    !!route &&
+    !!profile &&
+    needsRegen(route, {
+      level: contentLevel(profile.quiz_result?.level),
+      targetLevel: profile.target_level === "C1" ? "C1" : "B2",
+      examDate: profile.exam_date_mode === "exact" ? (profile.exam_date ?? undefined) : undefined,
+      horizonMonths: profile.exam_date_mode === "approx" ? (profile.exam_horizon_months ?? undefined) : undefined,
+      minutesDaily: minutesDaily ?? 30,
+    });
 
   let today: DayRow | null = null;
   if (intensity) {

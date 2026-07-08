@@ -5,16 +5,12 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { saveProfileIntensity, type Intensity } from "@/lib/profile";
 import { LEVELS, type Level } from "@/data/types";
-import { IntensityModal } from "@/components/IntensityModal";
 import { TaskModal } from "@/components/TaskModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
-  generateDailyPlan,
   loadDashboardData,
-  loadDailyState,
   saveDay,
   saveTaskResult,
   todayISO,
@@ -22,7 +18,6 @@ import {
   skillLabel,
   taskDescription,
   minutesLabel,
-  intensityLabel,
   contentLevel,
   computeStreak,
   weekCalendar,
@@ -89,11 +84,9 @@ export default function DashboardHome() {
   const [levelRaw, setLevelRaw] = useState("A2");
   const [level, setLevel] = useState<Level>("A2");
   const [dayNumber, setDayNumber] = useState(1);
-  const [intensity, setIntensity] = useState<Intensity | null>(null);
   const [today, setToday] = useState<DayRow | null>(null);
   const [history, setHistory] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showIntensity, setShowIntensity] = useState(false);
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const [hasRoute, setHasRoute] = useState(true);
@@ -113,12 +106,6 @@ export default function DashboardHome() {
       setLevel(data.level);
       setDayNumber(data.dayNumber);
 
-      if (!data.intensity) {
-        setLoading(false);
-        setShowIntensity(true); // first visit → choose intensity
-        return;
-      }
-      setIntensity(data.intensity);
       setToday(data.today);
       setHistory(data.history);
       setHasRoute(data.hasRoute);
@@ -175,41 +162,6 @@ export default function DashboardHome() {
     return () => window.removeEventListener("focus", creditVoiceTask);
   }, []);
 
-  async function chooseIntensity(i: Intensity) {
-    const firstTime = !intensity;
-    setIntensity(i);
-    setShowIntensity(false);
-    void saveProfileIntensity(i);
-    if (firstTime) {
-      setLoading(true);
-      const { today: t, history: h } = await loadDailyState(level, i, dayNumber, locale);
-      setToday(t);
-      setHistory(h);
-      setLoading(false);
-      window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: t.completedCount, total: t.total } }));
-      return;
-    }
-    if (i === intensity) return;
-    // route-driven days are sized by profile minutes, not the legacy intensity —
-    // don't overwrite them with template tasks (minutes editing: settings, §6)
-    if (hasRoute) return;
-    // pace change rebuilds TODAY too (not silently tomorrow); finished tasks keep credit
-    const tasks = generateDailyPlan(level, i, dayNumber, locale).map((t) => ({
-      ...t,
-      completed: !!today?.tasks.some((p) => p.skill === t.skill && p.completed),
-    }));
-    const row: DayRow = {
-      date: todayISO(),
-      tasks,
-      completedCount: tasks.filter((t) => t.completed).length,
-      total: tasks.length,
-    };
-    setToday(row);
-    setHistory((h) => [...h.filter((r) => r.date !== row.date), row].sort((a, b) => a.date.localeCompare(b.date)));
-    void saveDay(row);
-    window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: row.completedCount, total: row.total } }));
-  }
-
   function completeTask(task: DailyTask, result: { score: number; maxScore: number; answers: unknown }) {
     setActiveTask(null);
     if (!today) return;
@@ -253,12 +205,12 @@ export default function DashboardHome() {
     );
   }
 
-  // first visit — only the intensity modal
-  if (!today || !intensity) {
+  // pace comes from the diagnostic minutes (single source of truth) — no
+  // modal; a missing plan here only means the profile isn't loaded yet
+  if (!today) {
     return (
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
-        <IntensityModal open={showIntensity} current={intensity} onSelect={chooseIntensity} />
       </div>
     );
   }
@@ -310,15 +262,11 @@ export default function DashboardHome() {
             <p className="mt-0.5 text-sm capitalize text-[var(--color-muted)]">{dateStr}</p>
           </div>
           <div className="text-right text-sm">
-            <div className="font-medium text-[var(--color-foreground)]">
-              {minutesLabel(totalMin, locale)}{!hasRoute && ` · ${intensityLabel(intensity, locale)}`}
-            </div>
-            {/* route-driven pace is edited in settings (minutes/day), not here */}
-            {!hasRoute && (
-              <button type="button" onClick={() => setShowIntensity(true)} className="text-xs font-medium text-[var(--color-brand)] hover:underline">
-                {c.change}
-              </button>
-            )}
+            <div className="font-medium text-[var(--color-foreground)]">{minutesLabel(totalMin, locale)}</div>
+            {/* pace (minutes/day) is edited in settings — the single source of truth */}
+            <Link href="/dashboard/settings" className="text-xs font-medium text-[var(--color-brand)] hover:underline">
+              {c.change}
+            </Link>
           </div>
         </div>
 
@@ -500,7 +448,6 @@ export default function DashboardHome() {
       )}
 
       {/* modals */}
-      <IntensityModal open={showIntensity} current={intensity} onSelect={chooseIntensity} onClose={() => setShowIntensity(false)} />
       <AnimatePresence>
         {activeTask && (
           <ErrorBoundary

@@ -7,13 +7,14 @@ import { pick } from "@/lib/localized";
 import { loadPlan, type PackageId } from "@/lib/billing";
 import { planBadge } from "@/lib/dashboard";
 import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
-import { fetchExamPlan, saveExamPlanToProfile, type ExamDateMode } from "@/lib/exam-plan";
+import { fetchExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamDateMode } from "@/lib/exam-plan";
 
 const T = {
   ru: {
     profile: "Профиль", name: "Имя", email: "Email", avatar: "Аватар", upload: "Загрузить", save: "Сохранить", saved: "Сохранено ✓",
     city: "Город", country: "Страна", cityPh: "Например, Алматы", countryPh: "Например, Казахстан",
     exam: "Экзамен", chosenExam: "Выбранный экзамен", target: "Целевой уровень", examDate: "Дата экзамена",
+    pace: "Минут в день", paceNote: "Дневной план пересоберётся под новый темп при следующем открытии дашборда.",
     dateExact: "Точная дата", dateApprox: "Примерно", dateUnknown: "Не знаю", months: "мес", examSaved: "Сохранено ✓", saveExam: "Сохранить",
     sub: "Подписка", currentPlan: "Текущий план", validUntil: "Действует до", manage: "Управлять подпиской",
     notif: "Уведомления", emailNotif: "Email уведомления", reminders: "Напоминания о занятиях", remindTime: "Время напоминания",
@@ -23,6 +24,7 @@ const T = {
     profile: "Profile", name: "Name", email: "Email", avatar: "Avatar", upload: "Upload", save: "Save", saved: "Saved ✓",
     city: "City", country: "Country", cityPh: "e.g. Almaty", countryPh: "e.g. Kazakhstan",
     exam: "Exam", chosenExam: "Selected exam", target: "Target level", examDate: "Exam date",
+    pace: "Minutes per day", paceNote: "Your daily plan rebuilds to the new pace the next time you open the dashboard.",
     dateExact: "Exact date", dateApprox: "Approx.", dateUnknown: "Not sure", months: "mo", examSaved: "Saved ✓", saveExam: "Save",
     sub: "Subscription", currentPlan: "Current plan", validUntil: "Valid until", manage: "Manage subscription",
     notif: "Notifications", emailNotif: "Email notifications", reminders: "Lesson reminders", remindTime: "Reminder time",
@@ -32,6 +34,7 @@ const T = {
     profile: "Profil", name: "Ad", email: "E-posta", avatar: "Avatar", upload: "Yükle", save: "Kaydet", saved: "Kaydedildi ✓",
     city: "Şehir", country: "Ülke", cityPh: "örn. Almatı", countryPh: "örn. Kazakistan",
     exam: "Sınav", chosenExam: "Seçilen sınav", target: "Hedef seviye", examDate: "Sınav tarihi",
+    pace: "Günde dakika", paceNote: "Günlük plan, panoyu bir sonraki açışında yeni tempoya göre yeniden kurulur.",
     dateExact: "Kesin tarih", dateApprox: "Yaklaşık", dateUnknown: "Bilmiyorum", months: "ay", examSaved: "Kaydedildi ✓", saveExam: "Kaydet",
     sub: "Abonelik", currentPlan: "Mevcut plan", validUntil: "Geçerlilik", manage: "Aboneliği yönet",
     notif: "Bildirimler", emailNotif: "E-posta bildirimleri", reminders: "Ders hatırlatmaları", remindTime: "Hatırlatma saati",
@@ -41,6 +44,7 @@ const T = {
     profile: "Профиль", name: "Аты", email: "Email", avatar: "Аватар", upload: "Жүктеу", save: "Сақтау", saved: "Сақталды ✓",
     city: "Қала", country: "Ел", cityPh: "мыс. Алматы", countryPh: "мыс. Қазақстан",
     exam: "Емтихан", chosenExam: "Таңдалған емтихан", target: "Мақсатты деңгей", examDate: "Емтихан күні",
+    pace: "Күніне минут", paceNote: "Күнделікті жоспар келесі жолы дашбордты ашқанда жаңа қарқынға сай қайта құрылады.",
     dateExact: "Нақты күн", dateApprox: "Шамамен", dateUnknown: "Білмеймін", months: "ай", examSaved: "Сақталды ✓", saveExam: "Сақтау",
     sub: "Жазылым", currentPlan: "Ағымдағы жоспар", validUntil: "Дейін жарамды", manage: "Жазылымды басқару",
     notif: "Хабарламалар", emailNotif: "Email хабарламалар", reminders: "Сабақ еске салулары", remindTime: "Еске салу уақыты",
@@ -95,6 +99,7 @@ export default function SettingsPage() {
   const [dateMode, setDateMode] = useState<ExamDateMode>("unknown");
   const [examDate, setExamDate] = useState("");
   const [horizon, setHorizon] = useState<1 | 3 | 6>(3);
+  const [minutes, setMinutes] = useState<number>(30);
   const [examSaved, setExamSaved] = useState(false);
 
   useEffect(() => {
@@ -112,6 +117,7 @@ export default function SettingsPage() {
       setDateMode(p.examDateMode);
       setExamDate(p.examDate ?? "");
       if (p.examHorizonMonths) setHorizon(p.examHorizonMonths);
+      if (p.minutesDaily) setMinutes(p.minutesDaily);
     });
     return () => {
       active = false;
@@ -125,6 +131,14 @@ export default function SettingsPage() {
       examDate: dateMode === "exact" && examDate ? examDate : undefined,
       examHorizonMonths: dateMode === "approx" ? horizon : undefined,
     });
+    await saveStudyMinutes(minutes);
+    // changed inputs → the dashboard regenerates the route on its next load
+    // (needsRegen/routeStale check); drop the session guard so it can fire
+    try {
+      window.sessionStorage.removeItem("lp:route-requested");
+    } catch {
+      /* ignore */
+    }
     setExamSaved(true);
     setTimeout(() => setExamSaved(false), 1500);
   }
@@ -226,6 +240,22 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-[var(--color-muted)]">{c.pace}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {[15, 30, 45, 60].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMinutes(m)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${minutes === m ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}
+              >
+                {m === 60 ? "60+" : m}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--color-muted)]">{c.paceNote}</p>
         </div>
         <button type="button" onClick={saveExam} className="btn-primary w-fit rounded-full px-5 py-2.5 text-sm">
           {examSaved ? c.examSaved : c.saveExam}

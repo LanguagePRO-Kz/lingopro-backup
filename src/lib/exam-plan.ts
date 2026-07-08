@@ -64,7 +64,9 @@ export async function saveExamPlanToProfile(p: ExamPlan): Promise<void> {
   }
 }
 
-export async function fetchExamPlan(): Promise<(ExamPlan & { hasProfile: boolean }) | null> {
+export async function fetchExamPlan(): Promise<
+  (ExamPlan & { hasProfile: boolean; minutesDaily: number | null }) | null
+> {
   try {
     const supabase = createClient();
     const {
@@ -73,7 +75,7 @@ export async function fetchExamPlan(): Promise<(ExamPlan & { hasProfile: boolean
     if (!user) return null;
     const { data } = await supabase
       .from("profiles")
-      .select("target_level, exam_date, exam_date_mode, exam_horizon_months")
+      .select("target_level, exam_date, exam_date_mode, exam_horizon_months, study_minutes_daily")
       .eq("id", user.id)
       .maybeSingle();
     if (!data) return null;
@@ -87,9 +89,34 @@ export async function fetchExamPlan(): Promise<(ExamPlan & { hasProfile: boolean
       examHorizonMonths: ([1, 3, 6].includes(data.exam_horizon_months as number)
         ? data.exam_horizon_months
         : undefined) as 1 | 3 | 6 | undefined,
+      minutesDaily: (data.study_minutes_daily as number | null) ?? null,
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Daily minutes — the single pace control (asked once in the diagnostic,
+ * edited here). Keeps the legacy intensity column in sync for pre-route
+ * code paths.
+ */
+export async function saveStudyMinutes(minutes: number): Promise<void> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("profiles")
+      .update({
+        study_minutes_daily: minutes,
+        study_intensity: minutes <= 15 ? "light" : minutes <= 30 ? "medium" : "intensive",
+      })
+      .eq("id", user.id);
+  } catch {
+    /* best-effort */
   }
 }
 
