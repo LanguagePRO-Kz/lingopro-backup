@@ -8,6 +8,7 @@ import { READING_TASKS } from "@/data/reading-tasks";
 import { shuffleOptions } from "@/lib/shuffle";
 import { awardXp, XP } from "@/lib/xp";
 import type { Level, ReadingTask } from "@/data/types";
+import { SectionBack } from "@/components/SectionBack";
 
 type Shuffled = Record<string, { options: string[]; answer: number }>;
 function buildShuffled(tasks: ReadingTask[]): Shuffled {
@@ -69,6 +70,7 @@ export default function ReadingPage() {
 
   return (
     <div>
+      <SectionBack />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <div className="mt-2 text-sm text-[var(--color-muted)]">
         <span className="font-semibold text-[var(--color-brand)]">{doneCount}</span> / {READING_TASKS.length} {c.done}

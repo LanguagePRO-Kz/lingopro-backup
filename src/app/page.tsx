@@ -1,6 +1,5 @@
 import { Background } from "@/components/ui/Background";
 import { ScrollProgress } from "@/components/ui/ScrollProgress";
-import { LanguageStrip } from "@/components/LanguageStrip";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Certificates } from "@/components/Certificates";
@@ -18,7 +17,6 @@ export default function Home() {
     <>
       <Background />
       <ScrollProgress />
-      <LanguageStrip />
       <Header />
       <main>
         <Hero />

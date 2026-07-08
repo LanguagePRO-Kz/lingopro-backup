@@ -8,6 +8,7 @@ import { WRITING_TASKS } from "@/data/writing-tasks";
 import { awardXp, XP } from "@/lib/xp";
 import type { WritingReview } from "@/lib/ai/prompts/writing-review";
 import type { Level, WritingTask } from "@/data/types";
+import { SectionBack } from "@/components/SectionBack";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -143,6 +144,7 @@ export default function WritingPage() {
   if (!active) {
     return (
       <div>
+        <SectionBack />
         <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
         <div className="mt-2 text-sm text-[var(--color-muted)]">
           <span className="font-semibold text-[var(--color-brand)]">{doneIds.size}</span> / {WRITING_TASKS.length} {c.done}
@@ -222,7 +224,30 @@ export default function WritingPage() {
               </div>
             )}
             {status.kind === "error" && (
-              <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">{c[status.code]}</div>
+              <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">
+                <p>{c[status.code]}</p>
+                {/* every error offers a way forward (P0-5); text stays in the box, submit = retry */}
+                <div className="mt-2">
+                  {status.code === "errAuth" ? (
+                    <a href="/login" className="inline-block rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                      {pick(locale, { ru: "Войти", en: "Sign in", tr: "Giriş yap", kk: "Кіру" })}
+                    </a>
+                  ) : status.code === "errDaily" || status.code === "errMonthly" ? (
+                    <a href="/dashboard" className="inline-block rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                      {pick(locale, { ru: "К плану дня", en: "To today's plan", tr: "Günün planına", kk: "Күн жоспарына" })}
+                    </a>
+                  ) : (
+                    <p className="text-xs opacity-80">
+                      {pick(locale, {
+                        ru: "Текст сохранён в поле — нажми «Отправить» ещё раз.",
+                        en: "Your text is still in the box — press submit again.",
+                        tr: "Metnin kutuda duruyor — tekrar gönder.",
+                        kk: "Мәтінің өрісте тұр — қайта жібер.",
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </>
         )}

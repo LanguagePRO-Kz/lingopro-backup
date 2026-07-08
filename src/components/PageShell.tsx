@@ -23,7 +23,7 @@ export function PageShell({ children }: { children: ReactNode }) {
           <LanguageSwitcher />
           <Link
             href="/"
-            className="hidden text-sm text-[var(--color-muted)] transition-colors hover:text-[var(--color-foreground)] sm:inline-block"
+            className="text-sm text-[var(--color-muted)] transition-colors hover:text-[var(--color-foreground)]"
           >
             ← {t.pages.back}
           </Link>

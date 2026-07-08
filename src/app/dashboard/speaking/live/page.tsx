@@ -414,7 +414,60 @@ function LiveLesson() {
             ))}
           </div>
 
-          {err && <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">{c[err]}</div>}
+          {/* prep: what happens after the button (P0-4 — no surprise mic prompt) */}
+          <div className="mt-5 rounded-2xl bg-[var(--color-brand)]/[0.05] p-4">
+            <div className="text-sm font-semibold text-[var(--color-foreground)]">
+              {pick(locale, { ru: "Как проходит урок", en: "How the lesson works", tr: "Ders nasıl geçer", kk: "Сабақ қалай өтеді" })}
+            </div>
+            <ul className="mt-2 flex flex-col gap-1.5 text-xs leading-relaxed text-[var(--color-muted)]">
+              <li>
+                {pick(locale, {
+                  ru: "Ahu говорит по-турецки и ведёт урок под твой уровень. Отвечай голосом — ошибаться можно и нужно.",
+                  en: "Ahu speaks Turkish and teaches to your level. Answer out loud — mistakes are part of the lesson.",
+                  tr: "Ahu Türkçe konuşur ve seviyene göre ders işler. Sesli cevap ver — hata yapmak dersin parçası.",
+                  kk: "Ahu түрікше сөйлеп, деңгейіңе сай сабақ жүргізеді. Дауыстап жауап бер — қателесуге болады.",
+                })}
+              </li>
+              <li>
+                {pick(locale, {
+                  ru: "После нажатия кнопки браузер попросит доступ к микрофону — разреши его.",
+                  en: "After you press the button, the browser will ask for microphone access — allow it.",
+                  tr: "Düğmeye bastıktan sonra tarayıcı mikrofon izni isteyecek — izin ver.",
+                  kk: "Түймені басқаннан кейін браузер микрофонға рұқсат сұрайды — рұқсат бер.",
+                })}
+              </li>
+              <li>
+                {pick(locale, {
+                  ru: "Урок ~10 минут. В конце Ahu подведёт итог голосом, а письменный разбор появится на экране.",
+                  en: "The lesson is ~10 minutes. Ahu wraps up out loud, and a written review appears on screen.",
+                  tr: "Ders ~10 dakika. Sonunda Ahu sözlü özet yapar, yazılı değerlendirme ekranda görünür.",
+                  kk: "Сабақ ~10 минут. Соңында Ahu ауызша қорытады, жазбаша талдау экранда шығады.",
+                })}
+              </li>
+            </ul>
+          </div>
+
+          {err && (
+            <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">
+              <p>{c[err]}</p>
+              {/* every error offers a way forward (P0-5) */}
+              <div className="mt-2 flex flex-wrap gap-2">
+                {err === "errAuth" ? (
+                  <a href="/login" className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                    {pick(locale, { ru: "Войти", en: "Sign in", tr: "Giriş yap", kk: "Кіру" })}
+                  </a>
+                ) : err === "errNoMinutes" ? (
+                  <a href="/dashboard" className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                    {pick(locale, { ru: "К плану дня", en: "To today's plan", tr: "Günün planına", kk: "Күн жоспарына" })}
+                  </a>
+                ) : (
+                  <button type="button" onClick={start} className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                    {pick(locale, { ru: "Попробовать снова", en: "Try again", tr: "Tekrar dene", kk: "Қайта көру" })}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <button type="button" onClick={start} className="btn-primary mt-5 rounded-full px-6 py-3 text-sm font-semibold">
             🎙️ {c.start}

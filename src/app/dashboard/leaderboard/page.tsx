@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -20,10 +21,10 @@ type Row = {
 };
 
 const T = {
-  ru: { title: "Рейтинг студентов", tabs: ["По прогрессу", "По городу", "По стране"], you: "Это ты", empty: "Здесь пока никого. Пройди первый тест — попадёшь в рейтинг.", locale: "ru-RU" },
-  en: { title: "Student leaderboard", tabs: ["By progress", "By city", "By country"], you: "This is you", empty: "Nobody here yet. Take your first test to appear on the board.", locale: "en-US" },
-  tr: { title: "Öğrenci sıralaması", tabs: ["İlerlemeye göre", "Şehre göre", "Ülkeye göre"], you: "Bu sensin", empty: "Henüz kimse yok. İlk testi çöz, sıralamaya gir.", locale: "tr-TR" },
-  kk: { title: "Студенттер рейтингі", tabs: ["Прогресс бойынша", "Қала бойынша", "Ел бойынша"], you: "Бұл сен", empty: "Мұнда әзірге ешкім жоқ. Алғашқы тестіңді тапсыр.", locale: "kk-KZ" },
+  ru: { title: "Рейтинг студентов", tabs: ["По прогрессу", "По городу", "По стране"], you: "Это ты", empty: "Здесь пока никого. Выполни задание из плана дня — попадёшь в рейтинг.", emptyCta: "К плану дня", locale: "ru-RU" },
+  en: { title: "Student leaderboard", tabs: ["By progress", "By city", "By country"], you: "This is you", empty: "Nobody here yet. Complete a task from your daily plan to appear.", emptyCta: "To today's plan", locale: "en-US" },
+  tr: { title: "Öğrenci sıralaması", tabs: ["İlerlemeye göre", "Şehre göre", "Ülkeye göre"], you: "Bu sensin", empty: "Henüz kimse yok. Günlük plandan bir görev tamamla, sıralamaya gir.", emptyCta: "Günün planına", locale: "tr-TR" },
+  kk: { title: "Студенттер рейтингі", tabs: ["Прогресс бойынша", "Қала бойынша", "Ел бойынша"], you: "Бұл сен", empty: "Мұнда әзірге ешкім жоқ. Күн жоспарынан тапсырма орында.", emptyCta: "Күн жоспарына", locale: "kk-KZ" },
 };
 
 const SCOPES: Scope[] = ["global", "city", "country"];
@@ -86,7 +87,12 @@ export default function LeaderboardPage() {
           ))}
 
         {!loading && rows && rows.length === 0 && (
-          <div className="glass rounded-2xl p-8 text-center text-sm text-[var(--color-muted)]">{c.empty}</div>
+          <div className="glass rounded-2xl p-8 text-center text-sm text-[var(--color-muted)]">
+            <p>{c.empty}</p>
+            <Link href="/dashboard" className="btn-primary mt-4 inline-block rounded-full px-5 py-2.5 text-sm">
+              {c.emptyCta} →
+            </Link>
+          </div>
         )}
 
         {!loading &&

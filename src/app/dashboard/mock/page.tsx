@@ -8,6 +8,7 @@ import { MOCK_EXAMS } from "@/data/mock-exams";
 import { shuffleQuestionMap } from "@/lib/shuffle";
 import { useTTS } from "@/hooks/useTTS";
 import type { Level, MockExam, Question } from "@/data/types";
+import { SectionBack } from "@/components/SectionBack";
 
 const LEVELS: Level[] = ["A2", "B2", "C1"];
 
@@ -84,6 +85,7 @@ export default function MockPage() {
 
   return (
     <div>
+      <SectionBack />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
       <div className="mt-2 text-sm text-[var(--color-muted)]">
@@ -123,7 +125,14 @@ export default function MockPage() {
             </div>
           </motion.div>
         ))}
-        {list.length === 0 && <div className="rounded-2xl border border-black/[0.07] bg-white/60 px-5 py-8 text-center text-sm text-[var(--color-muted)] sm:col-span-2 lg:col-span-3">{c.empty}</div>}
+        {list.length === 0 && (
+          <div className="rounded-2xl border border-black/[0.07] bg-white/60 px-5 py-8 text-center text-sm text-[var(--color-muted)] sm:col-span-2 lg:col-span-3">
+            <p>{c.empty}</p>
+            <button type="button" onClick={() => { setLevel("all"); setOnlyUnfinished(false); }} className="btn-primary mt-4 rounded-full px-5 py-2.5 text-sm">
+              {c.all}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

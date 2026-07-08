@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { ExamSelector } from "./ExamSelector";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { Logo } from "./ui/Logo";
 
 export function Header() {
@@ -67,6 +68,8 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* interface language — prominent, not a thin corner strip (P0-6) */}
+          <LanguageSwitcher />
           <div className="hidden sm:block">
             <ExamSelector />
           </div>

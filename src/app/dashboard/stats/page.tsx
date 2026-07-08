@@ -164,6 +164,12 @@ export default function StatsPage() {
             <div className="h-full rounded-full bg-white transition-[width] duration-500" style={{ width: `${stats.goalProgressPct}%` }} />
           </div>
           <p className="mt-2 text-xs text-white/70">{c.goalNow(stats.currentLevel, stats.targetLevel)}</p>
+          {/* empty state → concrete next action, not a dead dash */}
+          {!stats.loading && !stats.currentLevel && (
+            <Link href="/quiz" className="mt-3 inline-block rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#3a1d9c] transition-transform active:scale-95">
+              {pick(locale, { ru: "Пройти диагностику", en: "Take the diagnostic", tr: "Teşhise başla", kk: "Диагностикадан өту" })} →
+            </Link>
+          )}
         </div>
       </div>
 

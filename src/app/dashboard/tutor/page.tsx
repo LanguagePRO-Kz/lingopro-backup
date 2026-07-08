@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { SectionBack } from "@/components/SectionBack";
 
 type Msg = { role: "ai" | "user"; text: string };
 
@@ -28,7 +29,6 @@ function getSR(): SRCtor | null {
 const T = {
   ru: {
     online: "Онлайн",
-    greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
     greet2: "Привет! Я твой персональный учитель турецкого. Спроси про грамматику, слово, план подготовки — или пришли предложение на проверку.",
     placeholder: "Напиши сообщение…",
     quick: ["Объясни грамматику", "Проверь предложение", "Подготовка к TÖMER", "Разговорная практика", "Переведи текст"],
@@ -39,7 +39,6 @@ const T = {
   },
   en: {
     online: "Online",
-    greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
     greet2: "Hi! I'm your personal Turkish teacher. Ask about grammar, a word, your prep plan — or send a sentence to check.",
     placeholder: "Type a message…",
     quick: ["Explain grammar", "Check a sentence", "TÖMER prep", "Speaking practice", "Translate text"],
@@ -50,7 +49,6 @@ const T = {
   },
   tr: {
     online: "Çevrimiçi",
-    greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
     greet2: "Dil bilgisi, kelime, hazırlık planı sor — ya da kontrol için bir cümle gönder.",
     placeholder: "Bir mesaj yaz…",
     quick: ["Dil bilgisi açıkla", "Cümle kontrol et", "TÖMER hazırlık", "Konuşma pratiği", "Metin çevir"],
@@ -61,7 +59,6 @@ const T = {
   },
   kk: {
     online: "Желіде",
-    greet1: "Merhaba! 👋 Ben senin kişisel Türkçe öğretmeninim. Sana nasıl yardımcı olabilirim?",
     greet2: "Сәлем! Мен сенің жеке түрік тілі мұғаліміңмін. Грамматика, сөз, дайындық жоспары туралы сұра — немесе тексеруге сөйлем жібер.",
     placeholder: "Хабарлама жаз…",
     quick: ["Грамматиканы түсіндір", "Сөйлемді тексер", "TÖMER дайындық", "Сөйлеу практикасы", "Мәтінді аудар"],
@@ -76,10 +73,7 @@ export default function TutorPage() {
   const { locale } = useI18n();
   const c = pick(locale, T);
 
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "ai", text: c.greet1 },
-    { role: "ai", text: c.greet2 },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: "ai", text: c.greet2 }]);
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
   const [micOk] = useState(() => getSR() !== null);
@@ -127,7 +121,9 @@ export default function TutorPage() {
     return s
       .replace(/^#{1,6}\s+/gm, "")
       .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/__(.+?)__/g, "$1")
       .replace(/(^|\s)\*([^*\n]+)\*(?=\s|[.,!?]|$)/g, "$1$2")
+      .replace(/(^|\s)_([^_\n]+)_(?=\s|[.,!?]|$)/g, "$1$2")
       .replace(/^[ \t]*[-*•]\s+/gm, "— ")
       .replace(/`([^`\n]+)`/g, "$1");
   }
@@ -145,8 +141,8 @@ export default function TutorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           feedbackLang: locale,
-          // greetings are UI chrome — the model only needs the dialogue
-          messages: nextMessages.slice(2).map((m) => ({
+          // the greeting is UI chrome — the model only needs the dialogue
+          messages: nextMessages.slice(1).map((m) => ({
             role: m.role === "ai" ? "assistant" : "user",
             content: m.text,
           })),
@@ -180,6 +176,7 @@ export default function TutorPage() {
 
   return (
     <div className="flex h-[calc(100vh-9.5rem)] flex-col">
+      <SectionBack />
       {/* header */}
       <div className="flex items-center gap-3 border-b border-black/[0.06] pb-4">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg">🤖</span>
