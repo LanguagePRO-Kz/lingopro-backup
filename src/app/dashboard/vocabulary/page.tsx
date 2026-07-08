@@ -7,6 +7,7 @@ import { pick } from "@/lib/localized";
 import { VOCABULARY } from "@/data/vocabulary";
 import { awardXp, XP } from "@/lib/xp";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 type Status = "learned" | "review" | "new";
 type Level = "A1" | "A2" | "B1" | "B2" | "C1";
@@ -129,6 +130,7 @@ export default function VocabularyPage() {
   return (
     <div>
       <SectionBack />
+      <SectionHint id="vocabulary" />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
 
       {/* spaced-repetition banner */}

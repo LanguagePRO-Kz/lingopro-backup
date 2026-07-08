@@ -10,6 +10,7 @@ import { planBadge } from "@/lib/dashboard";
 import { assessFeasibility } from "@/lib/plan/feasibility";
 import { topicsForSpan } from "@/lib/plan/route";
 import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
+import { setOnboarded } from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase/client";
 import { daysToExam, fetchExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamDateMode } from "@/lib/exam-plan";
 
@@ -27,6 +28,7 @@ const T = {
     sub: "Подписка", currentPlan: "Текущий план", validUntil: "Действует до", manage: "Управлять подпиской",
     notif: "Уведомления", emailNotif: "Email уведомления", reminders: "Напоминания о занятиях", remindTime: "Время напоминания",
     lang: "Язык интерфейса", delete: "Удалить аккаунт",
+    help: "Подсказки", helpReset: "Показать чек-лист и подсказки заново", helpResetDone: "Готово — они снова появятся в кабинете ✓",
   },
   en: {
     profile: "Profile", name: "Name", email: "Email", avatar: "Avatar", upload: "Upload", save: "Save", saved: "Saved ✓",
@@ -41,6 +43,7 @@ const T = {
     sub: "Subscription", currentPlan: "Current plan", validUntil: "Valid until", manage: "Manage subscription",
     notif: "Notifications", emailNotif: "Email notifications", reminders: "Lesson reminders", remindTime: "Reminder time",
     lang: "Interface language", delete: "Delete account",
+    help: "Hints", helpReset: "Show the checklist and hints again", helpResetDone: "Done — they'll reappear in the cabinet ✓",
   },
   tr: {
     profile: "Profil", name: "Ad", email: "E-posta", avatar: "Avatar", upload: "Yükle", save: "Kaydet", saved: "Kaydedildi ✓",
@@ -55,6 +58,7 @@ const T = {
     sub: "Abonelik", currentPlan: "Mevcut plan", validUntil: "Geçerlilik", manage: "Aboneliği yönet",
     notif: "Bildirimler", emailNotif: "E-posta bildirimleri", reminders: "Ders hatırlatmaları", remindTime: "Hatırlatma saati",
     lang: "Arayüz dili", delete: "Hesabı sil",
+    help: "İpuçları", helpReset: "Kontrol listesini ve ipuçlarını yeniden göster", helpResetDone: "Tamam — kabinde yeniden görünecekler ✓",
   },
   kk: {
     profile: "Профиль", name: "Аты", email: "Email", avatar: "Аватар", upload: "Жүктеу", save: "Сақтау", saved: "Сақталды ✓",
@@ -69,6 +73,7 @@ const T = {
     sub: "Жазылым", currentPlan: "Ағымдағы жоспар", validUntil: "Дейін жарамды", manage: "Жазылымды басқару",
     notif: "Хабарламалар", emailNotif: "Email хабарламалар", reminders: "Сабақ еске салулары", remindTime: "Еске салу уақыты",
     lang: "Интерфейс тілі", delete: "Аккаунтты жою",
+    help: "Кеңестер", helpReset: "Чек-лист пен кеңестерді қайта көрсету", helpResetDone: "Дайын — олар кабинетте қайта шығады ✓",
   },
 };
 
@@ -121,6 +126,7 @@ export default function SettingsPage() {
   const [horizon, setHorizon] = useState<1 | 3 | 6>(3);
   const [minutes, setMinutes] = useState<number>(30);
   const [examSaved, setExamSaved] = useState(false);
+  const [hintsReset, setHintsReset] = useState(false);
   // honest consequence math: student level + already-mastered topics
   const [level, setLevel] = useState<string | null>(null);
   const [mastered, setMastered] = useState<string[]>([]);
@@ -377,6 +383,21 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+      </Section>
+
+      {/* onboarding hints */}
+      <Section title={c.help}>
+        <button
+          type="button"
+          onClick={() => {
+            void setOnboarded(false); // re-opens the checklist + resets section hints
+            setHintsReset(true);
+            setTimeout(() => setHintsReset(false), 2500);
+          }}
+          className="btn-ghost w-fit rounded-full px-5 py-2.5 text-sm font-medium"
+        >
+          {hintsReset ? c.helpResetDone : c.helpReset}
+        </button>
       </Section>
 
       {/* delete */}

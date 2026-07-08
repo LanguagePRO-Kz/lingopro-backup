@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { useStats, type Period } from "@/lib/hooks/useStats";
+import { SectionHint } from "@/components/SectionHint";
 
 const T = {
   ru: {
@@ -109,6 +110,9 @@ export default function StatsPage() {
   return (
     <div>
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
+      <div className="mt-4">
+        <SectionHint id="stats" />
+      </div>
 
       {/* period tabs */}
       <div className="mt-5 flex flex-wrap gap-2">

@@ -9,6 +9,7 @@ import { awardXp, XP } from "@/lib/xp";
 import type { WritingReview } from "@/lib/ai/prompts/writing-review";
 import type { Level, WritingTask } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -145,6 +146,7 @@ export default function WritingPage() {
     return (
       <div>
         <SectionBack />
+      <SectionHint id="writing" />
         <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
         <div className="mt-2 text-sm text-[var(--color-muted)]">
           <span className="font-semibold text-[var(--color-brand)]">{doneIds.size}</span> / {WRITING_TASKS.length} {c.done}

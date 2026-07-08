@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 type Msg = { role: "ai" | "user"; text: string };
 
@@ -192,6 +193,7 @@ export default function TutorPage() {
   return (
     <div className="flex h-[calc(100vh-9.5rem)] flex-col">
       <SectionBack />
+      <SectionHint id="tutor" />
       {/* header */}
       <div className="flex items-center gap-3 border-b border-black/[0.06] pb-4">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg">🤖</span>

@@ -9,6 +9,7 @@ import { shuffleQuestionMap } from "@/lib/shuffle";
 import { useTTS } from "@/hooks/useTTS";
 import type { Level, MockExam, Question } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 const LEVELS: Level[] = ["A2", "B2", "C1"];
 
@@ -86,6 +87,7 @@ export default function MockPage() {
   return (
     <div>
       <SectionBack />
+      <SectionHint id="mock" />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
       <div className="mt-2 text-sm text-[var(--color-muted)]">

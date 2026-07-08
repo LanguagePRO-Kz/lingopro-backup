@@ -5,9 +5,10 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { LEVELS, type Level } from "@/data/types";
+import { LEVELS } from "@/data/types";
 import { TaskModal } from "@/components/TaskModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { StartChecklist } from "@/components/StartChecklist";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
   loadDashboardData,
@@ -82,8 +83,6 @@ export default function DashboardHome() {
 
   const [name, setName] = useState("студент");
   const [levelRaw, setLevelRaw] = useState("A2");
-  const [level, setLevel] = useState<Level>("A2");
-  const [dayNumber, setDayNumber] = useState(1);
   const [today, setToday] = useState<DayRow | null>(null);
   const [history, setHistory] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,8 +101,6 @@ export default function DashboardHome() {
       const data = await loadDashboardData(locale);
       if (!active) return;
       setLevelRaw(data.levelRaw);
-      setLevel(data.level);
-      setDayNumber(data.dayNumber);
 
       setToday(data.today);
       setHistory(data.history);
@@ -251,8 +248,11 @@ export default function DashboardHome() {
 
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
 
+      {/* ===== GETTING STARTED (first visits only; real progress) ===== */}
+      <StartChecklist level={levelRaw} firstTaskDone={totalTasksDone(history) > 0} />
+
       {/* ===== PLAN ===== */}
-      <div className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">
+      <div id="plan" className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--color-foreground)]">📋 {c.planTitle}</h2>

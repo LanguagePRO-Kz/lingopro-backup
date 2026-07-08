@@ -9,6 +9,7 @@ import { shuffleQuestionMap } from "@/lib/shuffle";
 import { awardXp, XP } from "@/lib/xp";
 import type { Level, ReadingTask } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 type Shuffled = Record<string, { options: string[]; answer: number }>;
 
@@ -77,6 +78,7 @@ export default function ListeningPage() {
   return (
     <div>
       <SectionBack />
+      <SectionHint id="listening" />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
       <div className="mt-2 text-sm text-[var(--color-muted)]">

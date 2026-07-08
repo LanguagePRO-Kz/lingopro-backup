@@ -8,6 +8,7 @@ import { GRAMMAR_TASKS } from "@/data/grammar-tasks";
 import { shuffleOptions } from "@/lib/shuffle";
 import type { Level } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
+import { SectionHint } from "@/components/SectionHint";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -55,6 +56,7 @@ export default function GrammarPage() {
   return (
     <div>
       <SectionBack />
+      <SectionHint id="grammar" />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
 
       {/* counter */}
