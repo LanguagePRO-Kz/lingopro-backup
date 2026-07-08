@@ -1,0 +1,82 @@
+{
+  "id": "okuma-b2-sample",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "B2",
+  "title": "Gıda İsrafı: Çöpe Giden Emek",
+  "body": "Birleşmiş Milletler verilerine göre dünyada üretilen gıdanın yaklaşık üçte biri hiç tüketilmeden çöpe gidiyor. Üstelik bu israfın büyük bölümü, sanılanın aksine, üretim aşamasında değil; marketlerde ve evlerimizde, yani zincirin son halkasında gerçekleşiyor. Görünüşü kusurlu diye raflara çıkamayan sebzeler, son kullanma tarihi yaklaştığı için indirime bile girmeden imha edilen ürünler ve göz kararı yapılan alışverişler, tabloyu her yıl biraz daha ağırlaştırıyor.\n\nOysa çözümün önemli bir kısmı küçük alışkanlık değişikliklerinde gizli. Uzmanlar, alışverişe listeyle çıkmanın ve indirim etiketinin cazibesine kapılıp ihtiyaç dışı ürün almamanın israfı gözle görülür biçimde azalttığını söylüyor. Bazı belediyeler ise daha kapsamlı bir yol izliyor: Satılamayan ancak tüketilebilir durumdaki gıdaları toplayıp ihtiyaç sahiplerine ulaştıran «gıda bankaları» kuruyor. Türkiye'de de yaygınlaşmaya başlayan bu uygulama, hem israfı azaltıyor hem de sosyal dayanışmayı güçlendiriyor.\n\nYine de araştırmacılar temkinli: Onlara göre bireysel çabalar ve yerel projeler değerli olsa da, sorunun kökten çözümü gıda zincirinin bütününü kapsayan bir planlama olmadan mümkün görünmüyor.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Metne göre gıda israfının büyük bölümü nerede gerçekleşmektedir?",
+      "options": [
+        "Marketlerde ve evlerde",
+        "Üretim aşamasında",
+        "Taşıma sırasında",
+        "Restoranlarda"
+      ],
+      "answer": 0,
+      "rationale": "«sanılanın aksine, üretim aşamasında değil; marketlerde ve evlerimizde» — дистрактор B — «народное» ожидание, прямо опровергнутое текстом; C и D не упомянуты, но правдоподобны."
+    },
+    {
+      "id": "q2",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi metinde israf nedeni olarak GEÇMEMEKTEDİR?",
+      "options": [
+        "Ürünlerin yanlış sıcaklıkta saklanması",
+        "Görünüşü kusurlu ürünlerin rafa çıkarılmaması",
+        "Son kullanma tarihi yaklaşan ürünlerin imha edilmesi",
+        "Plansız yapılan alışverişler"
+      ],
+      "answer": 0,
+      "rationale": "B, C, D дословно перечислены в первом абзаце; A — правдоподобная бытовая причина, в тексте отсутствует."
+    },
+    {
+      "id": "q3",
+      "type": "vocab_in_context",
+      "prompt": "Metindeki «zincirin son halkası» ifadesiyle anlatılmak istenen aşağıdakilerden hangisidir?",
+      "options": [
+        "Gıdanın tüketiciye ulaştığı son aşama",
+        "Üretimin ilk basamağı",
+        "Gıda fiyatlarının en yüksek olduğu dönem",
+        "Market raflarının düzenlenme biçimi"
+      ],
+      "answer": 0,
+      "rationale": "Метафора «последнее звено цепи» раскрывается соседним «marketlerde ve evlerimizde»; дистракторы обыгрывают слова zincir/raf из текста."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Metne göre gıda bankalarının sağladığı çifte yarar nedir?",
+      "options": [
+        "İsrafı azaltması ve dayanışmayı güçlendirmesi",
+        "Fiyatları düşürmesi ve üretimi artırması",
+        "Marketlerin kârını artırması ve vergi geliri sağlaması",
+        "Tarımı desteklemesi ve ihracatı artırması"
+      ],
+      "answer": 0,
+      "rationale": "«hem israfı azaltıyor hem de sosyal dayanışmayı güçlendiriyor»; дистракторы — экономически правдоподобные, но не из текста."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Metnin son paragrafından aşağıdaki yargılardan hangisi çıkarılabilir?",
+      "options": [
+        "Kalıcı çözüm için sistemli ve bütüncül bir yaklaşım gerekir",
+        "Bireysel çabalar sorunu tek başına çözmeye yeter",
+        "Araştırmacılar yerel projelere karşı çıkmaktadır",
+        "Gıda israfı önümüzdeki yıllarda kendiliğinden azalacaktır"
+      ],
+      "answer": 0,
+      "rationale": "Вывод из «kökten çözüm … bütününü kapsayan bir planlama olmadan mümkün görünmüyor»; B — прямое искажение, C — подмена «temkinli» на «karşı», D — не следует из текста."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}
