@@ -98,8 +98,8 @@ export async function fetchExamPlan(): Promise<
 
 /**
  * Daily minutes — the single pace control (asked once in the diagnostic,
- * edited here). Keeps the legacy intensity column in sync for pre-route
- * code paths.
+ * edited here). Intensity is a derived, in-memory concept only — there is
+ * no such column in the DB.
  */
 export async function saveStudyMinutes(minutes: number): Promise<void> {
   try {
@@ -108,13 +108,11 @@ export async function saveStudyMinutes(minutes: number): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase
+    const { error } = await supabase
       .from("profiles")
-      .update({
-        study_minutes_daily: minutes,
-        study_intensity: minutes <= 15 ? "light" : minutes <= 30 ? "medium" : "intensive",
-      })
+      .update({ study_minutes_daily: minutes })
       .eq("id", user.id);
+    if (error) console.error("[exam-plan] minutes save failed:", error.message);
   } catch {
     /* best-effort */
   }

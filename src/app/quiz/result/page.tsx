@@ -48,9 +48,11 @@ export default function QuizResultPage() {
       const profile = await fetchProfile();
       const local = loadResult();
 
-      // profile wins if present; otherwise migrate the local (anonymous) result
-      let final = profile?.quiz_result ?? null;
-      if (!final && local) {
+      // newest attempt wins (a retake's local cache can be fresher than the
+      // profile if the write raced); a local-only result gets migrated
+      const remote = profile?.quiz_result ?? null;
+      let final = remote;
+      if (local && (!remote || (local.takenAt ?? 0) > (remote.takenAt ?? 0))) {
         final = local;
         await saveProfileResult(local);
       }

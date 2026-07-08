@@ -242,7 +242,9 @@ export default function QuizPage() {
         data: { user },
       } = await createClient().auth.getUser();
       if (user) {
-        void saveProfileResult(result);
+        // awaited: /quiz/result reads the profile — a race here would show
+        // the PREVIOUS attempt's numbers on a retake
+        await saveProfileResult(result);
         router.push("/quiz/result");
       } else {
         setPhase("signup");

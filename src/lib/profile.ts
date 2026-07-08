@@ -17,7 +17,6 @@ export type Profile = {
   plan: string | null;
   quiz_result: QuizResult | null;
   plan_progress: Progress;
-  study_intensity: Intensity | null;
 };
 
 /** Read the current user's profile (null if not signed in). */
@@ -28,17 +27,19 @@ export async function fetchProfile(): Promise<Profile | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
+  // NB: select ONLY columns that exist — one bad column 400s the whole query
+  // (a phantom study_intensity here silently broke result migration for weeks)
+  const { data, error } = await supabase
     .from("profiles")
-    .select("plan, quiz_result, plan_progress, study_intensity")
+    .select("plan, quiz_result, plan_progress")
     .eq("id", user.id)
     .maybeSingle();
+  if (error) console.error("[profile] fetch failed:", error.message);
 
   return {
     plan: (data?.plan as string | null) ?? null,
     quiz_result: (data?.quiz_result as QuizResult | null) ?? null,
     plan_progress: (data?.plan_progress as Progress | null) ?? {},
-    study_intensity: (data?.study_intensity as Intensity | null) ?? null,
   };
 }
 
@@ -64,7 +65,6 @@ async function upsert(patch: Record<string, unknown>): Promise<boolean> {
 export const saveProfilePlan = (plan: string) => upsert({ plan });
 export const saveProfileResult = (quiz_result: QuizResult) => upsert({ quiz_result });
 export const saveProfileProgress = (plan_progress: Progress) => upsert({ plan_progress });
-export const saveProfileIntensity = (study_intensity: Intensity) => upsert({ study_intensity });
 
 /**
  * City / country used by the leaderboard scopes. Kept in a dedicated helper so

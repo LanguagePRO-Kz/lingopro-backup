@@ -459,7 +459,6 @@ export async function loadDashboardData(locale: Locale): Promise<{
 
   type ProfileRow = {
     quiz_result?: { level?: string; takenAt?: number; minutesDaily?: number } | null;
-    study_intensity?: Intensity | null;
     study_minutes_daily?: number | null;
     study_route?: unknown;
     target_level?: string | null;
@@ -469,7 +468,6 @@ export async function loadDashboardData(locale: Locale): Promise<{
   };
   let profile: ProfileRow | null = null;
   let history: DayRow[] = [];
-  let derivedIntensity: Intensity | null = null;
   let mastery: MasteryRow[] = [];
   let minutesDaily: number | null = null;
 
@@ -482,7 +480,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
     const [pRes, hRes, mRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("quiz_result, study_intensity, study_minutes_daily, study_route, target_level, exam_date, exam_date_mode, exam_horizon_months")
+        .select("quiz_result, study_minutes_daily, study_route, target_level, exam_date, exam_date_mode, exam_horizon_months")
         .eq("id", user.id)
         .maybeSingle(),
       supabase
@@ -505,30 +503,22 @@ export async function loadDashboardData(locale: Locale): Promise<{
 
     // Minutes/day are THE pace (asked once in the diagnostic, edited in
     // settings). Source order: profile column → onboarding choice inside the
-    // quiz result (heals a lost write) → legacy intensity for pre-v2 accounts
-    // → an honest steady 30. The founder killed the intensity modal — no
-    // account may be left without a pace.
+    // quiz result (heals a lost write) → an honest steady 30. No account may
+    // be left without a pace.
     minutesDaily = profile?.study_minutes_daily ?? profile?.quiz_result?.minutesDaily ?? null;
     if (!profile?.study_minutes_daily && minutesDaily) {
       await supabase.from("profiles").update({ study_minutes_daily: minutesDaily }).eq("id", user.id);
     }
-    if (minutesDaily == null && profile?.study_intensity) {
-      minutesDaily =
-        profile.study_intensity === "light" ? 15 : profile.study_intensity === "medium" ? 30 : 45;
-    }
     if (minutesDaily == null && profile) minutesDaily = 30;
-
-    // keep the legacy column in sync while pre-route code paths still read it
-    if (!profile?.study_intensity && minutesDaily) {
-      derivedIntensity = minutesDaily <= 15 ? "light" : minutesDaily <= 30 ? "medium" : "intensive";
-      void supabase.from("profiles").update({ study_intensity: derivedIntensity }).eq("id", user.id);
-    }
   } catch {
     history = Object.values(lsAll()).filter((r) => r.date >= from);
   }
 
   const levelRaw = profile?.quiz_result?.level ?? "A2";
-  const intensity = profile?.study_intensity ?? derivedIntensity;
+  // intensity is a derived, in-memory sizing hint for the pre-route template
+  // day — never stored (there is no such DB column)
+  const intensity: Intensity | null =
+    minutesDaily == null ? null : minutesDaily <= 15 ? "light" : minutesDaily <= 30 ? "medium" : "intensive";
   const level = contentLevel(levelRaw);
   const dayNumber = dayNumberFrom(profile?.quiz_result?.takenAt);
 

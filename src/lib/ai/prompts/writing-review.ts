@@ -41,7 +41,8 @@ ${lang === "kk" ? '4. Konunun Kazak dilbilgisinde doğrudan karşılığı varsa
 5. Hata UYDURMA. Üslupla ilgili veya tartışmalı noktaları "severity": "minor" olarak işaretle; kesin dilbilgisi hatalarını "major".
 6. Metin boşsa, Türkçe değilse, çok kısaysa (20 kelimeden az) veya görev metninin kopyasıysa: {"valid": false, "invalid_reason": "..."} döndür (invalid_reason ${langName}), hata listesi ve puan üretme.
 7. "corrected_text": metnin tamamen düzeltilmiş hâli. "advice": en fazla 3 kısa tavsiye.
-8. YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma. Şema:
+8. Metin alanlarında (rule, explanation, advice) markdown KULLANMA — yıldız, başlık, madde imi yok; sadece düz metin.
+9. YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma. Şema:
 {"valid": boolean, "invalid_reason": string|null, "score_total_25": number, "subscores": {"task": number, "coherence": number, "grammar": number, "vocab": number}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"${lang === "kk" ? ', "kk_parallel": string|null' : ""}}], "corrected_text": string, "advice": [string]}`;
 }
 

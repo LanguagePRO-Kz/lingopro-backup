@@ -122,6 +122,16 @@ export default function TutorPage() {
 
   const [thinking, setThinking] = useState(false);
 
+  /** Safety net: the prompt forbids markdown, but models drift — render plain text only. */
+  function deMarkdown(s: string): string {
+    return s
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/(^|\s)\*([^*\n]+)\*(?=\s|[.,!?]|$)/g, "$1$2")
+      .replace(/^[ \t]*[-*•]\s+/gm, "— ")
+      .replace(/`([^`\n]+)`/g, "$1");
+  }
+
   /** Real chat: send the visible history to /api/ai/tutor (quota `tutor`). */
   async function ask(userText: string) {
     const text = userText.trim();
@@ -144,7 +154,7 @@ export default function TutorPage() {
       });
       if (res.ok) {
         const data = (await res.json()) as { text?: string };
-        setMessages((m) => [...m, { role: "ai", text: data.text || c.errGeneric }]);
+        setMessages((m) => [...m, { role: "ai", text: data.text ? deMarkdown(data.text) : c.errGeneric }]);
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         const msg =

@@ -35,7 +35,8 @@ Kurallar:
 4. "topics_worked": derste gerçekten çalışılan konular (aynı listeden, hedef konuları ve dökümü dikkate al).
 5. "next_steps": hedefe giden en fazla 3 somut adım.
 6. Döküm çok kısaysa (öğrenci 2'den az anlamlı cümle kurduysa): {"valid": false, "invalid_reason": "..."} döndür (${langName}), puan ve hata üretme.
-7. YALNIZCA geçerli JSON döndür. Şema:
+7. Metin alanlarında (summary, comment, rule, explanation, next_steps) markdown KULLANMA — yıldız, başlık, madde imi yok; sadece düz metin.
+8. YALNIZCA geçerli JSON döndür. Şema:
 {"valid": boolean, "invalid_reason": string|null, "summary": string, "criteria": {"fluency": {"score": number, "comment": string}, "grammar": {"score": number, "comment": string}, "vocab": {"score": number, "comment": string}, "coherence": {"score": number, "comment": string}}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"}], "topics_worked": [string], "next_steps": [string]}`;
 }
 
