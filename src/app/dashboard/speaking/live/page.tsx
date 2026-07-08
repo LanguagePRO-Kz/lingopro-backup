@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { VOICE_OPTIONS } from "@/lib/ai/voices";
 import { topicById } from "@/lib/ai/topics";
 import type { VoiceReport } from "@/lib/ai/prompts/voice-review";
+import { attachKonusmaScore } from "@/lib/diagnostic/result";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { awardXp, XP } from "@/lib/xp";
@@ -155,6 +156,16 @@ function LiveLesson() {
   const [mode, setMode] = useState<Mode>("bolum1");
   const [voice, setVoice] = useState("ahu");
   const [phase, setPhase] = useState<Phase>("idle");
+  // plan-engine deep link (?mode=bolum2&focus=izafet,conditionals) — the daily
+  // "voice lesson" task pins the mode and the week's focus topics
+  const focusOverrideRef = useRef<string[] | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    if (m && (MODES as string[]).includes(m)) setMode(m as Mode);
+    const focus = (params.get("focus") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (focus.length) focusOverrideRef.current = focus.slice(0, 3); // server re-validates against the registry
+  }, []);
   const [err, setErr] = useState<"errAuth" | "errMic" | "errNoMinutes" | "errUnavailable" | "errGeneric" | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [elapsed, setElapsed] = useState(0);
@@ -269,7 +280,18 @@ function LiveLesson() {
             dedupKey: `voice:${convIdRef.current}`,
             metadata: { conversationId: convIdRef.current, seconds: d.seconds, mode },
           });
+          // credit today's voice_lesson task when the student returns to the plan
+          try {
+            const now = new Date();
+            window.localStorage.setItem(
+              "lingopro:voice-done",
+              `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+            );
+          } catch { /* ignore */ }
         }
+        // diagnostic v2 §4: the first reviewed lesson supplies the pending
+        // Konuşma /25 of the quiz result (idempotent, no-op once attached)
+        if (d.report?.valid) void attachKonusmaScore();
       }
     } catch {
       /* session row stays unsettled; server-side reconciliation is planned */
@@ -324,7 +346,7 @@ function LiveLesson() {
       const res = await fetch("/api/voice/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode, feedbackLang: locale, voiceId: voice }),
+        body: JSON.stringify({ mode, feedbackLang: locale, voiceId: voice, focusTopics: focusOverrideRef.current ?? undefined }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

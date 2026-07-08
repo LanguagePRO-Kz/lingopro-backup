@@ -96,6 +96,7 @@ export default function DashboardHome() {
   const [showIntensity, setShowIntensity] = useState(false);
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [hasRoute, setHasRoute] = useState(true);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lingopro:name");
@@ -120,15 +121,57 @@ export default function DashboardHome() {
       setIntensity(data.intensity);
       setToday(data.today);
       setHistory(data.history);
+      setHasRoute(data.hasRoute);
       setLoading(false);
       if (data.today) {
         window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: data.today.completedCount, total: data.today.total } }));
+      }
+
+      // plan engine: no study route yet → generate once (AI or honest fallback),
+      // then rebuild today from it. Session-guarded so quota errors don't loop.
+      if (!data.hasRoute && !window.sessionStorage.getItem("lp:route-requested")) {
+        window.sessionStorage.setItem("lp:route-requested", "1");
+        void fetch("/api/ai/route", { method: "POST" })
+          .then(async (r) => {
+            if (!r.ok || !active) return;
+            const fresh = await loadDashboardData(locale);
+            if (!active) return;
+            setHasRoute(fresh.hasRoute);
+            setToday(fresh.today);
+            setHistory(fresh.history);
+            if (fresh.today) {
+              window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: fresh.today.completedCount, total: fresh.today.total } }));
+            }
+          })
+          .catch(() => {});
       }
     })();
     return () => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // the live lesson page sets this flag when a session settles with real
+  // minutes — credit the day's voice_lesson task when the student returns
+  useEffect(() => {
+    function creditVoiceTask() {
+      if (window.localStorage.getItem("lingopro:voice-done") !== todayISO()) return;
+      setToday((prev) => {
+        if (!prev) return prev;
+        const idx = prev.tasks.findIndex((t) => t.kind === "voice_lesson" && !t.completed);
+        if (idx === -1) return prev;
+        const tasks = prev.tasks.map((t, i) => (i === idx ? { ...t, completed: true } : t));
+        const row: DayRow = { ...prev, tasks, completedCount: tasks.filter((t) => t.completed).length };
+        void saveDay(row);
+        setHistory((h) => h.map((r) => (r.date === row.date ? row : r)));
+        window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: row.completedCount, total: row.total } }));
+        return row;
+      });
+    }
+    creditVoiceTask();
+    window.addEventListener("focus", creditVoiceTask);
+    return () => window.removeEventListener("focus", creditVoiceTask);
   }, []);
 
   async function chooseIntensity(i: Intensity) {
@@ -146,6 +189,9 @@ export default function DashboardHome() {
       return;
     }
     if (i === intensity) return;
+    // route-driven days are sized by profile minutes, not the legacy intensity —
+    // don't overwrite them with template tasks (minutes editing: settings, §6)
+    if (hasRoute) return;
     // pace change rebuilds TODAY too (not silently tomorrow); finished tasks keep credit
     const tasks = generateDailyPlan(level, i, dayNumber, locale).map((t) => ({
       ...t,
@@ -313,8 +359,10 @@ export default function DashboardHome() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className={`flex flex-wrap items-center gap-1.5 text-sm font-medium text-[var(--color-foreground)] ${task.completed ? "line-through opacity-60" : ""}`}>
-                    {skillLabel(task.skill, locale)}
-                    <span className="text-[var(--color-muted)]">· {taskDescription(task, locale)}</span>
+                    {task.title || skillLabel(task.skill, locale)}
+                    {(!task.kind || task.kind === "regular") && (
+                      <span className="text-[var(--color-muted)]">· {taskDescription(task, locale)}</span>
+                    )}
                     {task.skill !== "vocabulary" && task.skill !== "writing" && (
                       <span className="rounded-full bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-brand-2)]">{task.level}</span>
                     )}
@@ -323,6 +371,20 @@ export default function DashboardHome() {
                 </div>
                 {task.completed ? (
                   <span className="shrink-0 text-xs font-semibold text-[#16a34a]">✓ {c.doneLabel}</span>
+                ) : task.kind === "voice_lesson" ? (
+                  <Link
+                    href={`/dashboard/speaking/live?mode=${task.voiceMode ?? "bolum1"}${task.focusTopics?.length ? `&focus=${task.focusTopics.join(",")}` : ""}`}
+                    className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+                  >
+                    {c.start}
+                  </Link>
+                ) : task.kind === "mock_section" || task.kind === "mock_full" ? (
+                  <Link
+                    href="/dashboard/mock"
+                    className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+                  >
+                    {c.start}
+                  </Link>
                 ) : (
                   <button
                     type="button"

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
-import { TOPICS, topicById, type Topic } from "@/lib/ai/topics";
+import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
   }
 
-  let body: { mode?: Mode; feedbackLang?: string; voiceId?: string };
+  let body: { mode?: Mode; feedbackLang?: string; voiceId?: string; focusTopics?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -111,12 +111,20 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(", ") || "henüz belirlenmedi";
 
-  // Lesson focus (core value): weak topics first, topped up with topics of
-  // the student's own level so every lesson has a concrete teaching target.
-  const focus: Topic[] = (weak ?? [])
-    .map((w) => topicById(w.topic as string))
+  // Lesson focus (core value). A plan-engine deep link may pin the focus
+  // (DESIGN-PLAN-ENGINE §4 p.2) — validated against the registry; otherwise
+  // weak topics first, topped up with topics of the student's own level so
+  // every lesson has a concrete teaching target.
+  const requested: Topic[] = (Array.isArray(body.focusTopics) ? body.focusTopics : [])
+    .map((id) => topicById(normalizeTopicId(id)))
     .filter((t): t is Topic => !!t && t.id !== "other")
     .slice(0, 3);
+  const focus: Topic[] = requested.length
+    ? requested
+    : (weak ?? [])
+        .map((w) => topicById(w.topic as string))
+        .filter((t): t is Topic => !!t && t.id !== "other")
+        .slice(0, 3);
   if (focus.length < 3) {
     const levelKey = ["A1", "A2", "B1", "B2", "C1"].includes(level) ? level : "A2";
     for (const t of TOPICS) {

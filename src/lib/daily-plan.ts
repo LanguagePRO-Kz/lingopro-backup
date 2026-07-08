@@ -14,6 +14,8 @@ import { createClient } from "./supabase/client";
 // banks are loaded on demand inside TaskModal (see src/lib/task-content.ts) so
 // they stay out of the dashboard bundle.
 import { LEVELS, type Level } from "@/data/types";
+import { buildDay, type MasteryRow } from "./plan/layout";
+import type { StudyRoute } from "./plan/route";
 
 export type Intensity = "light" | "medium" | "intensive";
 export type Skill = "grammar" | "reading" | "listening" | "writing" | "speaking" | "vocabulary";
@@ -307,7 +309,8 @@ export function wordsLearned(history: DayRow[]): number {
 /* ------------------------------- Storage --------------------------------- */
 // v3: bumped when tasks moved from stored `itemIds` to a `seed` (content is now
 // resolved on demand). Old-schema rows are ignored and regenerated.
-const LS_KEY = "lingopro:dailyPlan:v3";
+// v4: route-driven tasks (kind/focusTopics) — older cached shapes are dropped
+const LS_KEY = "lingopro:dailyPlan:v4";
 type LsMap = Record<string, DayRow>;
 
 /** A row is usable only if every task carries the current numeric fields. */
@@ -446,6 +449,8 @@ export async function loadDashboardData(locale: Locale): Promise<{
   dayNumber: number;
   today: DayRow | null;
   history: DayRow[];
+  /** false → the dashboard should trigger POST /api/ai/route once */
+  hasRoute: boolean;
 }> {
   const date = todayISO();
   const from = addDaysISO(date, -29);
@@ -454,10 +459,12 @@ export async function loadDashboardData(locale: Locale): Promise<{
     quiz_result?: { level?: string; takenAt?: number } | null;
     study_intensity?: Intensity | null;
     study_minutes_daily?: number | null;
+    study_route?: unknown;
   };
   let profile: ProfileRow | null = null;
   let history: DayRow[] = [];
   let derivedIntensity: Intensity | null = null;
+  let mastery: MasteryRow[] = [];
 
   try {
     const supabase = createClient();
@@ -465,10 +472,10 @@ export async function loadDashboardData(locale: Locale): Promise<{
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("no user");
-    const [pRes, hRes] = await Promise.all([
+    const [pRes, hRes, mRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("quiz_result, study_intensity, study_minutes_daily")
+        .select("quiz_result, study_intensity, study_minutes_daily, study_route")
         .eq("id", user.id)
         .maybeSingle(),
       supabase
@@ -477,9 +484,17 @@ export async function loadDashboardData(locale: Locale): Promise<{
         .eq("user_id", user.id)
         .gte("date", from)
         .order("date"),
+      supabase
+        .from("topic_mastery")
+        .select("topic, strength, error_count, last_error_at, last_practiced_at")
+        .eq("user_id", user.id)
+        .lt("strength", 60)
+        .order("strength")
+        .limit(30),
     ]);
     profile = (pRes.data as unknown as ProfileRow | null) ?? null;
     history = !hRes.error && hRes.data ? (hRes.data as DbRow[]).map(fromDb) : Object.values(lsAll()).filter((r) => r.date >= from);
+    mastery = (mRes.data as MasteryRow[] | null) ?? [];
 
     // Diagnostic v2 asked for minutes/day: until the plan engine consumes the
     // minutes directly, map them onto the legacy intensity so the student
@@ -498,18 +513,32 @@ export async function loadDashboardData(locale: Locale): Promise<{
   const level = contentLevel(levelRaw);
   const dayNumber = dayNumberFrom(profile?.quiz_result?.takenAt);
 
+  // plan engine: an AI/fallback route turns the day into a route-driven layout
+  const routeRaw = profile?.study_route as StudyRoute | null | undefined;
+  const route = routeRaw && routeRaw.version === 1 && Array.isArray(routeRaw.weeks) && routeRaw.weeks.length > 0 ? routeRaw : null;
+
   let today: DayRow | null = null;
   if (intensity) {
     today = history.find((r) => r.date === date) ?? null;
-    if (!isPlanValid(today ?? undefined)) {
-      const tasks = generateDailyPlan(level, intensity, dayNumber, locale);
-      today = { date, tasks, completedCount: 0, total: tasks.length };
+    // regenerate when the stored day predates the route (no `kind` fields yet)
+    const preRoute = !!route && !!today && isPlanValid(today) && !today.tasks.some((t) => t.kind);
+    if (!isPlanValid(today ?? undefined) || preRoute) {
+      const minutesDaily = profile?.study_minutes_daily ?? INTENSITY_MINUTES[intensity];
+      const tasks = route
+        ? buildDay({ route, date, dayNumber, mastery, history, minutesDaily, locale })
+        : generateDailyPlan(level, intensity, dayNumber, locale);
+      // keep credit for anything already completed today (same-skill match)
+      if (today && isPlanValid(today)) {
+        const doneSkills = new Set(today.tasks.filter((t) => t.completed).map((t) => t.skill));
+        for (const t of tasks) if (doneSkills.has(t.skill) && t.kind !== "mock_full" && t.kind !== "mock_section") t.completed = doneSkills.delete(t.skill);
+      }
+      today = { date, tasks, completedCount: tasks.filter((t) => t.completed).length, total: tasks.length };
       history = [...history.filter((r) => r.date !== date), today].sort((a, b) => a.date.localeCompare(b.date));
       await saveDay(today);
     }
   }
 
-  return { intensity, levelRaw, level, dayNumber, today, history };
+  return { intensity, levelRaw, level, dayNumber, today, history, hasRoute: !!route };
 }
 
 export async function peekToday(): Promise<{ completed: number; total: number } | null> {
