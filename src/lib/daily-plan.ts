@@ -1,8 +1,9 @@
 /**
  * Daily study plan — a set of concrete tasks per day sized by the student's
- * chosen intensity (light / medium / intensive) and diagnostic level.
- * Grammar + vocabulary appear every day; reading / listening / writing /
- * speaking rotate. Difficulty nudges up one CEFR step every 7 days.
+ * chosen minutes/day (THE pace, see exam-plan.ts) and diagnostic level.
+ * Grammar + vocabulary anchor every day; reading / listening / writing /
+ * speaking rotate through the remaining budget. Difficulty nudges up one
+ * CEFR step every 7 days.
  *
  * Progress persists to Supabase (`daily_progress`, `task_results`) with a
  * localStorage mirror so the board keeps working before the tables exist.
@@ -14,10 +15,9 @@ import { createClient } from "./supabase/client";
 // banks are loaded on demand inside TaskModal (see src/lib/task-content.ts) so
 // they stay out of the dashboard bundle.
 import { LEVELS, type Level } from "@/data/types";
-import { buildDay, type MasteryRow } from "./plan/layout";
+import { BUDGET_TOLERANCE, buildDay, type MasteryRow } from "./plan/layout";
 import { needsRegen, type StudyRoute } from "./plan/route";
 
-export type Intensity = "light" | "medium" | "intensive";
 export type Skill = "grammar" | "reading" | "listening" | "writing" | "speaking" | "vocabulary";
 
 export interface DailyTask {
@@ -105,17 +105,6 @@ export function minutesLabel(min: number, locale: Locale): string {
   return `~${min} ${u}`;
 }
 
-export const INTENSITY_MINUTES: Record<Intensity, number> = { light: 35, medium: 50, intensive: 80 };
-
-export function intensityLabel(intensity: Intensity, locale: Locale): string {
-  const m: Record<Intensity, Record<Locale, string>> = {
-    light: { ru: "Лёгкий темп", en: "Light pace", tr: "Hafif tempo", kk: "Жеңіл қарқын" },
-    medium: { ru: "Средний темп", en: "Medium pace", tr: "Orta tempo", kk: "Орташа қарқын" },
-    intensive: { ru: "Интенсивный темп", en: "Intensive pace", tr: "Yoğun tempo", kk: "Қарқынды темп" },
-  };
-  return m[intensity][locale];
-}
-
 /* ------------------------------- Date utils ------------------------------ */
 export function todayISO(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -140,35 +129,37 @@ export function contentLevel(level: string | undefined): Level {
 /* ---------------------------- Plan generation ---------------------------- */
 type Spec = { skill: Skill; count: number; minutes: number };
 
-function specsFor(intensity: Intensity, dayNumber: number): Spec[] {
-  if (intensity === "light") {
-    const rot: Skill = dayNumber % 2 === 0 ? "speaking" : "writing";
-    return [
-      { skill: "grammar", count: 10, minutes: 8 },
-      { skill: "vocabulary", count: 15, minutes: 7 },
-      { skill: "reading", count: 1, minutes: 10 },
-      { skill: "listening", count: 1, minutes: 8 },
-      { skill: rot, count: 1, minutes: 7 },
-    ];
-  }
-  if (intensity === "intensive") {
-    return [
-      { skill: "grammar", count: 20, minutes: 15 },
-      { skill: "vocabulary", count: 25, minutes: 10 },
-      { skill: "reading", count: 2, minutes: 18 },
-      { skill: "listening", count: 2, minutes: 15 },
-      { skill: "writing", count: 1, minutes: 12 },
-      { skill: "speaking", count: 3, minutes: 10 },
-    ];
-  }
-  return [
-    { skill: "grammar", count: 15, minutes: 12 },
-    { skill: "vocabulary", count: 20, minutes: 8 },
+/**
+ * Fill the student's ACTUAL minutes/day (the founder's iron rule: the chosen
+ * pace IS the plan size — 45 chosen may never become an 80-minute day).
+ * Grammar + vocabulary anchor the day; the tail rotates by dayNumber so a
+ * small budget still meets every skill across the week. Same ±10% tolerance
+ * as the route-driven buildDay.
+ */
+function specsForBudget(budget: number, dayNumber: number): Spec[] {
+  const small = budget <= 20;
+  const core: Spec[] = [
+    { skill: "grammar", count: small ? 10 : 15, minutes: small ? 8 : 12 },
+    { skill: "vocabulary", count: small ? 15 : 20, minutes: small ? 7 : 8 },
+  ];
+  const tail: Spec[] = [
     { skill: "reading", count: 1, minutes: 10 },
     { skill: "listening", count: 1, minutes: 8 },
     { skill: "writing", count: 1, minutes: 10 },
     { skill: "speaking", count: 2, minutes: 7 },
   ];
+  const rot = (dayNumber - 1) % tail.length;
+  const rotated = [...tail.slice(rot), ...tail.slice(0, rot)];
+
+  const specs: Spec[] = [];
+  let spent = 0;
+  for (const s of [...core, ...rotated]) {
+    if (spent + s.minutes > budget * (1 + BUDGET_TOLERANCE)) continue;
+    specs.push(s);
+    spent += s.minutes;
+    if (spent >= budget * (1 - BUDGET_TOLERANCE)) break;
+  }
+  return specs.length ? specs : [core[0]];
 }
 
 function rampLevel(base: Level, dayNumber: number): Level {
@@ -176,10 +167,10 @@ function rampLevel(base: Level, dayNumber: number): Level {
   return LEVELS[Math.min(LEVELS.length - 1, i + Math.floor((dayNumber - 1) / 7))];
 }
 
-/** Generate the day's tasks for a given level + intensity (deterministic). */
-export function generateDailyPlan(userLevel: Level, intensity: Intensity, dayNumber: number, locale: Locale): DailyTask[] {
+/** Generate the day's tasks for a given level + minute budget (deterministic). */
+export function generateDailyPlan(userLevel: Level, minutesDaily: number, dayNumber: number, locale: Locale): DailyTask[] {
   const level = rampLevel(userLevel, dayNumber);
-  return specsFor(intensity, dayNumber).map((spec, i) => ({
+  return specsForBudget(minutesDaily, dayNumber).map((spec, i) => ({
     id: `${spec.skill}-${i}`,
     skill: spec.skill,
     title: NAMES[spec.skill][locale],
@@ -399,51 +390,13 @@ export async function saveTaskResult(input: {
   }
 }
 
-export async function loadDailyState(
-  userLevel: Level,
-  intensity: Intensity,
-  dayNumber: number,
-  locale: Locale,
-): Promise<{ today: DayRow; history: DayRow[] }> {
-  const date = todayISO();
-  const from = addDaysISO(date, -29);
-  let history: DayRow[] = [];
-
-  try {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("no user");
-    const { data, error } = await supabase
-      .from("daily_progress")
-      .select("date, tasks, completed_count, total_count")
-      .eq("user_id", user.id)
-      .gte("date", from)
-      .order("date");
-    if (error) throw error;
-    history = (data as DbRow[]).map(fromDb);
-  } catch {
-    history = Object.values(lsAll()).filter((r) => r.date >= from);
-  }
-
-  // only accept today's row if it matches the current schema; else regenerate
-  let today = history.find((r) => r.date === date);
-  if (!isPlanValid(today)) {
-    const tasks = generateDailyPlan(userLevel, intensity, dayNumber, locale);
-    today = { date, tasks, completedCount: 0, total: tasks.length };
-    history = [...history.filter((r) => r.date !== date), today].sort((a, b) => a.date.localeCompare(b.date));
-    await saveDay(today);
-  }
-  return { today: today as DayRow, history };
-}
-
 /**
  * Single-round-trip dashboard load: one getUser + one Promise.all for the
  * profile and the 30-day history. Generates today's plan if it's missing.
  */
 export async function loadDashboardData(locale: Locale): Promise<{
-  intensity: Intensity | null;
+  /** the chosen pace; null → no profile at all (signed-out shell) */
+  minutesDaily: number | null;
   levelRaw: string;
   level: Level;
   dayNumber: number;
@@ -515,10 +468,6 @@ export async function loadDashboardData(locale: Locale): Promise<{
   }
 
   const levelRaw = profile?.quiz_result?.level ?? "A2";
-  // intensity is a derived, in-memory sizing hint for the pre-route template
-  // day — never stored (there is no such DB column)
-  const intensity: Intensity | null =
-    minutesDaily == null ? null : minutesDaily <= 15 ? "light" : minutesDaily <= 30 ? "medium" : "intensive";
   const level = contentLevel(levelRaw);
   const dayNumber = dayNumberFrom(profile?.quiz_result?.takenAt);
 
@@ -539,19 +488,39 @@ export async function loadDashboardData(locale: Locale): Promise<{
     });
 
   let today: DayRow | null = null;
-  if (intensity) {
+  if (minutesDaily != null) {
+    const budget = minutesDaily;
     today = history.find((r) => r.date === date) ?? null;
     // regenerate when the stored day predates the route (no `kind` fields yet)
     const preRoute = !!route && !!today && isPlanValid(today) && !today.tasks.some((t) => t.kind);
-    if (!isPlanValid(today ?? undefined) || preRoute) {
-      const budget = minutesDaily ?? INTENSITY_MINUTES[intensity];
-      const tasks = route
+    const isMock = (t: DailyTask) => t.kind === "mock_full" || t.kind === "mock_section";
+    const nonMockMinutes = (ts: DailyTask[]) => ts.filter((t) => !isMock(t)).reduce((s, t) => s + t.estimatedMinutes, 0);
+    const build = () =>
+      route
         ? buildDay({ route, date, dayNumber, mastery, history, minutesDaily: budget, locale })
-        : generateDailyPlan(level, intensity, dayNumber, locale);
+        : generateDailyPlan(level, budget, dayNumber, locale);
+
+    let tasks: DailyTask[] | null = null;
+    if (!isPlanValid(today ?? undefined) || preRoute) {
+      tasks = build();
+    } else if (today) {
+      // pace changed since the day was built (settings / diagnostic retake) —
+      // the founder's rule: the promised minutes ARE the plan size. Rebuild
+      // only when it actually changes the layout, so completing reviews or
+      // over-budget mock days never churn the board mid-day.
+      const planned = nonMockMinutes(today.tasks);
+      const mismatch = planned > budget * (1 + BUDGET_TOLERANCE) + 4 || planned < budget * 0.7;
+      if (mismatch) {
+        const candidate = build();
+        if (Math.abs(nonMockMinutes(candidate) - planned) > 4) tasks = candidate;
+      }
+    }
+
+    if (tasks) {
       // keep credit for anything already completed today (same-skill match)
       if (today && isPlanValid(today)) {
         const doneSkills = new Set(today.tasks.filter((t) => t.completed).map((t) => t.skill));
-        for (const t of tasks) if (doneSkills.has(t.skill) && t.kind !== "mock_full" && t.kind !== "mock_section") t.completed = doneSkills.delete(t.skill);
+        for (const t of tasks) if (doneSkills.has(t.skill) && !isMock(t)) t.completed = doneSkills.delete(t.skill);
       }
       today = { date, tasks, completedCount: tasks.filter((t) => t.completed).length, total: tasks.length };
       history = [...history.filter((r) => r.date !== date), today].sort((a, b) => a.date.localeCompare(b.date));
@@ -559,7 +528,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
     }
   }
 
-  return { intensity, levelRaw, level, dayNumber, today, history, hasRoute: !!route, routeStale };
+  return { minutesDaily, levelRaw, level, dayNumber, today, history, hasRoute: !!route, routeStale };
 }
 
 export async function peekToday(): Promise<{ completed: number; total: number } | null> {

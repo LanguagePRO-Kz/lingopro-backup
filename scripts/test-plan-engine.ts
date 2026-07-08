@@ -16,6 +16,7 @@ import {
 } from "../src/lib/plan/route";
 import { assessFeasibility } from "../src/lib/plan/feasibility";
 import { buildDay, dueReviews, mocksForDay, type MasteryRow } from "../src/lib/plan/layout";
+import { generateDailyPlan } from "../src/lib/daily-plan";
 import { TOPIC_IDS } from "../src/lib/ai/topics";
 
 let failures = 0;
@@ -149,6 +150,49 @@ console.log("— day layout —");
     finaleDay.map((t) => t.id).join(","),
   );
   check("finale day includes a mock", finaleDay.some((t) => t.kind === "mock_full" || t.kind === "mock_section"));
+}
+
+console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80-min day) —");
+{
+  // template path (no route yet) — every supported pace, a week of days
+  for (const budget of [15, 30, 45, 60]) {
+    let ok = true;
+    let detail = "";
+    for (let day = 1; day <= 7; day++) {
+      const tasks = generateDailyPlan("A2", budget, day, "ru");
+      const spent = tasks.reduce((s, t) => s + t.estimatedMinutes, 0);
+      if (spent > budget * 1.1 + 0.001) {
+        ok = false;
+        detail = `day ${day}: ${spent} min for a ${budget}-min pace`;
+        break;
+      }
+    }
+    check(`template ${budget} min/day stays ≤ +10%`, ok, detail);
+  }
+  // variety: a 30-min week still touches the rotating skills
+  const weekSkills = new Set(
+    Array.from({ length: 7 }, (_, i) => generateDailyPlan("A2", 30, i + 1, "ru")).flat().map((t) => t.skill),
+  );
+  check("30-min week rotates ≥4 skills", weekSkills.size >= 4, [...weekSkills].join(","));
+
+  // route path — non-mock load respects each pace too
+  const route = fallbackRoute(baseInputs, TODAY);
+  for (const budget of [15, 30, 45, 60]) {
+    let ok = true;
+    let detail = "";
+    for (let day = 1; day <= 7; day++) {
+      const tasks = buildDay({ route, date: plusDays(day - 1), dayNumber: day, mastery: [], history: [], minutesDaily: budget, locale: "ru" });
+      const spent = tasks
+        .filter((t) => t.kind !== "mock_full" && t.kind !== "mock_section")
+        .reduce((s, t) => s + t.estimatedMinutes, 0);
+      if (spent > budget * 1.1 + 0.001) {
+        ok = false;
+        detail = `day ${day}: ${spent} min non-mock for a ${budget}-min pace`;
+        break;
+      }
+    }
+    check(`route day ${budget} min/day stays ≤ +10% (non-mock)`, ok, detail);
+  }
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
