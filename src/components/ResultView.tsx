@@ -698,6 +698,15 @@ export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazm
         </>
       ) : (
         <div className="mt-6">
+          {/* honest upgrade note: old-format results have no /25 sections or
+              recommendations — say so and offer the new diagnostic instead of
+              silently showing less (founder feedback: "не пусто") */}
+          <div className="mb-4 rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] p-5">
+            <p className="text-sm leading-relaxed text-[var(--color-foreground)]">{qt(locale, "v2UpsellText")}</p>
+            <Link href="/quiz" className="btn-primary mt-3 inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+              {qt(locale, "v2UpsellCta")} →
+            </Link>
+          </div>
           <h2 className="mb-4 text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "detailTitle")}</h2>
           <div className="flex flex-col gap-3">
             {orderedSkills.map((s, i) => (

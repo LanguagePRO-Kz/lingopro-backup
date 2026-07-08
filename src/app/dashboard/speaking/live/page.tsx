@@ -39,6 +39,7 @@ const T = {
     focus: "Фокус урока", transcript: "Транскрипт", ended: "Урок завершён", spent: "Потрачено", min: "мин",
     fromBase: "из дневных", fromCredits: "из докупленных", short: "Сессия была короче 10 секунд — минуты не списаны.",
     reportPreparing: "Готовим письменный разбор…", reportTitle: "Разбор урока · TÖMER Konuşma",
+    settleFailed: "Запись урока ещё обрабатывается — разбор не получен.", settleRetry: "Получить разбор",
     crit: { fluency: "Беглость", grammar: "Грамматика", vocab: "Лексика", coherence: "Связность" },
     errors: "Ошибки из разговора", noErrors: "Заметных ошибок в разговоре не найдено!", rule: "Правило",
     topicsWorked: "Проработанные темы", nextSteps: "Что дальше", reportNone: "Разговор был слишком коротким для разбора.",
@@ -58,6 +59,7 @@ const T = {
     focus: "Lesson focus", transcript: "Transcript", ended: "Lesson finished", spent: "Spent", min: "min",
     fromBase: "from daily", fromCredits: "from purchased", short: "The session was under 10 seconds — no minutes were charged.",
     reportPreparing: "Preparing the written review…", reportTitle: "Lesson review · TÖMER Konuşma",
+    settleFailed: "The lesson recording is still processing — no review yet.", settleRetry: "Get the review",
     crit: { fluency: "Fluency", grammar: "Grammar", vocab: "Vocabulary", coherence: "Coherence" },
     errors: "Errors from the conversation", noErrors: "No notable errors found in the conversation!", rule: "Rule",
     topicsWorked: "Topics worked on", nextSteps: "Next steps", reportNone: "The conversation was too short for a review.",
@@ -77,6 +79,7 @@ const T = {
     focus: "Dersin odağı", transcript: "Döküm", ended: "Ders bitti", spent: "Harcanan", min: "dk",
     fromBase: "günlükten", fromCredits: "satın alınandan", short: "Oturum 10 saniyeden kısaydı — dakika düşülmedi.",
     reportPreparing: "Yazılı değerlendirme hazırlanıyor…", reportTitle: "Ders değerlendirmesi · TÖMER Konuşma",
+    settleFailed: "Ders kaydı hâlâ işleniyor — değerlendirme alınamadı.", settleRetry: "Değerlendirmeyi al",
     crit: { fluency: "Akıcılık", grammar: "Dil bilgisi", vocab: "Kelime", coherence: "Tutarlılık" },
     errors: "Konuşmadaki hatalar", noErrors: "Konuşmada kayda değer hata bulunamadı!", rule: "Kural",
     topicsWorked: "Çalışılan konular", nextSteps: "Sonraki adımlar", reportNone: "Konuşma değerlendirme için çok kısaydı.",
@@ -96,6 +99,7 @@ const T = {
     focus: "Сабақ фокусы", transcript: "Транскрипт", ended: "Сабақ аяқталды", spent: "Жұмсалды", min: "мин",
     fromBase: "күнделіктіден", fromCredits: "сатып алынғаннан", short: "Сессия 10 секундтан қысқа болды — минут есептелген жоқ.",
     reportPreparing: "Жазбаша талдау дайындалуда…", reportTitle: "Сабақ талдауы · TÖMER Konuşma",
+    settleFailed: "Сабақ жазбасы әлі өңделуде — талдау алынбады.", settleRetry: "Талдауды алу",
     crit: { fluency: "Еркіндік", grammar: "Грамматика", vocab: "Лексика", coherence: "Байланыстылық" },
     errors: "Әңгімедегі қателер", noErrors: "Әңгімеде елеулі қате табылмады!", rule: "Ереже",
     topicsWorked: "Өтілген тақырыптар", nextSteps: "Келесі қадамдар", reportNone: "Әңгіме талдау үшін тым қысқа болды.",
@@ -173,12 +177,15 @@ function LiveLesson() {
   const [elapsed, setElapsed] = useState(0);
   const [allowance, setAllowance] = useState<{ baseLeft: number; creditsLeft: number } | null>(null);
   const [lessonFocus, setLessonFocus] = useState<{ id: string; label: Record<Locale, string> }[]>([]);
-  const [settle, setSettle] = useState<{ minutes: number; seconds: number; fromBase: number; fromCredits: number; report: VoiceReport | null } | null>(null);
+  const [settle, setSettle] = useState<{ minutes: number | null; seconds: number; fromBase: number; fromCredits: number; report: VoiceReport | null } | null>(null);
   const [reportPending, setReportPending] = useState(false);
+  const [settleFailed, setSettleFailed] = useState(false);
   // billing cutoff confirmed server-side: everything after the press is free
   const [wrapFree, setWrapFree] = useState(false);
 
   const maxSecondsRef = useRef(900);
+  // render-safe mirror of maxSecondsRef (lint: no ref reads during render)
+  const [maxSeconds, setMaxSeconds] = useState(900);
   const convIdRef = useRef<string | null>(null);
   const settlingRef = useRef(false);
   const wrapRef = useRef<{ requested: boolean; spoke: boolean; timer: ReturnType<typeof setTimeout> | null }>({ requested: false, spoke: false, timer: null });
@@ -280,36 +287,52 @@ function LiveLesson() {
     settlingRef.current = true;
     setPhase("ended");
     setReportPending(true);
+    setSettleFailed(false);
     try {
-      const res = await fetch("/api/voice/session/end", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: convIdRef.current }),
-      });
-      if (res.ok) {
-        window.localStorage.removeItem("lingopro:pending-voice");
-        const d = await res.json();
-        setSettle(d);
-        if ((d.minutes ?? 0) > 0) {
-          void awardXp("speaking_test", XP.SPEAKING_TEST, {
-            dedupKey: `voice:${convIdRef.current}`,
-            metadata: { conversationId: convIdRef.current, seconds: d.seconds, mode },
+      // the server polls ElevenLabs too, but a slow finalize can still 404 —
+      // retry here so the student is never left review-less without a word
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let res: Response | null = null;
+        try {
+          res = await fetch("/api/voice/session/end", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ conversationId: convIdRef.current }),
           });
-          // credit today's voice_lesson task when the student returns to the plan
-          try {
-            const now = new Date();
-            window.localStorage.setItem(
-              "lingopro:voice-done",
-              `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
-            );
-          } catch { /* ignore */ }
+        } catch {
+          /* network hiccup — falls through to the retry delay */
         }
-        // diagnostic v2 §4: the first reviewed lesson supplies the pending
-        // Konuşma /25 of the quiz result (idempotent, no-op once attached)
-        if (d.report?.valid) void attachKonusmaScore();
+        if (res?.ok) {
+          window.localStorage.removeItem("lingopro:pending-voice");
+          const d = await res.json();
+          setSettle(d);
+          if ((d.minutes ?? 0) > 0) {
+            void awardXp("speaking_test", XP.SPEAKING_TEST, {
+              dedupKey: `voice:${convIdRef.current}`,
+              metadata: { conversationId: convIdRef.current, seconds: d.seconds, mode },
+            });
+            // credit today's voice_lesson task when the student returns to the plan
+            try {
+              const now = new Date();
+              window.localStorage.setItem(
+                "lingopro:voice-done",
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+              );
+            } catch { /* ignore */ }
+          }
+          // diagnostic v2 §4: the first reviewed lesson supplies the pending
+          // Konuşma /25 of the quiz result (idempotent, no-op once attached)
+          if (d.report?.valid) void attachKonusmaScore();
+          return; // settled — keep settlingRef so duplicate disconnects no-op
+        }
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
       }
+      // honest failure with a way forward — settling is idempotent server-side
+      setSettleFailed(true);
+      settlingRef.current = false;
     } catch {
-      /* session row stays unsettled; server-side reconciliation is planned */
+      setSettleFailed(true);
+      settlingRef.current = false;
     } finally {
       setReportPending(false);
     }
@@ -410,6 +433,7 @@ function LiveLesson() {
     setAllowance(data.allowance);
     setLessonFocus(data.lessonFocus ?? []);
     maxSecondsRef.current = data.maxSeconds;
+    setMaxSeconds(data.maxSeconds);
     conversation.startSession({
       conversationToken: data.conversationToken,
       connectionType: "webrtc",
@@ -419,7 +443,7 @@ function LiveLesson() {
   }
 
   const inCall = phase === "live" || phase === "wrapping";
-  const remaining = Math.max(0, maxSecondsRef.current - elapsed);
+  const remaining = Math.max(0, maxSeconds - elapsed);
   const report = settle?.report && settle.report.valid ? settle.report : null;
 
   return (
@@ -540,7 +564,7 @@ function LiveLesson() {
             </span>
             {inCall && (
               <span className={`text-sm font-semibold tabular-nums ${remaining <= 60 ? "text-[#dc2626]" : "text-[var(--color-muted)]"}`}>
-                {fmt(elapsed)} / {fmt(maxSecondsRef.current)}
+                {fmt(elapsed)} / {fmt(maxSeconds)}
               </span>
             )}
           </div>
@@ -593,6 +617,7 @@ function LiveLesson() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass mt-5 rounded-3xl p-6">
           <h3 className="text-base font-semibold text-[var(--color-foreground)]">{c.ended}</h3>
           {settle &&
+            settle.minutes != null &&
             (settle.minutes > 0 ? (
               <p className="mt-1 text-sm text-[var(--color-foreground)]">
                 {c.spent}: <b>{settle.minutes} {c.min}</b> ({settle.fromBase} {c.fromBase}
@@ -609,7 +634,20 @@ function LiveLesson() {
             </div>
           )}
 
-          {!reportPending && settle && !report && settle.minutes > 0 && (
+          {settleFailed && (
+            <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">
+              <p>{c.settleFailed}</p>
+              <button
+                type="button"
+                onClick={() => void settleSession()}
+                className="mt-2 rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white"
+              >
+                {c.settleRetry}
+              </button>
+            </div>
+          )}
+
+          {!reportPending && !settleFailed && settle && !report && (settle.minutes == null || settle.minutes > 0) && (
             <p className="mt-3 text-sm text-[var(--color-muted)]">{c.reportNone}</p>
           )}
 

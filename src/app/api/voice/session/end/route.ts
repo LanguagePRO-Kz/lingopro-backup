@@ -46,11 +46,28 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
 
-  const conv = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
-    headers: { "xi-api-key": apiKey },
-  })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+  // ElevenLabs finalizes the call record a few seconds AFTER the WebRTC
+  // disconnect — an immediate fetch 404s or returns no duration/transcript,
+  // which used to leave the student with a bare "lesson finished" and no
+  // review. Poll until the record is ready (or give up and let the client
+  // retry; settling is idempotent).
+  let conv: {
+    agent_id?: string;
+    status?: string;
+    metadata?: { call_duration_secs?: number; start_time_unix_secs?: number; dynamic_variables?: Record<string, string> };
+    conversation_initiation_client_data?: { dynamic_variables?: Record<string, string> };
+    transcript?: { role?: string; message?: string | null }[];
+  } | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    conv = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
+      headers: { "xi-api-key": apiKey },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+    const ready = !!conv && (conv.status === "done" || conv.status === "failed" || (conv.metadata?.call_duration_secs ?? 0) > 0);
+    if (ready) break;
+    if (attempt < 4) await new Promise((r) => setTimeout(r, 2500));
+  }
   if (!conv) return NextResponse.json({ error: "conversation_not_found" }, { status: 404 });
 
   if (conv.agent_id !== process.env.ELEVENLABS_AGENT_ID) {
@@ -105,7 +122,9 @@ export async function POST(req: Request) {
       .eq("transcript->>conversation_id", conversationId)
       .maybeSingle();
     if (existing) {
-      return NextResponse.json({ alreadySettled: true, seconds: existing.seconds, report: existing.report ?? null });
+      // minutes: null → the client shows the stored report without re-stating
+      // a spend that happened on the first settle
+      return NextResponse.json({ alreadySettled: true, seconds: existing.seconds, minutes: null, fromBase: 0, fromCredits: 0, report: existing.report ?? null });
     }
   }
 

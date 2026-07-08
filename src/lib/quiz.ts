@@ -525,6 +525,18 @@ const T = {
   goQuiz: { ru: "Пройти диагностику", en: "Take the diagnostic", tr: "Teşhise başla", kk: "Диагностикадан өту" },
   // detailed breakdown
   detailTitle: { ru: "Подробный разбор диагностики", en: "Detailed diagnostic breakdown", tr: "Ayrıntılı teşhis analizi", kk: "Толық диагностика талдауы" },
+  v2UpsellText: {
+    ru: "Формат диагностики обновился: теперь она даёт баллы по секциям TÖMER (/25), найденные пробелы и конкретные рекомендации. Этот результат — старого формата.",
+    en: "The diagnostic has been upgraded: it now scores each TÖMER section (/25) and shows found gaps plus concrete recommendations. This result is from the old format.",
+    tr: "Teşhis yenilendi: artık her TÖMER bölümünü (/25) puanlıyor, eksikleri ve somut önerileri gösteriyor. Bu sonuç eski formattan.",
+    kk: "Диагностика жаңарды: енді әр TÖMER бөліміне (/25) балл қойып, олқылықтар мен нақты ұсыныстар береді. Бұл нәтиже ескі форматта.",
+  },
+  v2UpsellCta: {
+    ru: "Пройти обновлённую диагностику",
+    en: "Take the upgraded diagnostic",
+    tr: "Yenilenen teşhise gir",
+    kk: "Жаңарған диагностикадан өту",
+  },
   knowsTitle: { ru: "Что ты знаешь:", en: "What you know:", tr: "Bildiklerin:", kk: "Нені білесің:" },
   gapsTitle: { ru: "Где пробелы:", en: "Where the gaps are:", tr: "Eksiklerin nerede:", kk: "Олқылықтар қайда:" },
   todoTitle: { ru: "Что делать:", en: "What to do:", tr: "Ne yapmalı:", kk: "Не істеу керек:" },
