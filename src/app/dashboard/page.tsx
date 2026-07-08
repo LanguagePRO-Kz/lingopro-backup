@@ -89,7 +89,6 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
   const [celebrate, setCelebrate] = useState(false);
-  const [hasRoute, setHasRoute] = useState(true);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lingopro:name");
@@ -108,7 +107,6 @@ export default function DashboardHome() {
 
       setToday(data.today);
       setHistory(data.history);
-      setHasRoute(data.hasRoute);
       setLoading(false);
       if (data.today) {
         window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: data.today.completedCount, total: data.today.total } }));
@@ -124,7 +122,6 @@ export default function DashboardHome() {
             if (!r.ok || !active) return;
             const fresh = await loadDashboardData(locale);
             if (!active) return;
-            setHasRoute(fresh.hasRoute);
             setToday(fresh.today);
             setHistory(fresh.history);
             if (fresh.today) {
