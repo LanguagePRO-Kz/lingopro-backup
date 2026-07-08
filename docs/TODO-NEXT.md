@@ -1,40 +1,32 @@
-# TODO: что осталось после сессии 08.07.2026 (диагностика v2 + ядро движка)
+# TODO: что осталось после сессий 08–09.07.2026 (диагностика v2 + движок)
 
-Статус: **диагностика v2 реализована целиком** (банк, движок, аудио, UI, отложенная
-Yazma-проверка, Konuşma-досчёт). **Плановый движок: ядро готово** (route, layout,
-feasibility, промпт, API `/api/ai/route` — всё с юнит-тестами `npm run test:plan`).
-Осталась UI-интеграция движка и мелочи. Каждый пункт ссылается на раздел чертежа.
+Статус: **диагностика v2 — готова целиком** (банк, движок, аудио, UI, отложенная
+Yazma-проверка, Konuşma-досчёт на результатах И в момент окончания урока).
+**Плановый движок — ядро + интеграция с дашбордом готовы**: route/layout/feasibility
+с тестами (`npm run test:plan`), `/api/ai/route`, миграция 0003 применена,
+день строится из маршрута (buildDay), триггер генерации на дашборде, задачи
+voice_lesson/mock рендерятся, дип-линки `?mode&focus` работают (сервер валидирует
+focus по реестру), голосовая задача дня зачитывается после урока.
+Осталось: §7 п.10–11 чертежа Б и хвосты. Каждый пункт ссылается на раздел чертежа.
 
-## 0. Основателю — перед тестом (блокер)
+## 1. Плановый движок — остаток UI (DESIGN-PLAN-ENGINE §7 п.10–11)
 
-- [ ] **Применить миграцию** `supabase/migrations/0003_diagnostic_v2.sql` в Supabase
-      SQL Editor (колонки `profiles.study_minutes_daily` и `profiles.study_route`).
-      Без неё: минуты из онбординга не сохранятся, `/api/ai/route` вернёт 500
-      `route_not_saved`.
-
-## 1. Плановый движок — UI-интеграция (DESIGN-PLAN-ENGINE §7 п.7–11)
-
-- [ ] **п.7 `src/lib/daily-plan.ts`**: `loadDashboardData` — добавить в `Promise.all`
-      загрузку `profiles.study_route` и `topic_mastery`; при наличии route строить
-      день через `buildDay()` из `src/lib/plan/layout.ts` вместо `generateDailyPlan`
-      (fallback на старый путь без route — миграционный период). LS-ключ плана → v4
-      (см. `isPlanValid`), чтобы старые кэши дней отбросились.
-- [ ] **п.8 `src/app/dashboard/page.tsx`**: если у юзера нет `study_route` —
-      триггернуть `POST /api/ai/route` (fire-and-forget → после ответа перестроить
-      сегодня, паттерн из фикса интенсивности). Рендер задач с `kind`:
-      `voice_lesson` → ссылка `/dashboard/speaking/live?mode={voiceMode}&focus={focusTopics.join(",")}`;
-      `mock_section`/`mock_full` → в мок-раннер (пока `/dashboard/mock`).
-- [ ] **п.9 `src/app/dashboard/speaking/live/page.tsx`**: читать `?mode&focus` из
-      query → передавать в тело `/api/voice/session`; сервер (`/api/voice/session`)
-      валидирует `focus ⊆ TOPIC_IDS` и использует вместо автофокуса.
 - [ ] **п.10 `src/app/dashboard/settings/page.tsx`**: редактируемые «минуты в день»
-      (уже есть цель/дата из блока D) + **модалка осуществимости §6**: перед
-      сохранением вызвать `assessFeasibility()` (`src/lib/plan/feasibility.ts`),
-      показать вердикт ok/tight/notEnough с вариантами (+минуты / сдвиг даты /
-      цель B2 / «оставить как есть» с бейджем «напряжённый»). Подтверждение →
-      `POST /api/ai/route` → перестроить сегодня. НИКАКИХ молчаливых перестроек.
+      (цель/дата уже есть из блока D) + **модалка осуществимости §6**: перед
+      сохранением вызвать `assessFeasibility()` (`src/lib/plan/feasibility.ts`;
+      remainingTopics = темы маршрута со strength<60), показать вердикт
+      ok/tight/notEnough с вариантами (+минуты / сдвиг даты / цель B2 / «оставить
+      как есть» с бейджем «напряжённый»). Подтверждение → `POST /api/ai/route` →
+      перестроить сегодня. НИКАКИХ молчаливых перестроек.
 - [ ] **п.11 `src/app/dashboard/plan/page.tsx`**: витрина маршрута — недели/темы/
       вехи из `study_route` вместо `studyplan.ts` (после этого `studyplan.ts` — на выпил).
+- [ ] **Зачёт мок-задач**: задачи `mock_section`/`mock_full` ведут на
+      `/dashboard/mock`, но завершение мока пока НЕ зачитывает задачу дня
+      (паттерн готов: localStorage-флаг как `lingopro:voice-done` + focus-хендлер
+      на дашборде). Связать при доработке мок-раннера (Content-чертёж).
+- [ ] **needsRegen-триггер**: при заходе на дашборд сравнить `route.inputs` с
+      профилем (`needsRegen()` уже в `src/lib/plan/route.ts`) — при расхождении
+      предложить пересборку (кнопка, не молча).
 
 ## 2. Диагностика v2 — хвосты (DESIGN-DIAGNOSTIC-V2)
 
@@ -45,8 +37,6 @@ feasibility, промпт, API `/api/ai/route` — всё с юнит-теста
       сознательно НЕ делались в v1.
 - [ ] Прослушать 6 mp3 в `public/audio/diagnostic/` (основатель) — регенерация:
       `npx -y tsx scripts/generate-diagnostic-audio.mts --force`.
-- [ ] `attachKonusmaScore` вызывается только на `/quiz/result` — добавить вызов
-      на дашборде после первого голосового урока (§4 «вызов на дашборде/результатах»).
 
 ## 3. Мелочи, отложенные основателем «на Opus»
 
