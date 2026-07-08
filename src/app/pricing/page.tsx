@@ -3,18 +3,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Background } from "@/components/ui/Background";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Logo } from "@/components/ui/Logo";
 import { useI18n } from "@/lib/i18n";
 import { pick, pluralize } from "@/lib/localized";
 import { loadResult, saveResult, PLANS, LEVEL_ORDER, levelIndex, type QuizResult } from "@/lib/quiz";
-import { savePlan, type PackageId } from "@/lib/billing";
-import { PRICING, currencyFor, fmtMoney, type Currency } from "@/lib/pricing";
+import { type PackageId } from "@/lib/billing";
+import { PRICING, currencyFor, fmtMoney, planRow, type Currency } from "@/lib/pricing";
 import { PricingTicker } from "@/components/PricingTicker";
 import { createClient } from "@/lib/supabase/client";
-import { saveProfilePlan, fetchProfile } from "@/lib/profile";
+import { fetchProfile } from "@/lib/profile";
+import { EarlyAccessModal } from "@/components/EarlyAccessModal";
 
 const T = {
   ru: {
@@ -32,6 +33,7 @@ const T = {
     toGoal: "До цели C1 —",
     levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
     choosePlan: "Выберите план подготовки",
+    earlyNote: "Ранний доступ: оплата откроется при запуске. Сейчас вход — по коду доступа.",
     discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
     names: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } as Record<string, string>,
     badges: { "3m": "Экономия 50%", "6m": "Максимальная экономия" } as Record<string, string>,
@@ -61,6 +63,7 @@ const T = {
     toGoal: "To the C1 goal —",
     levels: (n: number) => (n === 1 ? "level" : "levels"),
     choosePlan: "Choose a prep plan",
+    earlyNote: "Early access: card payments open at launch. For now, entry is by access code.",
     discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
     names: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } as Record<string, string>,
     badges: { "3m": "Save 50%", "6m": "Best value" } as Record<string, string>,
@@ -90,6 +93,7 @@ const T = {
     toGoal: "C1 hedefine —",
     levels: () => "seviye",
     choosePlan: "Bir hazırlık planı seç",
+    earlyNote: "Erken erişim: kart ödemeleri lansmanda açılacak. Şimdilik giriş erişim koduyla.",
     discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
     names: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } as Record<string, string>,
     badges: { "3m": "%50 tasarruf", "6m": "En iyi değer" } as Record<string, string>,
@@ -119,6 +123,7 @@ const T = {
     toGoal: "C1 мақсатына дейін —",
     levels: () => "деңгей",
     choosePlan: "Дайындық жоспарын таңда",
+    earlyNote: "Ерте қолжетімділік: карта төлемдері іске қосылғанда ашылады. Әзірге кіру — қолжетімділік кодымен.",
     discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
     names: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } as Record<string, string>,
     badges: { "3m": "50% үнемдеу", "6m": "Ең тиімді" } as Record<string, string>,
@@ -148,6 +153,7 @@ export default function PricingPage() {
   const [name, setName] = useState("");
   const [authed, setAuthed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [modalPkg, setModalPkg] = useState<PackageId | null>(null);
 
   useEffect(() => {
     const local = loadResult();
@@ -169,21 +175,22 @@ export default function PricingPage() {
       });
   }, []);
 
-  // pick a plan — no payment yet (Kaspi later): save to profile + cache, go to dashboard
+  // pick a plan → honest early access. Not authed yet? register first. Otherwise
+  // open the early-access modal: real payment opens at launch, and the only way
+  // in now is a genuine access code (redeem_promo) — no silent free grant.
   async function selectPlan(plan: PackageId) {
     if (busy) return;
+    setBusy(true);
     const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    setBusy(false);
     if (!user) {
       router.push("/register");
       return;
     }
-    setBusy(true);
-    await saveProfilePlan(plan);
-    savePlan(plan);
-    router.push("/dashboard");
+    setModalPkg(plan);
   }
 
   // finished the diagnostic → personal 30% discount
@@ -324,6 +331,9 @@ export default function PricingPage() {
           })}
         </div>
 
+        {/* honest early-access framing — no silent free grant */}
+        <p className="mt-4 text-center text-xs text-[var(--color-muted)]">{c.earlyNote}</p>
+
         {/* included features */}
         <div className="glass mt-8 rounded-3xl p-7">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.includedTitle}</h3>
@@ -341,6 +351,18 @@ export default function PricingPage() {
           </ul>
         </div>
       </main>
+
+      {/* early-access modal — code-gated entry (redeem_promo), no fake payment */}
+      <AnimatePresence>
+        {modalPkg && (
+          <EarlyAccessModal
+            pkgId={modalPkg}
+            planName={c.names[modalPkg]}
+            launchPrice={fmtMoney(cur, hasDiscount ? planRow(cur, modalPkg).disc : planRow(cur, modalPkg).price)}
+            onClose={() => setModalPkg(null)}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
