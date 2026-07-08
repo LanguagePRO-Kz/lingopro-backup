@@ -65,9 +65,35 @@ export async function POST(req: Request) {
   }
 
   const seconds: number = Math.max(0, Math.round(conv.metadata?.call_duration_secs ?? 0));
-  const minutes = seconds > 10 ? Math.ceil(seconds / 60) : 0; // <10s connects are free
 
   const admin = createAdminClient();
+
+  // Billing cutoff: the moment the student pressed "end lesson" (stamped by
+  // /api/voice/session/wrap). The oral wrap-up and disconnect lag are free —
+  // not a second is billed past the press. Anti-abuse: if the call kept going
+  // for more than the grace window after the stamp (a real wrap-up is <60s),
+  // the stamp is ignored and the full duration is billed.
+  const WRAP_GRACE_SECONDS = 120;
+  let billedSeconds = seconds;
+  if (admin) {
+    const { data: mark } = await admin
+      .from("voice_wrap_marks")
+      .select("requested_at")
+      .eq("user_id", user.id)
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+    const startMs = conv.metadata?.start_time_unix_secs ? conv.metadata.start_time_unix_secs * 1000 : null;
+    if (mark && startMs) {
+      const cutoffSec = Math.round((new Date(mark.requested_at).getTime() - startMs) / 1000);
+      const overrun = seconds - cutoffSec; // time the call ran past the press
+      if (cutoffSec >= 0 && overrun >= 0 && overrun <= WRAP_GRACE_SECONDS) {
+        billedSeconds = Math.min(seconds, cutoffSec);
+      }
+    }
+    // the mark has served its purpose either way
+    await admin.from("voice_wrap_marks").delete().eq("user_id", user.id).eq("conversation_id", conversationId);
+  }
+  const minutes = billedSeconds > 10 ? Math.ceil(billedSeconds / 60) : 0; // <10s connects are free
 
   // idempotency: a retry of the same conversation must not double-bill;
   // return the stored report so the client can re-render it

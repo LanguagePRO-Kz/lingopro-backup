@@ -17,8 +17,10 @@ type Phase = "idle" | "starting" | "live" | "wrapping" | "ended";
 
 const MODES: Mode[] = ["bolum1", "bolum2", "bolum3", "full", "free"];
 
-// oral wrap-up instruction sent as a contextual update when the student ends
-// the lesson (the agent prompt defines the same closing ritual)
+// oral wrap-up instruction sent as a user message (a message, unlike a
+// contextual update, always triggers a reply turn) when the student ends the
+// lesson; the agent prompt defines the same closing ritual. Billing is cut
+// server-side at the press — the wrap-up itself is free.
 const WRAP_NOTE: Record<string, string> = {
   ru: "SİSTEM NOTU: Öğrenci dersi şimdi bitiriyor. KAPANIŞ RİTÜELİNİ uygula: Türkçe tek cümle özet, sonra RUSÇA kısa sözlü değerlendirme (iyi yönler, 2-3 somut hata, bugünkü konular, hedefe giden sonraki adım), Türkçe veda. 45 saniyeyi geçme.",
   en: "SİSTEM NOTU: Öğrenci dersi şimdi bitiriyor. KAPANIŞ RİTÜELİNİ uygula: Türkçe tek cümle özet, sonra İNGİLİZCE kısa sözlü değerlendirme (iyi yönler, 2-3 somut hata, bugünkü konular, hedefe giden sonraki adım), Türkçe veda. 45 saniyeyi geçme.",
@@ -32,7 +34,7 @@ const T = {
     subtitle: "Урок с учебным фокусом: преподаватель ведёт диалог по темам твоего уровня, исправляет по ходу и в конце разбирает по критериям TÖMER Konuşma.",
     modes: { bolum1: "Bölüm 1 · Диалог", bolum2: "Bölüm 2 · Монолог", bolum3: "Bölüm 3 · Мнение", full: "Полный экзамен", free: "Свободная беседа" },
     voice: "Голос преподавателя", start: "Начать урок", starting: "Подключение…",
-    end: "Завершить с итогом", endNow: "закончить без итога", wrapping: "Преподаватель подводит итог — дослушай…",
+    end: "Завершить с итогом", endNow: "закончить без итога", wrapping: "Преподаватель подводит итог — дослушай…", wrapFreeNote: "Минуты уже не списываются — итог бесплатный.",
     listening: "Слушает тебя — говори", speaking: "Преподаватель говорит…", minutes: "Минуты сегодня", purchased: "докупленные",
     focus: "Фокус урока", transcript: "Транскрипт", ended: "Урок завершён", spent: "Потрачено", min: "мин",
     fromBase: "из дневных", fromCredits: "из докупленных", short: "Сессия была короче 10 секунд — минуты не списаны.",
@@ -51,7 +53,7 @@ const T = {
     subtitle: "A lesson with a teaching focus: the teacher steers the dialogue around your level's topics, corrects on the fly and reviews you against TÖMER Konuşma criteria.",
     modes: { bolum1: "Bölüm 1 · Dialogue", bolum2: "Bölüm 2 · Monologue", bolum3: "Bölüm 3 · Opinion", full: "Full exam", free: "Free talk" },
     voice: "Teacher's voice", start: "Start lesson", starting: "Connecting…",
-    end: "Finish with feedback", endNow: "end without feedback", wrapping: "The teacher is wrapping up — listen…",
+    end: "Finish with feedback", endNow: "end without feedback", wrapping: "The teacher is wrapping up — listen…", wrapFreeNote: "The clock has stopped — the wrap-up is free.",
     listening: "Listening — go ahead", speaking: "Teacher is speaking…", minutes: "Minutes today", purchased: "purchased",
     focus: "Lesson focus", transcript: "Transcript", ended: "Lesson finished", spent: "Spent", min: "min",
     fromBase: "from daily", fromCredits: "from purchased", short: "The session was under 10 seconds — no minutes were charged.",
@@ -70,7 +72,7 @@ const T = {
     subtitle: "Öğrenme odaklı ders: öğretmen diyaloğu seviyene uygun konular etrafında yürütür, anında düzeltir ve sonunda TÖMER Konuşma ölçütlerine göre değerlendirir.",
     modes: { bolum1: "Bölüm 1 · Karşılıklı", bolum2: "Bölüm 2 · Sözlü anlatım", bolum3: "Bölüm 3 · Görüş", full: "Tam sınav", free: "Serbest sohbet" },
     voice: "Öğretmenin sesi", start: "Derse başla", starting: "Bağlanıyor…",
-    end: "Değerlendirmeyle bitir", endNow: "değerlendirmesiz bitir", wrapping: "Öğretmen dersi topluyor — dinle…",
+    end: "Değerlendirmeyle bitir", endNow: "değerlendirmesiz bitir", wrapping: "Öğretmen dersi topluyor — dinle…", wrapFreeNote: "Dakika sayacı durdu — kapanış ücretsiz.",
     listening: "Dinliyor — konuş", speaking: "Öğretmen konuşuyor…", minutes: "Bugünkü dakikalar", purchased: "satın alınan",
     focus: "Dersin odağı", transcript: "Döküm", ended: "Ders bitti", spent: "Harcanan", min: "dk",
     fromBase: "günlükten", fromCredits: "satın alınandan", short: "Oturum 10 saniyeden kısaydı — dakika düşülmedi.",
@@ -89,7 +91,7 @@ const T = {
     subtitle: "Оқу фокусы бар сабақ: ұстаз диалогты деңгейіңе сай тақырыптармен жүргізеді, қатеңді сол сәтте түзетеді, соңында TÖMER Konuşma өлшемдерімен талдайды.",
     modes: { bolum1: "Bölüm 1 · Диалог", bolum2: "Bölüm 2 · Монолог", bolum3: "Bölüm 3 · Пікір", full: "Толық емтихан", free: "Еркін әңгіме" },
     voice: "Ұстаздың дауысы", start: "Сабақты бастау", starting: "Қосылуда…",
-    end: "Қорытындымен аяқтау", endNow: "қорытындысыз аяқтау", wrapping: "Ұстаз қорытынды айтып жатыр — тыңда…",
+    end: "Қорытындымен аяқтау", endNow: "қорытындысыз аяқтау", wrapping: "Ұстаз қорытынды айтып жатыр — тыңда…", wrapFreeNote: "Минуттар енді есептелмейді — қорытынды тегін.",
     listening: "Тыңдап тұр — сөйлей бер", speaking: "Ұстаз сөйлеп жатыр…", minutes: "Бүгінгі минуттар", purchased: "сатып алынған",
     focus: "Сабақ фокусы", transcript: "Транскрипт", ended: "Сабақ аяқталды", spent: "Жұмсалды", min: "мин",
     fromBase: "күнделіктіден", fromCredits: "сатып алынғаннан", short: "Сессия 10 секундтан қысқа болды — минут есептелген жоқ.",
@@ -173,6 +175,8 @@ function LiveLesson() {
   const [lessonFocus, setLessonFocus] = useState<{ id: string; label: Record<Locale, string> }[]>([]);
   const [settle, setSettle] = useState<{ minutes: number; seconds: number; fromBase: number; fromCredits: number; report: VoiceReport | null } | null>(null);
   const [reportPending, setReportPending] = useState(false);
+  // billing cutoff confirmed server-side: everything after the press is free
+  const [wrapFree, setWrapFree] = useState(false);
 
   const maxSecondsRef = useRef(900);
   const convIdRef = useRef<string | null>(null);
@@ -229,18 +233,29 @@ function LiveLesson() {
     });
   }, []);
 
-  // oral wrap-up: after the farewell instruction, end once the teacher has
-  // spoken and gone quiet again (safety timeout guards a stuck state)
+  // oral wrap-up: end once the teacher has delivered the summary and gone
+  // quiet. Keyed on BOTH phase and isSpeaking — the old version only reacted
+  // to isSpeaking *changes*, so a press made while the teacher was mid-turn
+  // never armed the detector and the session hung until the hard timeout,
+  // billing all the while (the founder's money-leak bug).
   useEffect(() => {
+    if (phase !== "wrapping") return;
     const w = wrapRef.current;
-    if (!w.requested) return;
-    if (isSpeaking) w.spoke = true;
-    if (!isSpeaking && w.spoke) {
-      const t = setTimeout(() => conversation.endSession(), 1500);
+    if (isSpeaking) {
+      w.spoke = true;
+      return;
+    }
+    if (w.spoke) {
+      // quiet after speaking — 3.5s covers the LLM+TTS gap between her
+      // interrupted turn and the actual wrap-up turn
+      const t = setTimeout(() => conversation.endSession(), 3500);
       return () => clearTimeout(t);
     }
+    // she never started the wrap-up — don't keep the student waiting
+    const t = setTimeout(() => conversation.endSession(), 15_000);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSpeaking]);
+  }, [isSpeaking, phase]);
 
   useEffect(() => {
     if (phase !== "live" && phase !== "wrapping") return;
@@ -300,20 +315,46 @@ function LiveLesson() {
     }
   }
 
+  /** Server-side billing cutoff: not a second past this press is charged. */
+  function stampCutoff() {
+    const id = convIdRef.current;
+    if (!id) return;
+    void fetch("/api/voice/session/wrap", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ conversationId: id }),
+    })
+      .then((r) => {
+        if (r.ok) setWrapFree(true);
+      })
+      .catch(() => {
+        /* no stamp → full billing, as before */
+      });
+  }
+
+  /** Instant end: cut billing and tear the session down immediately. */
+  function endNow() {
+    stampCutoff();
+    conversation.endSession();
+  }
+
   function requestWrapUp() {
     const w = wrapRef.current;
     if (w.requested) return;
     w.requested = true;
     w.spoke = false;
     setPhase("wrapping");
+    stampCutoff(); // billing stops NOW — the oral wrap-up is on the house
     try {
-      conversation.sendContextualUpdate(WRAP_NOTE[locale] ?? WRAP_NOTE.en);
+      // a user message (unlike a contextual update) always triggers a reply
+      // turn, so the teacher actually delivers the closing ritual
+      conversation.sendUserMessage(WRAP_NOTE[locale] ?? WRAP_NOTE.en);
     } catch {
       conversation.endSession();
       return;
     }
     // if the teacher never wraps up, force-end
-    w.timer = setTimeout(() => conversation.endSession(), 75_000);
+    w.timer = setTimeout(() => conversation.endSession(), 45_000);
   }
 
   async function start() {
@@ -321,6 +362,7 @@ function LiveLesson() {
     setLines([]);
     setSettle(null);
     setElapsed(0);
+    setWrapFree(false);
     convIdRef.current = null;
     settlingRef.current = false;
     wrapRef.current = { requested: false, spoke: false, timer: null };
@@ -503,6 +545,12 @@ function LiveLesson() {
             )}
           </div>
 
+          {phase === "wrapping" && wrapFree && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#16a34a]/10 px-3 py-1 text-xs font-medium text-[#15803d]">
+              ✓ {c.wrapFreeNote}
+            </div>
+          )}
+
           <div className="mt-3 flex justify-center rounded-2xl bg-black/[0.03] px-4 py-2">
             <Wave
               active={inCall}
@@ -525,6 +573,14 @@ function LiveLesson() {
               <button type="button" onClick={requestWrapUp} className="btn-primary rounded-full px-5 py-2.5 text-sm font-medium">
                 🏁 {c.end}
               </button>
+              <button type="button" onClick={endNow} className="text-xs text-[var(--color-muted)] underline-offset-2 hover:underline">
+                {c.endNow}
+              </button>
+            </div>
+          )}
+          {phase === "wrapping" && (
+            <div className="mt-4">
+              {/* the student is never locked in: skip the (free) wrap-up any time */}
               <button type="button" onClick={() => conversation.endSession()} className="text-xs text-[var(--color-muted)] underline-offset-2 hover:underline">
                 {c.endNow}
               </button>
