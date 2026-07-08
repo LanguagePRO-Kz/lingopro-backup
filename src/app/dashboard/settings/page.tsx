@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useExam } from "@/lib/exam-context";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { loadPlan, type PackageId } from "@/lib/billing";
+import { contentLevel } from "@/lib/daily-plan";
 import { planBadge } from "@/lib/dashboard";
+import { assessFeasibility } from "@/lib/plan/feasibility";
+import { topicsForSpan } from "@/lib/plan/route";
 import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
-import { fetchExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamDateMode } from "@/lib/exam-plan";
+import { createClient } from "@/lib/supabase/client";
+import { daysToExam, fetchExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamDateMode } from "@/lib/exam-plan";
 
 const T = {
   ru: {
@@ -15,6 +19,10 @@ const T = {
     city: "Город", country: "Страна", cityPh: "Например, Алматы", countryPh: "Например, Казахстан",
     exam: "Экзамен", chosenExam: "Выбранный экзамен", target: "Целевой уровень", examDate: "Дата экзамена",
     pace: "Минут в день", paceNote: "Дневной план пересоберётся под новый темп при следующем открытии дашборда.",
+    fUnknown: (m: number, d: number, tgt: string) => `При ${m} мин/день на все темы до ${tgt} нужно ~${d} дней занятий.`,
+    fOk: (need: number, left: number) => `Успеваешь: ~${need} дней работы при ${left} днях до экзамена.`,
+    fTight: (need: number, left: number) => `Впритык: ~${need} дней работы при ${left} до экзамена — без пропусков.`,
+    fNotEnough: (m: number, mn: number, dt: string) => `Честно: при ${m} мин/день к дате экзамена не успеть. Варианты: ${mn} мин/день, дата не раньше ${dt} или цель B2 вместо C1.`,
     dateExact: "Точная дата", dateApprox: "Примерно", dateUnknown: "Не знаю", months: "мес", examSaved: "Сохранено ✓", saveExam: "Сохранить",
     sub: "Подписка", currentPlan: "Текущий план", validUntil: "Действует до", manage: "Управлять подпиской",
     notif: "Уведомления", emailNotif: "Email уведомления", reminders: "Напоминания о занятиях", remindTime: "Время напоминания",
@@ -25,6 +33,10 @@ const T = {
     city: "City", country: "Country", cityPh: "e.g. Almaty", countryPh: "e.g. Kazakhstan",
     exam: "Exam", chosenExam: "Selected exam", target: "Target level", examDate: "Exam date",
     pace: "Minutes per day", paceNote: "Your daily plan rebuilds to the new pace the next time you open the dashboard.",
+    fUnknown: (m: number, d: number, tgt: string) => `At ${m} min/day, covering everything up to ${tgt} takes ~${d} study days.`,
+    fOk: (need: number, left: number) => `On track: ~${need} days of work with ${left} days until the exam.`,
+    fTight: (need: number, left: number) => `Tight: ~${need} days of work with ${left} until the exam — no skipped days.`,
+    fNotEnough: (m: number, mn: number, dt: string) => `Honestly: at ${m} min/day you won't make the exam date. Options: ${mn} min/day, a date after ${dt}, or target B2 instead of C1.`,
     dateExact: "Exact date", dateApprox: "Approx.", dateUnknown: "Not sure", months: "mo", examSaved: "Saved ✓", saveExam: "Save",
     sub: "Subscription", currentPlan: "Current plan", validUntil: "Valid until", manage: "Manage subscription",
     notif: "Notifications", emailNotif: "Email notifications", reminders: "Lesson reminders", remindTime: "Reminder time",
@@ -35,6 +47,10 @@ const T = {
     city: "Şehir", country: "Ülke", cityPh: "örn. Almatı", countryPh: "örn. Kazakistan",
     exam: "Sınav", chosenExam: "Seçilen sınav", target: "Hedef seviye", examDate: "Sınav tarihi",
     pace: "Günde dakika", paceNote: "Günlük plan, panoyu bir sonraki açışında yeni tempoya göre yeniden kurulur.",
+    fUnknown: (m: number, d: number, tgt: string) => `Günde ${m} dk ile ${tgt} seviyesine kadar tüm konular ~${d} çalışma günü sürer.`,
+    fOk: (need: number, left: number) => `Yetişiyorsun: sınava ${left} gün varken ~${need} günlük iş.`,
+    fTight: (need: number, left: number) => `Sıkışık: sınava ${left} gün varken ~${need} günlük iş — hiç gün kaçırmadan.`,
+    fNotEnough: (m: number, mn: number, dt: string) => `Dürüstçe: günde ${m} dk ile sınav tarihine yetişmez. Seçenekler: günde ${mn} dk, ${dt} sonrası bir tarih ya da C1 yerine B2.`,
     dateExact: "Kesin tarih", dateApprox: "Yaklaşık", dateUnknown: "Bilmiyorum", months: "ay", examSaved: "Kaydedildi ✓", saveExam: "Kaydet",
     sub: "Abonelik", currentPlan: "Mevcut plan", validUntil: "Geçerlilik", manage: "Aboneliği yönet",
     notif: "Bildirimler", emailNotif: "E-posta bildirimleri", reminders: "Ders hatırlatmaları", remindTime: "Hatırlatma saati",
@@ -45,6 +61,10 @@ const T = {
     city: "Қала", country: "Ел", cityPh: "мыс. Алматы", countryPh: "мыс. Қазақстан",
     exam: "Емтихан", chosenExam: "Таңдалған емтихан", target: "Мақсатты деңгей", examDate: "Емтихан күні",
     pace: "Күніне минут", paceNote: "Күнделікті жоспар келесі жолы дашбордты ашқанда жаңа қарқынға сай қайта құрылады.",
+    fUnknown: (m: number, d: number, tgt: string) => `Күніне ${m} минутпен ${tgt} деңгейіне дейінгі барлық тақырыпқа ~${d} оқу күні керек.`,
+    fOk: (need: number, left: number) => `Үлгересің: емтиханға ${left} күн қалғанда ~${need} күндік жұмыс.`,
+    fTight: (need: number, left: number) => `Тығыз: емтиханға ${left} күн қалғанда ~${need} күндік жұмыс — бір күн де жібермей.`,
+    fNotEnough: (m: number, mn: number, dt: string) => `Шынын айтқанда: күніне ${m} минутпен емтихан күніне үлгермейсің. Нұсқалар: күніне ${mn} минут, ${dt} кейінгі күн немесе C1 орнына B2.`,
     dateExact: "Нақты күн", dateApprox: "Шамамен", dateUnknown: "Білмеймін", months: "ай", examSaved: "Сақталды ✓", saveExam: "Сақтау",
     sub: "Жазылым", currentPlan: "Ағымдағы жоспар", validUntil: "Дейін жарамды", manage: "Жазылымды басқару",
     notif: "Хабарламалар", emailNotif: "Email хабарламалар", reminders: "Сабақ еске салулары", remindTime: "Еске салу уақыты",
@@ -101,6 +121,9 @@ export default function SettingsPage() {
   const [horizon, setHorizon] = useState<1 | 3 | 6>(3);
   const [minutes, setMinutes] = useState<number>(30);
   const [examSaved, setExamSaved] = useState(false);
+  // honest consequence math: student level + already-mastered topics
+  const [level, setLevel] = useState<string | null>(null);
+  const [mastered, setMastered] = useState<string[]>([]);
 
   useEffect(() => {
     setName(window.localStorage.getItem("lingopro:name") || "");
@@ -118,11 +141,36 @@ export default function SettingsPage() {
       setExamDate(p.examDate ?? "");
       if (p.examHorizonMonths) setHorizon(p.examHorizonMonths);
       if (p.minutesDaily) setMinutes(p.minutesDaily);
+      setLevel(p.level);
     });
+    createClient()
+      .from("topic_mastery")
+      .select("topic")
+      .gte("strength", 60)
+      .then(({ data }) => {
+        if (active && data) setMastered(data.map((r) => r.topic as string));
+      });
     return () => {
       active = false;
     };
   }, []);
+
+  // live verdict: recomputed as the student toggles pace/date/target — the
+  // consequence is visible BEFORE saving, never a silent rebuild
+  const feasibility = useMemo(() => {
+    if (!level) return null;
+    const span = topicsForSpan(contentLevel(level), targetLevel);
+    const done = new Set(mastered);
+    const remaining = span.filter((t) => !done.has(t)).length;
+    if (remaining === 0) return null;
+    const daysLeft =
+      dateMode === "exact" && examDate
+        ? daysToExam({ examDateMode: "exact", examDate })
+        : dateMode === "approx"
+          ? horizon * 30
+          : null;
+    return assessFeasibility({ remainingTopics: remaining, minutesDaily: minutes, daysLeft });
+  }, [level, targetLevel, dateMode, examDate, horizon, minutes, mastered]);
 
   async function saveExam() {
     await saveExamPlanToProfile({
@@ -257,6 +305,28 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-[var(--color-muted)]">{c.paceNote}</p>
         </div>
+
+        {/* honest consequence of the chosen pace/date/target — live, before saving */}
+        {feasibility && (
+          <div
+            className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              feasibility.verdict === "notEnough"
+                ? "bg-[#dc2626]/[0.08] text-[#b91c1c]"
+                : feasibility.verdict === "tight"
+                  ? "bg-[#d97706]/10 text-[#92400e]"
+                  : feasibility.verdict === "ok"
+                    ? "bg-[#16a34a]/[0.08] text-[#15803d]"
+                    : "bg-black/[0.04] text-[var(--color-muted)]"
+            }`}
+          >
+            {feasibility.verdict === "unknown" && c.fUnknown(minutes, feasibility.daysNeeded, targetLevel)}
+            {feasibility.verdict === "ok" && c.fOk(feasibility.daysNeeded, feasibility.daysLeft)}
+            {feasibility.verdict === "tight" && c.fTight(feasibility.daysNeeded, feasibility.daysLeft)}
+            {feasibility.verdict === "notEnough" &&
+              c.fNotEnough(minutes, feasibility.minutesNeeded ?? minutes, feasibility.dateNeeded ?? "")}
+          </div>
+        )}
+
         <button type="button" onClick={saveExam} className="btn-primary w-fit rounded-full px-5 py-2.5 text-sm">
           {examSaved ? c.examSaved : c.saveExam}
         </button>

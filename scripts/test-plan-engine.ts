@@ -16,7 +16,7 @@ import {
 } from "../src/lib/plan/route";
 import { assessFeasibility } from "../src/lib/plan/feasibility";
 import { buildDay, dueReviews, mocksForDay, type MasteryRow } from "../src/lib/plan/layout";
-import { generateDailyPlan } from "../src/lib/daily-plan";
+import { dayNeedsRebuild, generateDailyPlan } from "../src/lib/daily-plan";
 import { TOPIC_IDS } from "../src/lib/ai/topics";
 
 let failures = 0;
@@ -193,6 +193,31 @@ console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80
     }
     check(`route day ${budget} min/day stays ≤ +10% (non-mock)`, ok, detail);
   }
+}
+
+console.log("— pace change in settings rebuilds today (founder bug: 45→60 kept a 48-min day) —");
+{
+  const sum = (budget: number) => generateDailyPlan("A2", budget, 3, "ru").reduce((s, t) => s + t.estimatedMinutes, 0);
+  // walk the founder's scenario: 60 → 30 → 45 → 60
+  let planned = sum(60);
+  check(`day built at 60 ≈ 60 (${planned} min)`, planned >= 50 && planned <= 66, String(planned));
+
+  check("60 → 30: rebuild fires", dayNeedsRebuild(planned, 30));
+  planned = sum(30);
+  check(`rebuilt at 30 ≈ 30 (${planned} min)`, planned >= 23 && planned <= 33, String(planned));
+
+  check("30 → 45: rebuild fires", dayNeedsRebuild(planned, 45));
+  planned = sum(45);
+  check(`rebuilt at 45 ≈ 45 (${planned} min)`, planned >= 36 && planned <= 50, String(planned));
+
+  check("45 → 60: rebuild fires (the live 48-vs-60 case)", dayNeedsRebuild(48, 60));
+  planned = sum(60);
+  check(`rebuilt at 60 ≈ 60 (${planned} min)`, planned >= 50 && planned <= 66, String(planned));
+
+  // stability: a matching day is never churned
+  check("55-min day at pace 60 stays", !dayNeedsRebuild(55, 60));
+  check("48-min day at pace 45 stays", !dayNeedsRebuild(48, 45));
+  check("28-min day at pace 30 stays", !dayNeedsRebuild(28, 30));
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");

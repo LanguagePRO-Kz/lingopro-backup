@@ -65,7 +65,7 @@ export async function saveExamPlanToProfile(p: ExamPlan): Promise<void> {
 }
 
 export async function fetchExamPlan(): Promise<
-  (ExamPlan & { hasProfile: boolean; minutesDaily: number | null }) | null
+  (ExamPlan & { hasProfile: boolean; minutesDaily: number | null; level: string | null }) | null
 > {
   try {
     const supabase = createClient();
@@ -75,12 +75,13 @@ export async function fetchExamPlan(): Promise<
     if (!user) return null;
     const { data } = await supabase
       .from("profiles")
-      .select("target_level, exam_date, exam_date_mode, exam_horizon_months, study_minutes_daily")
+      .select("target_level, exam_date, exam_date_mode, exam_horizon_months, study_minutes_daily, level:quiz_result->>level")
       .eq("id", user.id)
       .maybeSingle();
     if (!data) return null;
     return {
       hasProfile: true,
+      level: (data.level as string | null) ?? null,
       targetLevel: data.target_level === "B2" ? "B2" : "C1",
       examDateMode: (["exact", "approx", "unknown"].includes(data.exam_date_mode as string)
         ? data.exam_date_mode

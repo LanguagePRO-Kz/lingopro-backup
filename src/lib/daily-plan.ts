@@ -304,6 +304,19 @@ export function wordsLearned(history: DayRow[]): number {
 const LS_KEY = "lingopro:dailyPlan:v4";
 type LsMap = Record<string, DayRow>;
 
+/**
+ * Stored day no longer matches the promised pace → rebuild. BOTH directions
+ * matter: 45→30 leaves an over-budget day, 45→60 leaves a day ~20% under the
+ * new promise (the founder's "changed minutes, nothing happened" bug). The
+ * ±4-minute slack keeps review/mock jitter from churning a valid day.
+ */
+export function dayNeedsRebuild(plannedNonMockMinutes: number, budget: number): boolean {
+  return (
+    plannedNonMockMinutes > budget * (1 + BUDGET_TOLERANCE) + 4 ||
+    plannedNonMockMinutes < budget * (1 - BUDGET_TOLERANCE) - 4
+  );
+}
+
 /** A row is usable only if every task carries the current numeric fields. */
 export function isPlanValid(row: DayRow | undefined): boolean {
   return (
@@ -509,8 +522,7 @@ export async function loadDashboardData(locale: Locale): Promise<{
       // only when it actually changes the layout, so completing reviews or
       // over-budget mock days never churn the board mid-day.
       const planned = nonMockMinutes(today.tasks);
-      const mismatch = planned > budget * (1 + BUDGET_TOLERANCE) + 4 || planned < budget * 0.7;
-      if (mismatch) {
+      if (dayNeedsRebuild(planned, budget)) {
         const candidate = build();
         if (Math.abs(nonMockMinutes(candidate) - planned) > 4) tasks = candidate;
       }
