@@ -297,6 +297,11 @@ export default function DashboardHome() {
       {/* ===== WEEKLY DIGEST (last week's real numbers, honest zero) ===== */}
       <WeeklyDigest history={history} />
 
+      {/* ===== Ahu's daily note: AI from real facts, honest template
+           fallback — above the plan so it reads as the teacher opening
+           the day (founder: «слово Ahu на главной», видимым) ===== */}
+      <AhuNote streak={streak} history={history} />
+
       {/* ===== PLAN ===== */}
       <div id="plan" className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -422,9 +427,6 @@ export default function DashboardHome() {
           </div>
         </div>
       </div>
-
-      {/* ===== Ahu's daily note: AI from real facts, honest template fallback ===== */}
-      <AhuNote streak={streak} history={history} />
 
       {/* ===== MY PROGRESS ===== */}
       <h2 className="mt-8 text-lg font-semibold text-[var(--color-foreground)]">{c.myProgress}</h2>

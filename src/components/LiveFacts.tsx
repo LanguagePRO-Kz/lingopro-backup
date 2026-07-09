@@ -19,21 +19,25 @@ import { contentLevel } from "@/lib/daily-plan";
 const T = {
   ru: {
     exam: (d: number) => `📅 До экзамена: ${d} ${d % 10 === 1 && d % 100 !== 11 ? "день" : [2, 3, 4].includes(d % 10) && ![12, 13, 14].includes(d % 100) ? "дня" : "дней"}`,
+    noDate: "📅 Дата экзамена не выбрана",
     streak: (n: number) => `🔥 ${n} ${[2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "дня" : n % 10 === 1 && n % 100 !== 11 ? "день" : "дней"} подряд`,
     topics: (done: number, all: number, tgt: string) => `📈 Темы до ${tgt}: ${done} из ${all}`,
   },
   en: {
     exam: (d: number) => `📅 Exam in ${d} ${d === 1 ? "day" : "days"}`,
+    noDate: "📅 Exam date not set",
     streak: (n: number) => `🔥 ${n} ${n === 1 ? "day" : "days"} in a row`,
     topics: (done: number, all: number, tgt: string) => `📈 Topics to ${tgt}: ${done} of ${all}`,
   },
   tr: {
     exam: (d: number) => `📅 Sınava ${d} gün`,
+    noDate: "📅 Sınav tarihi seçilmedi",
     streak: (n: number) => `🔥 Üst üste ${n} gün`,
     topics: (done: number, all: number, tgt: string) => `📈 ${tgt} yolundaki konular: ${done}/${all}`,
   },
   kk: {
     exam: (d: number) => `📅 Емтиханға ${d} күн`,
+    noDate: "📅 Емтихан күні таңдалмаған",
     streak: (n: number) => `🔥 Қатарынан ${n} күн`,
     topics: (done: number, all: number, tgt: string) => `📈 ${tgt} жолындағы тақырыптар: ${done}/${all}`,
   },
@@ -44,6 +48,7 @@ export function LiveFacts({ streak, levelRaw }: { streak: number; levelRaw: stri
   const c = pick(locale, T);
 
   const [examDays, setExamDays] = useState<number | null>(null);
+  const [noDate, setNoDate] = useState(false);
   const [topics, setTopics] = useState<{ done: number; all: number; target: string } | null>(null);
 
   useEffect(() => {
@@ -51,7 +56,10 @@ export function LiveFacts({ streak, levelRaw }: { streak: number; levelRaw: stri
     void (async () => {
       const p = await fetchExamPlan();
       if (!p || !active) return;
-      setExamDays(daysToExam(p));
+      const d = daysToExam(p);
+      setExamDays(d);
+      // "нет даты" — тоже реальный факт, и он действием ведёт в настройки
+      setNoDate(d == null);
       const span = topicsForSpan(contentLevel(levelRaw), p.targetLevel);
       if (span.length === 0) return;
       const { data, error } = await createClient().from("topic_mastery").select("topic").gte("strength", 60);
@@ -66,11 +74,12 @@ export function LiveFacts({ streak, levelRaw }: { streak: number; levelRaw: stri
 
   const chips: string[] = [];
   if (examDays != null) chips.push(c.exam(examDays));
+  else if (noDate) chips.push(c.noDate);
   if (streak >= 2) chips.push(c.streak(streak));
   if (topics) chips.push(c.topics(topics.done, topics.all, topics.target));
   if (chips.length === 0) {
     // observable reason instead of a silent no-show (onboarding lesson)
-    console.info(`[motivator] LiveFacts hidden: no exam date${streak < 2 ? ", streak < 2" : ""}, topics not loaded yet`);
+    console.info("[motivator] LiveFacts: data still loading (profile fetch pending)");
     return null;
   }
 
