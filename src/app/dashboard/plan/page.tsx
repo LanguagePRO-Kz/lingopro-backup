@@ -5,24 +5,28 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { loadResult, PLANS, qt, type QuizResult } from "@/lib/quiz";
+import { loadResult, qt, PLANS, type QuizResult } from "@/lib/quiz";
+import { motivate, skillName } from "@/lib/studyplan";
 import { fetchExamPlan, type ExamPlan } from "@/lib/exam-plan";
 import { assessPlan, type StudentLevel } from "@/lib/plan/feasibility";
 import {
-  todaysTasks,
-  loadProgress,
-  saveProgress,
-  toggleTask,
-  doneToday,
-  streak as streakOf,
-  totalDone,
-  activeDays,
-  motivate,
-  skillName,
-  type Progress,
-  type PlanTask,
-} from "@/lib/studyplan";
-import { saveProfileProgress } from "@/lib/profile";
+  computeStreak,
+  loadDashboardData,
+  todayISO,
+  totalTasksDone,
+  type DayRow,
+} from "@/lib/daily-plan";
+import { currentWeekIndex, type StudyRoute } from "@/lib/plan/route";
+import { topicById } from "@/lib/ai/topics";
+import { createClient } from "@/lib/supabase/client";
+
+/**
+ * "Мой план" — a read-only mirror of the REAL plan (founder honesty pass):
+ * today's tasks come from the same engine as the dashboard and can only be
+ * completed by actually doing them there (no manual ticks — that was fake
+ * progress corrupting XP/streak/stats); stages are the student's real route
+ * weeks, not a hardcoded 12-month template.
+ */
 
 const T = {
   ru: {
@@ -32,9 +36,11 @@ const T = {
     emptyCta: "Пройти диагностику",
     title: "Твой персональный план",
     goalNow: "сейчас", goalTarget: "цель", duration: "Срок",
-    today: "Задания на сегодня", done: "выполнено", min: "мин", startBtn: "Начать",
+    today: "Задания на сегодня", done: "выполнено", min: "мин",
+    openPlan: "Выполнить в плане дня", honestNote: "Галочки ставятся сами — когда задание реально выполнено в плане дня.",
     streak: "Серия", days: "дн.", totalDone: "Заданий выполнено", activeDays: "Активных дней",
-    focus: "Над чем работаем (по диагностике)", stages: "Этапы плана",
+    focus: "Над чем работаем (по диагностике)", stages: "Этапы плана — твой маршрут",
+    week: "Неделя", mockFull: "полный пробник", mockSection: "пробник секции", moreWeeks: (n: number) => `…и ещё ${n} нед. до цели`,
     motivator: "AI Öğretmen — твой мотиватор", askAi: "Совет от AI", thinking: "Думаю…",
     retake: "Пройти диагностику заново",
   },
@@ -45,9 +51,11 @@ const T = {
     emptyCta: "Take the diagnostic",
     title: "Your personal plan",
     goalNow: "now", goalTarget: "goal", duration: "Timeline",
-    today: "Today's tasks", done: "done", min: "min", startBtn: "Start",
+    today: "Today's tasks", done: "done", min: "min",
+    openPlan: "Do it in the daily plan", honestNote: "Ticks appear on their own — when a task is really completed in the daily plan.",
     streak: "Streak", days: "d", totalDone: "Tasks completed", activeDays: "Active days",
-    focus: "What we focus on (from the diagnostic)", stages: "Plan stages",
+    focus: "What we focus on (from the diagnostic)", stages: "Plan stages — your route",
+    week: "Week", mockFull: "full mock", mockSection: "section mock", moreWeeks: (n: number) => `…and ${n} more weeks to the goal`,
     motivator: "AI Öğretmen — your motivator", askAi: "AI advice", thinking: "Thinking…",
     retake: "Retake the diagnostic",
   },
@@ -58,9 +66,11 @@ const T = {
     emptyCta: "Teşhise başla",
     title: "Kişisel planın",
     goalNow: "şimdi", goalTarget: "hedef", duration: "Süre",
-    today: "Bugünün görevleri", done: "tamam", min: "dk", startBtn: "Başla",
+    today: "Bugünün görevleri", done: "tamam", min: "dk",
+    openPlan: "Günün planında yap", honestNote: "İşaretler kendiliğinden gelir — görev günün planında gerçekten tamamlanınca.",
     streak: "Seri", days: "g", totalDone: "Tamamlanan görev", activeDays: "Aktif gün",
-    focus: "Neye odaklanıyoruz (teşhise göre)", stages: "Plan aşamaları",
+    focus: "Neye odaklanıyoruz (teşhise göre)", stages: "Plan aşamaları — rotan",
+    week: "Hafta", mockFull: "tam deneme", mockSection: "bölüm denemesi", moreWeeks: (n: number) => `…hedefe ${n} hafta daha`,
     motivator: "AI Öğretmen — motivatörün", askAi: "AI tavsiyesi", thinking: "Düşünüyorum…",
     retake: "Teşhisi tekrar geç",
   },
@@ -71,9 +81,11 @@ const T = {
     emptyCta: "Диагностикадан өту",
     title: "Сенің жеке жоспарың",
     goalNow: "қазір", goalTarget: "мақсат", duration: "Мерзім",
-    today: "Бүгінгі тапсырмалар", done: "орындалды", min: "мин", startBtn: "Бастау",
+    today: "Бүгінгі тапсырмалар", done: "орындалды", min: "мин",
+    openPlan: "Күн жоспарында орында", honestNote: "Белгілер өздігінен қойылады — тапсырма күн жоспарында шын орындалғанда.",
     streak: "Серия", days: "к.", totalDone: "Орындалған тапсырма", activeDays: "Белсенді күн",
-    focus: "Неге назар аударамыз (диагностика бойынша)", stages: "Жоспар кезеңдері",
+    focus: "Неге назар аударамыз (диагностика бойынша)", stages: "Жоспар кезеңдері — сенің маршрутың",
+    week: "Апта", mockFull: "толық сынама", mockSection: "бөлім сынамасы", moreWeeks: (n: number) => `…мақсатқа дейін тағы ${n} апта`,
     motivator: "AI Öğretmen — мотиваторың", askAi: "AI кеңесі", thinking: "Ойланудамын…",
     retake: "Диагностиканы қайта өту",
   },
@@ -91,7 +103,9 @@ export default function PlanPage() {
 
   const [ready, setReady] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
-  const [progress, setProgress] = useState<Progress>({});
+  const [today, setToday] = useState<DayRow | null>(null);
+  const [history, setHistory] = useState<DayRow[]>([]);
+  const [route, setRoute] = useState<StudyRoute | null>(null);
   const [tip, setTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
   // real goal/date/pace — the goal card must show the student's actual
@@ -99,17 +113,33 @@ export default function PlanPage() {
   const [examPlan, setExamPlan] = useState<(ExamPlan & { minutesDaily: number | null }) | null>(null);
 
   useEffect(() => {
-    setResult(loadResult());
-    setProgress(loadProgress());
-    setReady(true);
     let active = true;
+    setResult(loadResult());
+    // the SAME engine as the dashboard: today's tasks + real history — a
+    // task can only become "done" by really doing it there
+    void loadDashboardData(locale).then((d) => {
+      if (!active) return;
+      setToday(d.today);
+      setHistory(d.history);
+      setReady(true);
+    });
     void fetchExamPlan().then((p) => {
       if (p && active) setExamPlan(p);
     });
+    void (async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("study_route").eq("id", user.id).maybeSingle();
+      const r = (data?.study_route ?? null) as StudyRoute | null;
+      if (active && r && r.version === 1 && Array.isArray(r.weeks) && r.weeks.length > 0) setRoute(r);
+    })();
     return () => {
       active = false;
     };
-  }, []);
+  }, [locale]);
 
   if (!ready) {
     return (
@@ -141,22 +171,14 @@ export default function PlanPage() {
   }
 
   /* -------------------------------- Plan --------------------------------- */
-  const tasks = todaysTasks(result, locale);
-  const done = doneToday(progress);
-  const doneCount = done.length;
-  const str = streakOf(progress);
+  const tasks = today?.tasks ?? [];
+  const doneCount = tasks.filter((t) => t.completed).length;
+  const str = computeStreak(history);
   const plan = PLANS[result.plan];
   const mot = motivate(locale, doneCount, tasks.length, str);
   const weak = [...result.skills].sort((a, b) => a.percent - b.percent).slice(0, 3);
-
-  function toggle(t: PlanTask) {
-    setProgress((prev) => {
-      const next = toggleTask(prev, t.id);
-      saveProgress(next);
-      void saveProfileProgress(next);
-      return next;
-    });
-  }
+  const weekIdx = route ? currentWeekIndex(route, todayISO()) : 0;
+  const shownWeeks = route ? route.weeks.slice(0, Math.max(8, weekIdx)) : [];
 
   async function askAi() {
     setTipLoading(true);
@@ -236,59 +258,61 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {/* today tasks */}
-      <div className="glass rounded-3xl p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.today}</h2>
-          <span className="text-sm font-medium text-[var(--color-brand)]">{doneCount}/{tasks.length} {c.done}</span>
-        </div>
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
-          <motion.div className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]" animate={{ width: `${(doneCount / tasks.length) * 100}%` }} transition={{ duration: 0.4 }} />
-        </div>
+      {/* today — the REAL daily plan, read-only: no manual ticks (fake
+          progress corrupted XP/streak/stats); tasks complete themselves when
+          really done in the daily plan */}
+      {tasks.length > 0 && (
+        <div className="glass rounded-3xl p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.today}</h2>
+            <span className="text-sm font-medium text-[var(--color-brand)]">{doneCount}/{tasks.length} {c.done}</span>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
+            <motion.div className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]" animate={{ width: `${(doneCount / tasks.length) * 100}%` }} transition={{ duration: 0.4 }} />
+          </div>
+          <p className="mt-2 text-xs text-[var(--color-muted)]">{c.honestNote}</p>
 
-        <div className="mt-4 flex flex-col gap-2.5">
-          {tasks.map((t) => {
-            const isDone = done.includes(t.id);
-            return (
+          <div className="mt-4 flex flex-col gap-2.5">
+            {tasks.map((t) => (
               <div key={t.id} className="flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-black/[0.02] p-3.5">
-                <button
-                  type="button"
-                  onClick={() => toggle(t)}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs transition-colors ${isDone ? "border-[var(--color-brand-2)] bg-[var(--color-brand-2)] text-white" : "border-black/[0.2] text-transparent"}`}
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs ${t.completed ? "border-[var(--color-brand-2)] bg-[var(--color-brand-2)] text-white" : "border-black/[0.2] text-transparent"}`}
                 >
                   ✓
-                </button>
-                <span className="text-xl">{t.emoji}</span>
+                </span>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-medium text-[var(--color-foreground)] ${isDone ? "line-through opacity-50" : ""}`}>{t.title}</div>
-                  <div className="text-xs text-[var(--color-muted)]">{skillName(t.id, locale)} · {t.minutes} {c.min} · {t.xp} XP</div>
+                  <div className={`text-sm font-medium text-[var(--color-foreground)] ${t.completed ? "line-through opacity-50" : ""}`}>{t.title}</div>
+                  <div className="text-xs text-[var(--color-muted)]">~{t.estimatedMinutes} {c.min}</div>
                 </div>
-                <Link href={t.href} className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20">
-                  {c.startBtn} →
-                </Link>
+                {!t.completed && (
+                  <Link href="/dashboard#plan" className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20">
+                    {c.openPlan} →
+                  </Link>
+                )}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* stats */}
+      {/* stats — from REAL daily_progress history, not manual clicks */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass rounded-2xl p-4 text-center">
           <div className="text-2xl font-bold text-[var(--color-foreground)]">🔥 {str}</div>
           <div className="mt-0.5 text-xs text-[var(--color-muted)]">{c.streak} ({c.days})</div>
         </div>
         <div className="glass rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--color-foreground)]">{totalDone(progress)}</div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">{totalTasksDone(history)}</div>
           <div className="mt-0.5 text-xs text-[var(--color-muted)]">{c.totalDone}</div>
         </div>
         <div className="glass rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--color-foreground)]">{activeDays(progress)}</div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">{history.filter((r) => r.completedCount > 0).length}</div>
           <div className="mt-0.5 text-xs text-[var(--color-muted)]">{c.activeDays}</div>
         </div>
       </div>
 
-      {/* focus areas (from diagnostic) */}
+      {/* focus areas (from diagnostic); A0 is an internal marker, the TÖMER
+          scale starts at A1 → display "<A1" */}
       <div className="glass rounded-3xl p-6">
         <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.focus}</h2>
         <div className="mt-4 flex flex-col gap-3">
@@ -296,7 +320,7 @@ export default function PlanPage() {
             <div key={s.id}>
               <div className="mb-1 flex justify-between text-sm">
                 <span className="text-[var(--color-foreground)]">{skillName(s.id, locale)}</span>
-                <span className="text-[var(--color-muted)]">{s.percent}% · {s.level}</span>
+                <span className="text-[var(--color-muted)]">{s.percent}% · {s.level === "A0" ? "<A1" : s.level}</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
                 <div className="h-full rounded-full" style={{ width: `${s.percent}%`, background: barColor(s.percent) }} />
@@ -306,18 +330,35 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {/* plan stages */}
-      <div className="glass rounded-3xl p-6">
-        <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.stages}</h2>
-        <div className="mt-4 flex flex-col gap-2.5">
-          {plan.stages.map((st, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand)] text-xs font-bold text-white">{i + 1}</span>
-              <span className="text-sm text-[var(--color-foreground)]">{st[locale]}</span>
-            </div>
-          ))}
+      {/* plan stages — the student's REAL route weeks (goal/date/pace-aware),
+          hidden until the route exists; the 12-month template block lied */}
+      {route && shownWeeks.length > 0 && (
+        <div className="glass rounded-3xl p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{c.stages}</h2>
+          <div className="mt-4 flex flex-col gap-2.5">
+            {shownWeeks.map((w) => (
+              <div
+                key={w.index}
+                className={`flex items-start gap-3 rounded-2xl px-3 py-2.5 ${w.index === weekIdx ? "bg-[var(--color-brand)]/[0.07]" : ""}`}
+              >
+                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${w.index === weekIdx ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.06] text-[var(--color-muted)]"}`}>
+                  {w.index}
+                </span>
+                <div className="min-w-0 flex-1 text-sm">
+                  <span className="font-medium text-[var(--color-foreground)]">{c.week} {w.index}: {w.theme[locale]}</span>
+                  <div className="mt-0.5 text-xs text-[var(--color-muted)]">
+                    {w.topics.map((t) => topicById(t)?.label[locale] ?? t).join(" · ")}
+                    {w.mockPolicy !== "none" && ` · 🎯 ${w.mockPolicy === "full" ? c.mockFull : c.mockSection}`}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {route.weeks.length > shownWeeks.length && (
+              <p className="text-xs text-[var(--color-muted)]">{c.moreWeeks(route.weeks.length - shownWeeks.length)}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <Link href="/quiz" className="text-center text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)]">
         {c.retake}
