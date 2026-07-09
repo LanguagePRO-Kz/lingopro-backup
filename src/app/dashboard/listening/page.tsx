@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { LISTENING_TASKS } from "@/data/listening-tasks";
+import AUDIO_MANIFEST from "@/data/listening-audio.json";
 import { shuffleQuestionMap } from "@/lib/shuffle";
 import { awardXp, XP } from "@/lib/xp";
 import type { Level, ReadingTask } from "@/data/types";
@@ -14,6 +15,11 @@ import { SectionHint } from "@/components/SectionHint";
 type Shuffled = Record<string, { options: string[]; answer: number }>;
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
+
+// real studio audio (ElevenLabs, generated once into public/audio/listening);
+// tasks missing from the manifest keep the Web Speech fallback until the
+// bank generation catches up
+const AUDIO: Record<string, string> = AUDIO_MANIFEST as Record<string, string>;
 
 function speakSeq(lines: string[], onEnd?: () => void) {
   if (typeof window === "undefined" || !window.speechSynthesis) {
@@ -116,17 +122,41 @@ function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingT
   const [playing, setPlaying] = useState(false);
   const [showText, setShowText] = useState(false);
   const mounted = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const lines = useMemo(() => ex.text.split("\n").filter(Boolean), [ex.text]);
+  const audioSrc = AUDIO[ex.id] ?? null;
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       window.speechSynthesis?.cancel();
+      audioRef.current?.pause();
     };
   }, []);
 
   function play() {
+    if (audioSrc) {
+      // real recording: role voices + natural pauses, replayable freely
+      if (!audioRef.current) {
+        audioRef.current = new Audio(audioSrc);
+        audioRef.current.onended = () => mounted.current && setPlaying(false);
+        audioRef.current.onerror = () => {
+          // missing/broken file → honest Web Speech fallback, not silence
+          if (!mounted.current) return;
+          audioRef.current = null;
+          speakSeq(lines, () => mounted.current && setPlaying(false));
+        };
+      }
+      if (playing) {
+        audioRef.current.pause();
+        setPlaying(false);
+      } else {
+        setPlaying(true);
+        void audioRef.current.play();
+      }
+      return;
+    }
     setPlaying(true);
     speakSeq(lines, () => mounted.current && setPlaying(false));
   }
