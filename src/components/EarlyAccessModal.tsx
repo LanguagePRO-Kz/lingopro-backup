@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
@@ -8,6 +8,7 @@ import { pick } from "@/lib/localized";
 import { savePlan, type PackageId } from "@/lib/billing";
 import { saveProfilePlan } from "@/lib/profile";
 import { redeemPromo, type PromoReason } from "@/lib/promo";
+import { currencyFor } from "@/lib/pricing";
 
 /**
  * Honest early-access modal. Real card payments open at launch (Kaspi keys
@@ -28,6 +29,12 @@ const T = {
     granted: "Готово! Открываем доступ…",
     savedDiscount: (n: number) => `Скидка ${n}% сохранена — спишется при запуске оплаты.`,
     noCode: "Кода нет? Доступ открываем волнами — напиши нам, добавим тебя в очередь.",
+    bodyLive: "Оплати картой — доступ откроется сразу после подтверждения. Или введи код доступа.",
+    pay: "Оплатить картой",
+    paying: "Открываем оплату…",
+    payErr: "Не удалось открыть оплату — попробуй ещё раз.",
+    orCode: "или по коду доступа",
+    qrHint: "Отсканируй в приложении Kaspi:",
     reasons: {
       not_found: "Код не найден",
       expired: "Срок действия кода истёк",
@@ -48,6 +55,12 @@ const T = {
     granted: "Done! Opening your access…",
     savedDiscount: (n: number) => `${n}% discount saved — applied when payments launch.`,
     noCode: "No code? We open access in waves — message us to join the queue.",
+    bodyLive: "Pay by card — access opens right after confirmation. Or enter an access code.",
+    pay: "Pay by card",
+    paying: "Opening checkout…",
+    payErr: "Couldn't open checkout — please try again.",
+    orCode: "or with an access code",
+    qrHint: "Scan in the Kaspi app:",
     reasons: {
       not_found: "Code not found",
       expired: "This code has expired",
@@ -68,6 +81,12 @@ const T = {
     granted: "Hazır! Erişimin açılıyor…",
     savedDiscount: (n: number) => `%${n} indirim kaydedildi — ödeme başladığında uygulanacak.`,
     noCode: "Kodun yok mu? Erişimi dalgalar hâlinde açıyoruz — yazarsan sıraya ekleriz.",
+    bodyLive: "Kartla öde — onaydan hemen sonra erişim açılır. Ya da erişim kodu gir.",
+    pay: "Kartla öde",
+    paying: "Ödeme açılıyor…",
+    payErr: "Ödeme açılamadı — lütfen tekrar dene.",
+    orCode: "veya erişim koduyla",
+    qrHint: "Kaspi uygulamasında tara:",
     reasons: {
       not_found: "Kod bulunamadı",
       expired: "Bu kodun süresi dolmuş",
@@ -88,6 +107,12 @@ const T = {
     granted: "Дайын! Қолжетімділік ашылуда…",
     savedDiscount: (n: number) => `${n}% жеңілдік сақталды — төлем ашылғанда есептеледі.`,
     noCode: "Код жоқ па? Қолжетімділікті толқынмен ашамыз — жазсаң, кезекке қосамыз.",
+    bodyLive: "Картамен төле — растаудан кейін бірден қолжетімділік ашылады. Немесе код енгіз.",
+    pay: "Картамен төлеу",
+    paying: "Төлем ашылуда…",
+    payErr: "Төлемді ашу мүмкін болмады — қайталап көр.",
+    orCode: "немесе қолжетімділік кодымен",
+    qrHint: "Kaspi қосымшасында сканерле:",
     reasons: {
       not_found: "Код табылмады",
       expired: "Кодтың мерзімі өтіп кеткен",
@@ -124,6 +149,51 @@ export function EarlyAccessModal({
 
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  /* --------------- платёжный слот (Kaspi KZT / Dodo USD) --------------- */
+  // Кнопка оплаты появляется сама, когда провайдер рынка включён env'ом
+  // (KASPI_MODE/DODO_MODE ≠ off) — активация без правок кода.
+  const currency = currencyFor(locale);
+  const [payOn, setPayOn] = useState(false);
+  const [payState, setPayState] = useState<"idle" | "busy" | "error">("idle");
+  const [qr, setQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/payments/status?currency=${currency}`)
+      .then((r) => r.json())
+      .then((d: { ok?: boolean; mode?: string }) => setPayOn(!!d.ok && d.mode !== "off"))
+      .catch(() => setPayOn(false));
+  }, [currency]);
+
+  async function payByCard() {
+    if (payState === "busy") return;
+    setPayState("busy");
+    setQr(null);
+    try {
+      const res = await fetch("/api/payments/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId: pkgId, currency }),
+      });
+      const d = (await res.json()) as
+        | { ok: true; kind: "redirect"; url: string }
+        | { ok: true; kind: "qr"; qrPayload: string }
+        | { ok: false; reason: string };
+      if (d.ok && d.kind === "redirect") {
+        window.location.href = d.url;
+        return;
+      }
+      if (d.ok && d.kind === "qr") {
+        setQr(d.qrPayload);
+        setPayState("idle");
+        return;
+      }
+      console.info("[payments] checkout unavailable:", !d.ok ? d.reason : "");
+      setPayState("error");
+    } catch {
+      setPayState("error");
+    }
+  }
 
   async function activate() {
     const trimmed = code.trim();
@@ -179,13 +249,41 @@ export function EarlyAccessModal({
           </button>
         </div>
 
-        {/* honest framing: payment opens at launch */}
-        <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">{c.body}</p>
+        {/* honest framing: пока оплата выключена — «откроется при запуске» */}
+        <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">{payOn ? c.bodyLive : c.body}</p>
 
         <div className="mt-4 flex items-baseline justify-between rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3">
           <span className="text-xs text-[var(--color-muted)]">{c.launch}</span>
           <span className="text-lg font-bold text-[var(--color-foreground)]">{launchPrice}</span>
         </div>
+
+        {/* оплата картой — рендерится только при включённом провайдере */}
+        {payOn && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={payByCard}
+              disabled={payState === "busy"}
+              className="btn-primary w-full rounded-full px-6 py-4 text-base font-semibold disabled:opacity-50"
+            >
+              {payState === "busy" ? c.paying : `${c.pay} · ${launchPrice}`}
+            </button>
+            {payState === "error" && (
+              <div className="mt-2 text-xs font-medium text-[#dc2626]">❌ {c.payErr}</div>
+            )}
+            {qr && (
+              <div className="mt-3 rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4 text-center">
+                <div className="text-xs text-[var(--color-muted)]">{c.qrHint}</div>
+                {/* TODO(kaspi): если банк даст QR-сценарий — подключить рендер
+                    QR-кода из qrPayload (одна маленькая либа, слот готов) */}
+                <div className="mt-2 break-all font-mono text-xs text-[var(--color-foreground)]">{qr}</div>
+              </div>
+            )}
+            <div className="my-4 flex items-center gap-3 text-[11px] text-[var(--color-muted)]">
+              <span className="h-px flex-1 bg-black/[0.08]" /> {c.orCode} <span className="h-px flex-1 bg-black/[0.08]" />
+            </div>
+          </div>
+        )}
 
         {/* access code */}
         <div className="mt-5">
