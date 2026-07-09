@@ -177,7 +177,7 @@ const ru = {
   },
   certificates: {
     title: "Студенты нашей методики — с сертификатами TÖMER",
-    subtitle: "Реальные сертификаты студентов нашей офлайн-школы Language PRO. Теперь эта методика — в платформе.",
+    subtitle: "Реальные сертификаты студентов нашей онлайн-школы языковых курсов Language PRO. Теперь эта методика — в платформе.",
     certWord: "Сертификат",
     studentWord: "Студент",
     levelWord: "Уровень",
@@ -522,7 +522,7 @@ const kk: Dict = {
   },
   certificates: {
     title: "Біздің әдістеменің студенттері — TÖMER сертификаттарымен",
-    subtitle: "Language PRO офлайн мектебіміз студенттерінің нақты сертификаттары. Енді осы әдістеме — платформада.",
+    subtitle: "Тіл курстарының онлайн мектебі Language PRO студенттерінің нақты сертификаттары. Енді осы әдістеме — платформада.",
     certWord: "Сертификат",
     studentWord: "Студент",
     levelWord: "Деңгей",
@@ -862,7 +862,7 @@ const en: Dict = {
   },
   certificates: {
     title: "Our method's students — with TÖMER certificates",
-    subtitle: "Real certificates earned by students of our offline school Language PRO. That same method now powers this platform.",
+    subtitle: "Real certificates earned by students of Language PRO, our online language school. That same method now powers this platform.",
     certWord: "Certificate",
     studentWord: "Student",
     levelWord: "Level",
@@ -1202,7 +1202,7 @@ const tr: Dict = {
   },
   certificates: {
     title: "Metodumuzun öğrencileri — TÖMER belgeleriyle",
-    subtitle: "Offline okulumuz Language PRO öğrencilerinin gerçek belgeleri. Aynı metot artık bu platformda.",
+    subtitle: "Online dil kursu okulumuz Language PRO öğrencilerinin gerçek belgeleri. Aynı metot artık bu platformda.",
     certWord: "Sertifika",
     studentWord: "Öğrenci",
     levelWord: "Seviye",
