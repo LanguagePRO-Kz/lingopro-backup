@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
 import { GoogleButton } from "@/components/ui/GoogleButton";
-import { AppleButton } from "@/components/ui/AppleButton";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { createClient } from "@/lib/supabase/client";
@@ -144,7 +143,6 @@ export default function LoginPage() {
 
         <div className="mt-6 flex flex-col gap-3">
           <GoogleButton label={c.google} onClick={handleGoogleLogin} />
-          <AppleButton label={c.apple} disabled badge={c.soon} />
         </div>
 
         <div className="my-5 flex items-center gap-3 text-xs text-[var(--color-muted)]">

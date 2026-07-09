@@ -22,15 +22,16 @@ export function Header() {
   }, []);
 
   const L = pick(locale, {
-    ru: { platform: "Платформа", reviews: "Отзывы", school: "Для школ" },
-    en: { platform: "Platform", reviews: "Reviews", school: "For schools" },
-    tr: { platform: "Platform", reviews: "Yorumlar", school: "Okullar için" },
-    kk: { platform: "Платформа", reviews: "Пікірлер", school: "Мектептерге" },
+    ru: { platform: "Платформа", how: "Как это работает", school: "Для школ" },
+    en: { platform: "Platform", how: "How it works", school: "For schools" },
+    tr: { platform: "Platform", how: "Nasıl çalışır", school: "Okullar için" },
+    kk: { platform: "Платформа", how: "Қалай жұмыс істейді", school: "Мектептерге" },
   });
 
+  // «Отзывы» anchor removed with the fabricated reviews section (UX-audit #2)
   const navLinks = [
     { href: "#platform", label: L.platform },
-    { href: "#reviews", label: L.reviews },
+    { href: "#how", label: L.how },
     { href: "#pricing", label: t.nav.pricing },
     { href: "#faq", label: t.nav.faq },
     { href: "/b2b", label: L.school },

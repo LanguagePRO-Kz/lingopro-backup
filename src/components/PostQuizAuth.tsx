@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
 import { GoogleButton } from "@/components/ui/GoogleButton";
-import { AppleButton } from "@/components/ui/AppleButton";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { createClient } from "@/lib/supabase/client";
@@ -134,6 +133,14 @@ export function PostQuizAuth() {
     return () => clearInterval(id);
   }, [cooldown]);
 
+  // the success screen was an extra click before the result (UX-audit #8) —
+  // auto-continue after a beat; the button stays as a fallback
+  useEffect(() => {
+    if (!success) return;
+    const id = setTimeout(() => (window.location.href = NEXT), 1600);
+    return () => clearTimeout(id);
+  }, [success]);
+
   function handleAuthError(message: string) {
     if (isRateLimit(message)) {
       setCooldown(30);
@@ -232,9 +239,10 @@ export function PostQuizAuth() {
             <h1 className="text-center text-2xl font-bold tracking-tight">{c.title}</h1>
             <p className="mt-2 text-center text-sm text-[var(--color-muted)]">{c.subtitle}</p>
 
+            {/* Apple removed until it works — a dead «Скоро» button on the
+                conversion gate erodes trust (UX-audit #6) */}
             <div className="mt-6 flex flex-col gap-3">
               <GoogleButton label={c.google} onClick={handleGoogle} />
-              <AppleButton label={c.apple} disabled badge={c.soon} />
             </div>
 
             <div className="my-5 flex items-center gap-3 text-xs text-[var(--color-muted)]">

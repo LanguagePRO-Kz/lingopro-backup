@@ -95,7 +95,9 @@ export default function TutorPage() {
     const SR = getSR();
     if (!SR) return;
     const r = new SR();
-    r.lang = "tr-TR";
+    // recognize in the INTERFACE language — a Russian question through a
+    // tr-TR recognizer came out as noise (UX-audit #16)
+    r.lang = { ru: "ru-RU", en: "en-US", tr: "tr-TR", kk: "kk-KZ" }[locale] ?? "tr-TR";
     r.continuous = false;
     r.interimResults = true;
     r.onresult = (e) => {

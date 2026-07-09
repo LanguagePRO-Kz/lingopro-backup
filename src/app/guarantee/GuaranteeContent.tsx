@@ -109,6 +109,14 @@ const CONTENT = {
 export function GuaranteeContent() {
   const { t, locale } = useI18n();
   const c = pick(locale, CONTENT);
+  // honest status banner (UX-audit #5): the refund terms below become
+  // binding only when payments launch — today's early access is free
+  const notice = pick(locale, {
+    ru: "Сейчас платформа в раннем доступе: занятия бесплатны по промокоду, оплата ещё не запущена. Условия ниже вступают в силу вместе с запуском оплаты.",
+    en: "The platform is in free early access (promo code) — payments haven't launched yet. The terms below take effect the day payments go live.",
+    tr: "Platform şu an erken erişimde: promosyon koduyla ücretsiz, ödeme henüz açılmadı. Aşağıdaki koşullar ödemelerin açılmasıyla yürürlüğe girer.",
+    kk: "Платформа қазір ерте қолжетімділікте: промокодпен тегін, төлем әлі іске қосылмаған. Төмендегі шарттар төлем іске қосылған күні күшіне енеді.",
+  });
 
   return (
     <>
@@ -137,7 +145,11 @@ export function GuaranteeContent() {
           <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">{c.title}</h1>
         </div>
 
-        <div className="glass mt-10 rounded-3xl p-6 sm:p-8">
+        <div className="mt-6 rounded-2xl bg-[#d97706]/10 px-5 py-4 text-sm leading-relaxed text-[#92400e]">
+          ℹ️ {notice}
+        </div>
+
+        <div className="glass mt-6 rounded-3xl p-6 sm:p-8">
           <p className="text-base leading-relaxed text-[var(--color-foreground)]">
             {c.introBefore}
             <span className="font-semibold text-[var(--color-brand)]">{c.refundBold}</span>

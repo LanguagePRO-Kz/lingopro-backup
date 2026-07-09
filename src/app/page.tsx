@@ -5,7 +5,7 @@ import { Hero } from "@/components/Hero";
 import { Certificates } from "@/components/Certificates";
 import { TrustBar } from "@/components/TrustBar";
 import { PlatformInside } from "@/components/PlatformInside";
-import { Reviews } from "@/components/Reviews";
+import { HowItWorks } from "@/components/HowItWorks";
 import { Guarantee } from "@/components/Guarantee";
 import { Pricing } from "@/components/Pricing";
 import { FAQ } from "@/components/FAQ";
@@ -23,7 +23,9 @@ export default function Home() {
         <Certificates />
         <TrustBar />
         <PlatformInside />
-        <Reviews />
+        {/* fabricated reviews removed (UX-audit #2) — real ones return when
+            real students write them; until then: the honest 3-step story */}
+        <HowItWorks />
         <Guarantee />
         <Pricing />
         <FAQ />

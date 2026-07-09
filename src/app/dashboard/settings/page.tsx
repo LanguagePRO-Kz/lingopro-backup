@@ -84,18 +84,6 @@ const LANGS: { id: Locale; label: string }[] = [
   { id: "kk", label: "KZ" },
 ];
 
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative h-6 w-11 rounded-full transition-colors ${on ? "bg-[var(--color-brand)]" : "bg-black/[0.15]"}`}
-    >
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-    </button>
-  );
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="glass rounded-3xl p-6">
@@ -111,13 +99,11 @@ export default function SettingsPage() {
   const c = pick(locale, T);
 
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [saved, setSaved] = useState(false);
   const [plan, setPlan] = useState<PackageId | null>(null);
-  const [emailOn, setEmailOn] = useState(true);
-  const [remindOn, setRemindOn] = useState(true);
-  const [remindTime, setRemindTime] = useState("10:00");
 
   // exam plan (block D): real values from the profile, editable
   const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
@@ -136,6 +122,12 @@ export default function SettingsPage() {
     setName(window.localStorage.getItem("lingopro:name") || "");
     setPlan(loadPlan());
     let active = true;
+    // the real account email — «student@lingopro.app» for everyone was a lie
+    void createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (active && data.user?.email) setEmail(data.user.email);
+      });
     fetchProfileLocation().then((loc) => {
       if (!active) return;
       setCity(loc.city ?? "");
@@ -210,13 +202,11 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-6">
       {/* profile */}
       <Section title={c.profile}>
+        {/* avatar upload removed until it works (UX-audit #11: dead buttons) */}
         <div className="flex items-center gap-4">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-xl font-bold text-white">
             {(name || "S").charAt(0).toUpperCase()}
           </span>
-          <button type="button" className="rounded-full border border-black/[0.1] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition-colors hover:bg-black/[0.03]">
-            {c.avatar}: {c.upload}
-          </button>
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-[var(--color-muted)]">{c.name}</span>
@@ -224,7 +214,7 @@ export default function SettingsPage() {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-[var(--color-muted)]">{c.email}</span>
-          <input value="student@lingopro.app" readOnly className={`${inputCls} cursor-not-allowed bg-black/[0.03] text-[var(--color-muted)]`} />
+          <input value={email || "…"} readOnly className={`${inputCls} cursor-not-allowed bg-black/[0.03] text-[var(--color-muted)]`} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
@@ -362,33 +352,14 @@ export default function SettingsPage() {
         </button>
       </Section>
 
-      {/* subscription */}
+      {/* subscription — plan badge only; the fake «valid until» date and the
+          dead «manage» button are gone until billing exists (UX-audit #11);
+          notification toggles removed too — they saved nowhere */}
       <Section title={c.sub}>
         <div className="flex items-center justify-between">
           <span className="text-sm text-[var(--color-muted)]">{c.currentPlan}</span>
           <span className="text-sm font-semibold text-[var(--color-brand)]">{planBadge(plan, locale)}</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[var(--color-muted)]">{c.validUntil}</span>
-          <span className="text-sm font-medium text-[var(--color-foreground)]">19.09.2026</span>
-        </div>
-        <button type="button" className="btn-ghost w-fit rounded-full px-5 py-2.5 text-sm font-medium">{c.manage}</button>
-      </Section>
-
-      {/* notifications */}
-      <Section title={c.notif}>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[var(--color-foreground)]">{c.emailNotif}</span>
-          <Toggle on={emailOn} onClick={() => setEmailOn((v) => !v)} />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[var(--color-foreground)]">{c.reminders}</span>
-          <Toggle on={remindOn} onClick={() => setRemindOn((v) => !v)} />
-        </div>
-        <label className="flex items-center justify-between gap-3">
-          <span className="text-sm text-[var(--color-muted)]">{c.remindTime}</span>
-          <input type="time" value={remindTime} onChange={(e) => setRemindTime(e.target.value)} className={inputCls} />
-        </label>
       </Section>
 
       {/* language */}
@@ -427,10 +398,14 @@ export default function SettingsPage() {
         </button>
       </Section>
 
-      {/* delete */}
-      <button type="button" className="w-fit rounded-full border border-[#dc2626]/30 px-5 py-2.5 text-sm font-medium text-[#dc2626] transition-colors hover:bg-[#dc2626]/[0.06]">
+      {/* delete — a working request channel until self-service deletion is
+          built (a dead legally-important button was worse: UX-audit #11) */}
+      <a
+        href={`mailto:support@lingopro.app?subject=${encodeURIComponent("Удаление аккаунта / Account deletion")}&body=${encodeURIComponent(`Прошу удалить мой аккаунт: ${email}`)}`}
+        className="w-fit rounded-full border border-[#dc2626]/30 px-5 py-2.5 text-sm font-medium text-[#dc2626] transition-colors hover:bg-[#dc2626]/[0.06]"
+      >
         {c.delete}
-      </button>
+      </a>
     </div>
   );
 }

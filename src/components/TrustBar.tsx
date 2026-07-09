@@ -5,48 +5,46 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { Reveal } from "./ui/Reveal";
 
 type Metric = { value: string; label: string };
-type Content = { title: string; metrics: Metric[]; social: string };
+type Content = { title: string; metrics: Metric[] };
 
+// honest product facts only — the fake social proof («500+ студентов ·
+// 94% довольных») is gone until there are real users to count
 const CONTENT: Record<Locale, Content> = {
   ru: {
-    title: "Нам доверяют студенты, готовящиеся к TÖMER по всему миру",
+    title: "Платформа, построенная строго под формат TÖMER",
     metrics: [
       { value: "A1 → C1", label: "полный диапазон уровней TÖMER" },
       { value: "~15 мин", label: "на AI-диагностику уровня" },
       { value: "30·60·90", label: "дней персонального плана" },
       { value: "5 навыков", label: "оцениваются с самого старта" },
     ],
-    social: "500+ студентов · 12 стран · 94% довольных",
   },
   kk: {
-    title: "Бүкіл әлемде TÖMER-ге дайындалатын студенттер бізге сенеді",
+    title: "TÖMER форматына арнайы құрылған платформа",
     metrics: [
       { value: "A1 → C1", label: "TÖMER деңгейлерінің толық ауқымы" },
       { value: "~15 мин", label: "AI деңгей диагностикасына" },
       { value: "30·60·90", label: "жеке жоспар күндері" },
       { value: "5 дағды", label: "ең басынан бағаланады" },
     ],
-    social: "500+ студент · 12 ел · 94% қанағаттану деңгейі",
   },
   en: {
-    title: "Trusted by students preparing for TÖMER worldwide",
+    title: "A platform built strictly around the TÖMER format",
     metrics: [
       { value: "A1 → C1", label: "full range of TÖMER levels" },
       { value: "~15 min", label: "for the AI level diagnostic" },
       { value: "30·60·90", label: "days of a personal plan" },
       { value: "5 skills", label: "assessed from the very start" },
     ],
-    social: "500+ students · 12 countries · 94% satisfaction rate",
   },
   tr: {
-    title: "Dünya genelinde TÖMER'e hazırlanan öğrenciler bize güveniyor",
+    title: "TÖMER formatına göre inşa edilmiş platform",
     metrics: [
       { value: "A1 → C1", label: "TÖMER seviyelerinin tamamı" },
       { value: "~15 dk", label: "AI seviye tanısı için" },
       { value: "30·60·90", label: "kişisel plan günü" },
       { value: "5 beceri", label: "en baştan değerlendirilir" },
     ],
-    social: "500+ öğrenci · 12 ülke · %94 memnuniyet oranı",
   },
 };
 
@@ -79,8 +77,6 @@ export function TrustBar() {
           ))}
         </div>
 
-        {/* social proof — mock figures, international */}
-        <p className="mt-8 text-center text-xs text-[var(--color-muted)]">{c.social}</p>
       </Reveal>
     </section>
   );

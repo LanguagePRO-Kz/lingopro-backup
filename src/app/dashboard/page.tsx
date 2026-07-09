@@ -15,6 +15,7 @@ import { Milestones } from "@/components/Milestones";
 import { WeeklyDigest } from "@/components/WeeklyDigest";
 import { AhuNote } from "@/components/AhuNote";
 import { fetchExamPlan } from "@/lib/exam-plan";
+import { createClient } from "@/lib/supabase/client";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
   loadDashboardData,
@@ -101,6 +102,23 @@ export default function DashboardHome() {
     void fetchExamPlan().then((p) => {
       if (p && active) setTargetLevel(p.targetLevel);
     });
+    // Google sign-ups never typed a name into our form — «Привет, студент»
+    // while the account knows full_name is a bug (UX-audit #7)
+    if (!stored) {
+      void createClient()
+        .auth.getUser()
+        .then(({ data }) => {
+          const full = (data.user?.user_metadata?.full_name as string | undefined)?.trim();
+          if (full && active) {
+            setName(full.split(" ")[0]);
+            try {
+              window.localStorage.setItem("lingopro:name", full.split(" ")[0]);
+            } catch {
+              /* ignore */
+            }
+          }
+        });
+    }
     return () => {
       active = false;
     };

@@ -295,14 +295,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* external + user */}
       <div className="mt-3 flex flex-col gap-2">
+        {/* the mailto works — the contradictory «Скоро» badge is gone
+            (UX-audit #15: a working button must not be labelled unready) */}
         <a
           href={ENROLL_MAILTO}
           className="flex items-center gap-2 rounded-xl border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/[0.05] px-3 py-2.5 text-sm font-medium text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[0.1]"
         >
           🔗 <span className="flex-1">{tx.enroll}</span>
-          <span className="rounded-full bg-[#f97316]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#ea580c]">
-            {tx.soon}
-          </span>
         </a>
 
         <div className="rounded-2xl border border-black/[0.06] bg-white p-3">
