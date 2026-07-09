@@ -49,16 +49,16 @@
     },
     {
       "id": "q4",
-      "type": "detail",
-      "prompt": "Geçen yıl rekoltenin yaklaşık yarısının kaybedilmesinin sebebi nedir?",
+      "type": "not_true",
+      "prompt": "Söyleşiye göre aşağıdakilerden hangisi YANLIŞTIR?",
       "options": [
-        "Erken gelen don",
-        "Kovanlardaki hastalık",
-        "Aşırı sıcaklar",
-        "Pazarlama sorunları"
+        "Balı pazarlamak, üretmekten daha kolaydır.",
+        "Kovanların içindeki sıcaklık telefondan takip edilebiliyor.",
+        "Geçen yıl erken gelen don yüzünden rekoltenin yaklaşık yarısı kaybedildi.",
+        "Ayşe Hanım gençlere mesleği şartlı olarak öneriyor."
       ],
       "answer": 0,
-      "rationale": "«erken gelen don yüzünden»; C — климатически правдоподобно, но противоположно; D — из финала беседы, не о рекольте."
+      "rationale": "Тип not_true (закрывает ворота ≥3 типов): A — инверсия финальной реплики «pazarlamak, üretmekten daha zor»; B/C/D — прозвучавшие факты (технология, заморозки, условная рекомендация)."
     },
     {
       "id": "q5",

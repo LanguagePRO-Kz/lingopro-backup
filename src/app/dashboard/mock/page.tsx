@@ -9,6 +9,7 @@ import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
 import { createClient } from "@/lib/supabase/client";
 import { todayISO } from "@/lib/daily-plan";
+import { loadResult } from "@/lib/quiz";
 import {
   TOMER_EXAMS,
   sectionUnits,
@@ -389,11 +390,20 @@ export default function MockPage() {
   const { locale } = useI18n();
   const c = pick(locale, T);
   // full level coverage A1→C1, one exam per level for now (more per level later)
-  const [examIdx, setExamIdx] = useState(3); // B2 — the flagship target level
+  const [examIdx, setExamIdx] = useState(3); // fallback: B2, the flagship target
   const exam: TomerExam = TOMER_EXAMS[examIdx];
 
   const [view, setView] = useState<View>({ kind: "exam" });
   const [scores, setScores] = useState<SectionScores>({});
+
+  // preselect the student's OWN level from the diagnostic (A0 trains on A1) —
+  // defaulting everyone to B2 crushed beginners; the picker stays free
+  useEffect(() => {
+    const lvl = loadResult()?.level;
+    if (!lvl) return;
+    const idx = TOMER_EXAMS.findIndex((e) => e.level === (lvl === "A0" ? "A1" : lvl));
+    if (idx >= 0) setExamIdx(idx);
+  }, []);
 
   useEffect(() => {
     setScores({});
