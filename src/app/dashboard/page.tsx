@@ -294,12 +294,8 @@ export default function DashboardHome() {
       {/* ===== GETTING STARTED (first visits only; real progress) ===== */}
       <StartChecklist level={levelRaw} firstTaskDone={totalTasksDone(history) > 0} />
 
-      {/* ===== WEEKLY DIGEST (last week's real numbers, honest zero) ===== */}
-      <WeeklyDigest history={history} />
-
-      {/* ===== Ahu's daily note: AI from real facts, honest template
-           fallback — above the plan so it reads as the teacher opening
-           the day (founder: «слово Ahu на главной», видимым) ===== */}
+      {/* ===== Ahu's daily note: slim strip, the teacher opens the day —
+           the PLAN below stays the hero of the page ===== */}
       <AhuNote streak={streak} history={history} />
 
       {/* ===== PLAN ===== */}
@@ -403,6 +399,10 @@ export default function DashboardHome() {
           })}
         </div>
       </div>
+
+      {/* ===== WEEKLY DIGEST — Mon–Tue only, real numbers or an honest
+           skip line; below the plan so the top never turns into каша ===== */}
+      <WeeklyDigest history={history} />
 
       {/* ===== STREAK ===== */}
       <div className="mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#f59e0b] to-[#ef4444] p-6 text-white">

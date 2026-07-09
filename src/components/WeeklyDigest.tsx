@@ -96,6 +96,13 @@ export function WeeklyDigest({ history }: { history: DayRow[] }) {
     };
   }, [lsKey, prevMonday, thisMonday]);
 
+  // fresh reading, not a permanent fixture: Monday/Tuesday only (founder:
+  // the dashboard must not accumulate blocks)
+  const dow = new Date().getDay();
+  if (!forced && dow !== 1 && dow !== 2) {
+    console.info("[motivator] WeeklyDigest hidden: shows Mon–Tue only — force with /dashboard?motivator=1");
+    return null;
+  }
   // only accounts that existed before this week get a digest
   if (!forced && !history.some((r) => r.date < thisMonday)) {
     console.info("[motivator] WeeklyDigest hidden: no history before this Monday (new account) — force with /dashboard?motivator=1");

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { getMotivation, lastActivity, phraseOfDay, todayISO, type DayRow } from "@/lib/daily-plan";
+import { getMotivation, lastActivity, todayISO, type DayRow } from "@/lib/daily-plan";
 
 /**
  * Daily Ahu note (motivator block 3): ONE personal message per day, written
@@ -67,20 +67,17 @@ export function AhuNote({ streak, history }: { streak: number; history: DayRow[]
 
   // honest fallback: the streak-based template (real numbers, no AI)
   const m = getMotivation(locale, streak, lastActivity(history));
-  const p = phraseOfDay(locale);
 
+  // deliberately SLIM (founder: the dashboard must not drown the plan) —
+  // one strip: small avatar + the note, no decorations
   return (
-    <div className="mt-6 flex items-start gap-4 rounded-3xl border border-black/[0.06] bg-gradient-to-br from-[var(--color-brand)]/[0.06] to-[var(--color-brand-2)]/[0.06] p-5 sm:p-6">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg text-white">
+    <div className="mt-4 flex items-start gap-3 rounded-2xl border border-black/[0.06] bg-gradient-to-br from-[var(--color-brand)]/[0.05] to-[var(--color-brand-2)]/[0.05] px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-sm text-white">
         👩🏻‍🏫
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-bold text-[var(--color-foreground)]">{aiText ? c.from : m.title}</div>
-        <p className="mt-0.5 text-sm text-[var(--color-muted)]">{aiText ?? m.text[locale]}</p>
-        <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs">
-          <span className="font-semibold text-[var(--color-brand)]">{p.tr}</span>
-          <span className="text-[var(--color-muted)]"> — {p.translation}</span>
-        </div>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand)]">{c.from}</span>
+        <p className="mt-0.5 text-sm leading-relaxed text-[var(--color-foreground)]">{aiText ?? m.text[locale]}</p>
       </div>
     </div>
   );
