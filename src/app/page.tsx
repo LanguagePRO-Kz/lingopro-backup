@@ -33,9 +33,9 @@ export default function Home() {
         <Certificates />
         <Pricing />
         <Guarantee />
-        <FAQ />
         <UGCCreator />
         <FinalCTA />
+        <FAQ />
       </main>
       <Footer />
     </>

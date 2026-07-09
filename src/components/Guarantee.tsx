@@ -10,12 +10,12 @@ export function Guarantee() {
   const { locale } = useI18n();
   // honest framing (UX-audit #5): no refund promise while payments don't
   // exist — the guarantee is stated as what it is: live from the day
-  // payments launch; early access is free
+  // payments launch. No promo/early-access mechanics in public copy.
   const c = pick(locale, {
-    ru: { title: "Честная гарантия", text: "Сейчас ранний доступ — занятия бесплатны по промокоду. С запуском оплаты заработает гарантия: уровень не вырос за 3 месяца занятий — вернём 100%.", cta: "Начать подготовку", terms: "Условия гарантии" },
-    en: { title: "An honest guarantee", text: "Early access is free with a promo code right now. When payments launch, the guarantee kicks in: no level growth after 3 months of study — 100% refund.", cta: "Start preparing", terms: "Guarantee terms" },
-    tr: { title: "Dürüst garanti", text: "Şu an erken erişim — promosyon koduyla ücretsiz. Ödemeler açıldığında garanti devreye girer: 3 aylık çalışmada seviye yükselmezse %100 iade.", cta: "Hazırlığa başla", terms: "Garanti koşulları" },
-    kk: { title: "Адал кепілдік", text: "Қазір ерте қолжетімділік — промокодпен тегін. Төлем іске қосылғанда кепілдік күшіне енеді: 3 ай оқып деңгей өспесе — 100% қайтарамыз.", cta: "Дайындықты бастау", terms: "Кепілдік шарттары" },
+    ru: { title: "Честная гарантия", text: "С запуском оплаты заработает гарантия: уровень не вырос за 3 месяца занятий — вернём 100%.", cta: "Начать подготовку", terms: "Условия гарантии" },
+    en: { title: "An honest guarantee", text: "When payments launch, the guarantee kicks in: no level growth after 3 months of study — 100% refund.", cta: "Start preparing", terms: "Guarantee terms" },
+    tr: { title: "Dürüst garanti", text: "Ödemeler açıldığında garanti devreye girer: 3 aylık çalışmada seviye yükselmezse %100 iade.", cta: "Hazırlığa başla", terms: "Garanti koşulları" },
+    kk: { title: "Адал кепілдік", text: "Төлем іске қосылғанда кепілдік күшіне енеді: 3 ай оқып деңгей өспесе — 100% қайтарамыз.", cta: "Дайындықты бастау", terms: "Кепілдік шарттары" },
   });
 
   return (
