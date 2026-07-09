@@ -1,0 +1,82 @@
+{
+  "id": "okuma-c1-001",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "C1",
+  "title": "Algoritmaların Gölgesinde Seçim Özgürlüğü",
+  "body": "Dijital platformların hayatımıza yerleşmesiyle birlikte «seçim» kavramının kendisi de sessiz bir dönüşüm geçirdi. İzleyeceğimiz film, dinleyeceğimiz şarkı, hatta okuyacağımız haber çoğu zaman bize bir öneri sisteminin süzgecinden geçirilerek sunuluyor. Savunucularına göre bu sistemler, sınırsız içerik okyanusunda boğulmamızı önleyen birer can simidi; eleştirmenlerine göre ise tercihlerimizi görünmez biçimde şekillendiren, giderek daralan birer akıntı.\n\nSorunun özü, öneri algoritmalarının geçmiş davranışlarımızdan beslenmesinde yatıyor. Sistem, neyi beğendiysek benzerini önerdikçe, farklı olanla karşılaşma ihtimalimiz kendiliğinden azalıyor. Araştırmacıların «filtre balonu» adını verdiği bu durum, yalnızca müzik zevkimizi tekdüzeleştirmekle kalmıyor; dünya görüşümüzü besleyen kaynakları da türdeşleştiriyor. Kendi görüşlerimizin yankısını duyduğumuz bu dijital odalarda, karşıt fikirler giderek birer yabancıya dönüşüyor.\n\nYine de tabloyu tümüyle karanlık görmek haksızlık olur. Aynı algoritmalar, niş alanlarda üreten sanatçıların keşfedilmesini sağlıyor; hiçbir yayınevinin risk almayacağı bir ilk romanı, tam da onu sevecek okurla buluşturabiliyor. Üstelik kimi platformlar, kullanıcıya «keşif modu» gibi bilinçli rastlantı seçenekleri sunmaya başladı.\n\nGörünen o ki mesele teknolojinin kendisinde değil, onunla kurduğumuz ilişkinin niteliğinde düğümleniyor. Önerilen her içeriği sorgusuzca tüketmek ile öneriyi bir başlangıç noktası sayıp bilinçli olarak dışına çıkmak arasındaki fark, dijital çağda özgürlüğün yeni tanımı olabilir.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main_idea",
+      "prompt": "Metnin ana düşüncesi aşağıdakilerden hangisidir?",
+      "options": [
+        "Öneri sistemleri karşısındaki özgürlük, kullanıcının bilinçli tutumuyla belirlenir",
+        "Öneri algoritmaları seçim özgürlüğünü tamamen ortadan kaldırmıştır",
+        "Dijital platformlar sanatçılar için her zaman yararlıdır",
+        "İnsanlar algoritmalardan kurtulmak için platformları terk etmelidir"
+      ],
+      "answer": 0,
+      "rationale": "Финал «mesele ... ilişkinin niteliğinde»; B — радикализация, C — частный аргумент, D — не предлагается."
+    },
+    {
+      "id": "q2",
+      "type": "vocab_in_context",
+      "prompt": "Metindeki «filtre balonu» kavramı neyi ifade etmektedir?",
+      "options": [
+        "Kişinin yalnızca kendi tercihlerine benzeyen içeriklerle çevrilmesi",
+        "İnternet bağlantısının yavaşlaması",
+        "Platformların ücretli üyelik istemesi",
+        "Sanal gerçeklik teknolojisi"
+      ],
+      "answer": 0,
+      "rationale": "Определение прямо перед термином; дистракторы — техножаргонные ассоциации."
+    },
+    {
+      "id": "q3",
+      "type": "detail",
+      "prompt": "Metne göre öneri sistemlerinin SAVUNUCULARI bu sistemleri neye benzetmektedir?",
+      "options": [
+        "İçerik okyanusunda boğulmayı önleyen can simidine",
+        "Giderek daralan bir akıntıya",
+        "Görünmez bir süzgece",
+        "Yankılı bir odaya"
+      ],
+      "answer": 0,
+      "rationale": "«savunucularına göre ... can simidi»; B — метафора КРИТИКОВ (проверка атрибуции)."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Metinde algoritmaların olumlu katkısına örnek olarak ne gösterilmektedir?",
+      "options": [
+        "Niş sanatçıların kendi okuruyla buluşması",
+        "Haberlerin daha hızlı yayılması",
+        "İçerik üretiminin ucuzlaması",
+        "Telif haklarının korunması"
+      ],
+      "answer": 0,
+      "rationale": "«ilk romanı ... onu sevecek okurla buluşturabiliyor»; B–D — типовые «плюсы», в тексте нет."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Yazarın üslubuyla ilgili aşağıdakilerden hangisi söylenebilir?",
+      "options": [
+        "İki karşıt görüşü de tartıp dengeli bir sonuca varmaktadır",
+        "Teknoloji şirketlerini açıkça suçlamaktadır",
+        "Geleceğe dair kesin tahminlerde bulunmaktadır",
+        "Konuya kayıtsız kalmaktadır"
+      ],
+      "answer": 0,
+      "rationale": "Структура «savunucular/eleştirmenler → yine de → görünen o ki» = взвешенность."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

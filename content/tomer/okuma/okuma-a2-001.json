@@ -1,0 +1,82 @@
+{
+  "id": "okuma-a2-001",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "A2",
+  "title": "Yeni Bir Alışkanlık: Sabah Koşusu",
+  "body": "Emre iki ay önce koşmaya başladı. Daha önce spor yapmıyordu ve kendini hep yorgun hissediyordu. Bir gün doktoru ona «Günde yarım saat yürüyün ya da koşun» dedi. Emre önce istemedi çünkü sabahları erken kalkmak ona çok zor geliyordu.\n\nİlk hafta sadece on dakika koşabildi ve her yeri ağrıdı. Ama vazgeçmedi. Şimdi her sabah parkta kırk dakika koşuyor. Kendini daha enerjik hissediyor ve gece daha iyi uyuyor. Geçen hafta ilk kez bir koşu yarışmasına katıldı. Birinci olmadı ama yarışı bitirdi ve bununla gurur duyuyor.\n\nEmre artık arkadaşlarına da koşuyu tavsiye ediyor: «Önemli olan hızlı koşmak değil, düzenli koşmak» diyor.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Emre koşmaya neden başladı?",
+      "options": [
+        "Doktoru tavsiye ettiği için",
+        "Arkadaşları koştuğu için",
+        "Yarışmaya katılmak istediği için",
+        "Kilo vermek istediği için"
+      ],
+      "answer": 0,
+      "rationale": "«doktoru ona ... dedi»; C — ловушка на yarışma (следствие, не причина)."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Emre başlangıçta neden istekli değildi?",
+      "options": [
+        "Erken kalkmak ona zor geldiği için",
+        "Parkı sevmediği için",
+        "Zamanı olmadığı için",
+        "Koşu ayakkabısı olmadığı için"
+      ],
+      "answer": 0,
+      "rationale": "«sabahları erken kalkmak ona çok zor geliyordu»; остальные — правдоподобны, в тексте нет."
+    },
+    {
+      "id": "q3",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi koşunun Emre'ye faydası olarak METİNDE GEÇMEZ?",
+      "options": [
+        "Kilo vermesi",
+        "Kendini enerjik hissetmesi",
+        "Daha iyi uyuması",
+        "Kendisiyle gurur duyması"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D в тексте; A — самое ожидаемое «преимущество бега», но его нет."
+    },
+    {
+      "id": "q4",
+      "type": "inference",
+      "prompt": "«Birinci olmadı ama yarışı bitirdi ve bununla gurur duyuyor» cümlesinden ne anlaşılmaktadır?",
+      "options": [
+        "Emre için bitirmek kazanmaktan daha önemliydi",
+        "Emre yarışta çok üzüldü",
+        "Emre bir daha yarışmayacak",
+        "Emre yarışı yarıda bıraktı"
+      ],
+      "answer": 0,
+      "rationale": "Вывод о ценности финиша; D — прямое противоречие."
+    },
+    {
+      "id": "q5",
+      "type": "vocab_in_context",
+      "prompt": "Emre'nin «Önemli olan hızlı koşmak değil, düzenli koşmak» sözüyle anlatmak istediği nedir?",
+      "options": [
+        "Sürekli ve disiplinli olmak hızdan daha değerlidir",
+        "Yavaş koşmak sağlığa zararlıdır",
+        "Yarışmalarda hız önemli değildir",
+        "Koşu için sabah en iyi zamandır"
+      ],
+      "answer": 0,
+      "rationale": "düzenli = регулярный; C — сужение до гонок, B/D — не из текста."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

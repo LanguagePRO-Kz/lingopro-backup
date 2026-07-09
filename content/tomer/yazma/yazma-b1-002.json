@@ -1,0 +1,21 @@
+{
+  "id": "yazma-b1-002",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "B1",
+  "title": "Şikâyet E-postası",
+  "body": "İnternetten sipariş ettiğiniz ürün yanlış geldi. Mağazaya durumu anlatan bir şikâyet e-postası yazınız (en az 80, en çok 120 kelime).\n\nE-postanızda ne sipariş ettiğinizi, ne geldiğini, ne zaman sipariş verdiğinizi yazın ve sorunun nasıl çözülmesini istediğinizi açıkça belirtin.",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  },
+  "constraints": {
+    "minWords": 80,
+    "maxWords": 120,
+    "genre": "e-posta"
+  }
+}

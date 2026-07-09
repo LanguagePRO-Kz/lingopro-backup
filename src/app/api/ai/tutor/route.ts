@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   const [{ data: profile }, { data: weak }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("quiz_result, target_level")
+      .select("quiz_result, target_level, gender")
       .eq("id", quota.userId)
       .maybeSingle(),
     supabase
@@ -84,6 +84,7 @@ export async function POST(req: Request) {
     task: "tutor_chat",
     feedbackLang: lang,
     system: buildTutorSystem({
+      gender: (profile?.gender as "female" | "male" | null) ?? null,
       lang,
       level: quiz?.level ?? "A2",
       targetLevel: (profile?.target_level as string | null) ?? "B2",

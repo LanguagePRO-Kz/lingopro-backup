@@ -388,12 +388,15 @@ type View = { kind: "exam" } | { kind: "section"; section: TomerSection } | { ki
 export default function MockPage() {
   const { locale } = useI18n();
   const c = pick(locale, T);
-  const exam: TomerExam = TOMER_EXAMS[0];
+  // full level coverage A1→C1, one exam per level for now (more per level later)
+  const [examIdx, setExamIdx] = useState(3); // B2 — the flagship target level
+  const exam: TomerExam = TOMER_EXAMS[examIdx];
 
   const [view, setView] = useState<View>({ kind: "exam" });
   const [scores, setScores] = useState<SectionScores>({});
 
   useEffect(() => {
+    setScores({});
     void loadScores(exam.id).then(setScores);
   }, [exam.id]);
 
@@ -453,6 +456,25 @@ export default function MockPage() {
       <SectionHint id="mock" />
       <h2 className="text-xl font-bold tracking-tight">{c.title} · {exam.level}</h2>
       <p className="mt-1 max-w-xl text-sm text-[var(--color-muted)]">{c.sub}</p>
+
+      {/* level picker: one exam per level (A1→C1) for now */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {TOMER_EXAMS.map((e, i) => (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => {
+              setExamIdx(i);
+              setView({ kind: "exam" });
+            }}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              i === examIdx ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"
+            }`}
+          >
+            {e.level}
+          </button>
+        ))}
+      </div>
 
       {/* honest total */}
       <div className="glass mt-5 rounded-3xl p-6">

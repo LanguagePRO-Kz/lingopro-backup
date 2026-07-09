@@ -128,9 +128,11 @@ export async function POST(req: Request) {
     }
   }
 
+  // profile serves both billing (timezone) and the review (gendered address)
+  const { data: profile } = await supabase.from("profiles").select("timezone, gender").eq("id", user.id).maybeSingle();
+
   let settle: { ok?: boolean; from_base?: number; from_credits?: number; uncovered?: number } = {};
   if (minutes > 0) {
-    const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
     const day = todayInTimezone((profile?.timezone as string | null) ?? null);
     const { data, error } = await supabase.rpc("consume_voice_minutes", {
       p_day: day,
@@ -165,7 +167,7 @@ export async function POST(req: Request) {
     const result = await callAI({
       task: "voice_review",
       feedbackLang: lang,
-      system: buildVoiceReviewSystem(lang),
+      system: buildVoiceReviewSystem(lang, (profile?.gender as "female" | "male" | null) ?? null),
       messages: [
         {
           role: "user",

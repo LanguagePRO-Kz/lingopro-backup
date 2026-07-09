@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-a1-001",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "A1",
+  "title": "Manavda",
+  "body": "FATİH: Merhaba, hoş geldiniz! Ne istersiniz?\nAHU: Merhaba. Bir kilo domates, lütfen. Domatesler taze mi?\nFATİH: Çok taze, bugün geldi. Başka bir şey?\nAHU: Evet, yarım kilo üzüm istiyorum. Elmalar kaça?\nFATİH: Elmanın kilosu kırk lira.\nAHU: Biraz pahalı. O zaman elma almayacağım. Sadece domates ve üzüm.\nFATİH: Tamam. Hepsi seksen lira.\nAHU: Buyurun. Teşekkür ederim, iyi günler!\nFATİH: Ben teşekkür ederim, yine bekleriz.",
+  "audioSrc": "/audio/tomer/dinleme-a1-001.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Ahu ne kadar domates istiyor?",
+      "options": [
+        "Bir kilo",
+        "Yarım kilo",
+        "İki kilo",
+        "Bir tane"
+      ],
+      "answer": 0,
+      "rationale": "«bir kilo domates»; B — ловушка на yarım kilo (это про виноград)."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Ahu neden elma almıyor?",
+      "options": [
+        "Pahalı bulduğu için",
+        "Taze olmadığı için",
+        "Evde elma olduğu için",
+        "Elma sevmediği için"
+      ],
+      "answer": 0,
+      "rationale": "«Biraz pahalı. O zaman elma almayacağım»; B — обыгрывает вопрос о свежести (он был про помидоры)."
+    },
+    {
+      "id": "q3",
+      "type": "detail",
+      "prompt": "Ahu toplam ne kadar ödüyor?",
+      "options": [
+        "Seksen lira",
+        "Kırk lira",
+        "Yüz lira",
+        "Elli lira"
+      ],
+      "answer": 0,
+      "rationale": "«Hepsi seksen lira»; B — ловушка на прозвучавшую цену яблок."
+    },
+    {
+      "id": "q4",
+      "type": "not_true",
+      "prompt": "Ahu aşağıdakilerden hangisini ALMIYOR?",
+      "options": [
+        "Elma",
+        "Domates",
+        "Üzüm",
+        "Hiçbiri — hepsini alıyor"
+      ],
+      "answer": 0,
+      "rationale": "Покупает помидоры и виноград, от яблок отказалась; D — для невнимательных."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Konuşma nerede geçiyor?",
+      "options": [
+        "Manavda",
+        "Lokantada",
+        "Eczanede",
+        "Kıyafet mağazasında"
+      ],
+      "answer": 0,
+      "rationale": "Фрукты-овощи, килограммы, цены — вывод о месте."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

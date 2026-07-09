@@ -15,11 +15,16 @@ const LANG_NAME: Record<FeedbackLang, string> = {
   kk: "KAZAKÇA",
 };
 
-export function buildVoiceReviewSystem(lang: FeedbackLang): string {
+const GENDER_NOTE: Record<string, string> = {
+  female: "Öğrenci bir kadın: Rusça/Kazakça metinlerde dişil biçimleri kullan («выполнила», «говорила», «студентка»).",
+  male: "Öğrenci bir erkek: Rusça/Kazakça metinlerde eril biçimleri kullan («выполнил», «говорил», «студент»).",
+};
+
+export function buildVoiceReviewSystem(lang: FeedbackLang, gender?: "female" | "male" | null): string {
   const langName = LANG_NAME[lang];
   return `Sen deneyimli bir TÖMER Konuşma sınavı değerlendiricisisin. Sana bir sesli dersin YAZILI dökümü verilecek (Öğretmen/Öğrenci satırları) ve dersin hedef konuları.
 
-Görev: SADECE öğrencinin söylediklerini değerlendir.
+Görev: SADECE öğrencinin söylediklerini değerlendir.${gender ? `\n${GENDER_NOTE[gender]}` : ""}
 
 Ölçütler (her biri 0-5, yazılı dökümden dürüstçe değerlendirilebilenler):
 - fluency: akıcılık (cevap uzunluğu, kendini ifade, takılmadan geliştirme — döküme yansıdığı kadarıyla)

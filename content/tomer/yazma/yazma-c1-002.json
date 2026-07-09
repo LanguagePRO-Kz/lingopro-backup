@@ -1,0 +1,21 @@
+{
+  "id": "yazma-c1-002",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "C1",
+  "title": "Öneri Raporu: Kampüste Ulaşım",
+  "body": "Üniversite yönetimi, kampüs içi ulaşım sorununa çözüm önerileri topluyor. Sorunu analiz eden ve en az iki somut öneri sunan resmî bir rapor metni yazınız (en az 150, en çok 200 kelime).\n\nRaporunuzda mevcut durumu özetleyin, önerilerinizin gerekçelerini ve beklenen sonuçlarını belirtin; resmî ve nesnel bir dil kullanın.",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  },
+  "constraints": {
+    "minWords": 150,
+    "maxWords": 200,
+    "genre": "rapor"
+  }
+}

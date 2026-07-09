@@ -1,0 +1,21 @@
+{
+  "id": "yazma-a1-002",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "A1",
+  "title": "Bir Günüm",
+  "body": "Sıradan bir gününüzü anlatan kısa bir metin yazınız (en az 50, en çok 70 kelime).\n\nSabah ne zaman kalkıyorsunuz, gün içinde neler yapıyorsunuz, akşam nasıl geçiyor? Şimdiki zaman kullanın.",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  },
+  "constraints": {
+    "minWords": 50,
+    "maxWords": 70,
+    "genre": "anlatım"
+  }
+}

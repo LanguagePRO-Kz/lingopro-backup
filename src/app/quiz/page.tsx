@@ -105,7 +105,7 @@ const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [
   { id: "unknown", label: "lvUnknown", hint: "" },
 ];
 const TIMELINES: QuizTKey[] = ["tl1", "tl3", "tl6", "tlOpen"];
-const ONB_STEPS = 5;
+const ONB_STEPS = 6;
 
 const RETAKE_KEY = "lingopro:quizRetakes";
 
@@ -142,6 +142,7 @@ export default function QuizPage() {
   const [showDatePick, setShowDatePick] = useState(false);
   const [examDate, setExamDate] = useState("");
   const [minutesDaily, setMinutesDaily] = useState<number | null>(null);
+  const [gender, setGender] = useState<"female" | "male" | null>(null);
 
   const [stage, setStage] = useState<StageId>("router");
   const [routerState, setRouterState] = useState<RouterState | null>(null);
@@ -170,6 +171,7 @@ export default function QuizPage() {
       setRouterLevel(p.routerLevel as BankLevel | null);
       setSeed(p.seed);
       setMinutesDaily(p.minutesDaily);
+      setGender(p.gender ?? null);
       answerLogRef.current = p.answers ?? [];
       setDinlemeAgg(p.dinleme);
       setOkumaAgg(p.okuma);
@@ -190,12 +192,13 @@ export default function QuizPage() {
         routerLevel,
         seed,
         minutesDaily,
+        gender,
         answers: answerLogRef.current,
         dinleme: dinlemeAgg,
         okuma: okumaAgg,
       });
     }
-  }, [hydrated, phase, onbStep, stage, routerState, routerLevel, seed, minutesDaily, dinlemeAgg, okumaAgg]);
+  }, [hydrated, phase, onbStep, stage, routerState, routerLevel, seed, minutesDaily, gender, dinlemeAgg, okumaAgg]);
 
   /* ── stage flow ────────────────────────────────────────────────────────── */
 
@@ -233,6 +236,7 @@ export default function QuizPage() {
         writingText,
         yazmaPromptId: promptId,
         minutesDaily: minutesDaily ?? 30,
+        gender,
       });
       saveResult(result); // anonymous cache — survives the sign-up hop
       clearProgress();
@@ -250,7 +254,7 @@ export default function QuizPage() {
         setPhase("signup");
       }
     },
-    [routerState, dinlemeAgg, okumaAgg, minutesDaily, router],
+    [routerState, dinlemeAgg, okumaAgg, minutesDaily, gender, router],
   );
 
   /* ------------------------------ Onboarding ----------------------------- */
@@ -440,8 +444,7 @@ export default function QuizPage() {
                         type="button"
                         onClick={() => {
                           setMinutesDaily(m.minutes);
-                          setStage("router");
-                          setPhase("stage");
+                          setOnbStep(5);
                         }}
                         className="flex flex-col items-start rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
                       >
@@ -449,6 +452,34 @@ export default function QuizPage() {
                           {m.minutes === 60 ? "60+" : m.minutes} {qt(locale, "minPerDay")}
                         </span>
                         <span className="text-xs text-[var(--color-muted)]">{qt(locale, m.labelKey)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {onbStep === 5 && (
+                <>
+                  <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{qt(locale, "onbGender")}</h1>
+                  <p className="mt-2 text-sm text-[var(--color-muted)]">{qt(locale, "genderNote")}</p>
+                  <div className="mt-5 grid gap-3">
+                    {([
+                      { v: "female", key: "genderF", emoji: "👩" },
+                      { v: "male", key: "genderM", emoji: "👨" },
+                      { v: null, key: "genderSkip", emoji: "🤝" },
+                    ] as { v: "female" | "male" | null; key: "genderF" | "genderM" | "genderSkip"; emoji: string }[]).map((g) => (
+                      <button
+                        key={g.key}
+                        type="button"
+                        onClick={() => {
+                          setGender(g.v);
+                          setStage("router");
+                          setPhase("stage");
+                        }}
+                        className="flex items-center gap-3 rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
+                      >
+                        <span className="text-xl">{g.emoji}</span>
+                        <span className="text-base font-semibold text-[var(--color-foreground)]">{qt(locale, g.key)}</span>
                       </button>
                     ))}
                   </div>

@@ -285,6 +285,8 @@ export type QuizResult = {
   yazmaReview?: WritingReview;
   /** Daily study minutes chosen in onboarding (15/30/45/60) */
   minutesDaily?: number;
+  /** asked once in onboarding; null = prefer not to say */
+  gender?: "female" | "male" | null;
 };
 
 export const LEVEL_ORDER: Level[] = ["A0", "A1", "A2", "B1", "B2", "C1"];
@@ -341,6 +343,7 @@ export type QuizProgress = {
   routerLevel: Level | null;
   seed: number;
   minutesDaily: number | null;
+  gender?: "female" | "male" | null;
   answers: AnswerRecord[];
   dinleme: { correct: number; total: number } | null;
   okuma: { correct: number; total: number } | null;
@@ -599,6 +602,11 @@ const T = {
   },
   targetRange: { ru: "После подготовки", en: "After preparation", tr: "Hazırlıktan sonra", kk: "Дайындықтан кейін" },
   // CTA note
+  onbGender: { ru: "Как к тебе обращаться?", en: "How should we address you?", tr: "Sana nasıl hitap edelim?", kk: "Саған қалай жүгінейік?" },
+  genderNote: { ru: "Нужно только для правильных обращений — «готова» или «готов».", en: "Used only for correct grammatical address.", tr: "Yalnızca doğru hitap biçimleri için gerekli.", kk: "Тек дұрыс жүгіну үшін қажет." },
+  genderF: { ru: "Я девушка", en: "Female", tr: "Kadın", kk: "Қыз/әйелмін" },
+  genderM: { ru: "Я парень", en: "Male", tr: "Erkek", kk: "Жігіт/ер адаммын" },
+  genderSkip: { ru: "Не указывать", en: "Prefer not to say", tr: "Belirtmek istemiyorum", kk: "Көрсетпеймін" },
   discountNote: {
     ru: "Пройди диагностику → получи скидку 30% на любой пакет",
     en: "Take the diagnostic → get 30% off any package",

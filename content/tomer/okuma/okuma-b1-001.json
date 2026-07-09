@@ -1,0 +1,82 @@
+{
+  "id": "okuma-b1-001",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "B1",
+  "title": "Yurt mu, Kiralık Ev mi?",
+  "body": "Üniversiteyi kazanan her öğrencinin karşısına aynı soru çıkar: yurtta mı kalmalı, ev mi kiralamalı? İki seçeneğin de kendine göre artıları ve eksileri var.\n\nYurdun en büyük avantajı ekonomik olması. Faturalar, internet ve çoğu zaman yemek fiyata dahil. Üstelik yurtta kalan öğrenci kampüse genellikle yürüyerek gidebiliyor ve ilk günden arkadaş çevresi ediniyor. Buna karşılık kurallar herkese göre değil: belirli saatte giriş, ortak banyo, gürültülü çalışma ortamı. Kendi odasında sessizlik isteyen bir öğrenci için bu ciddi bir sorun olabilir.\n\nKiralık ev ise özgürlük demek: istediğin saatte gir çık, istediğini pişir, misafirini ağırla. Ancak bu özgürlüğün bedeli var. Kira, depozito, faturalar ve ev eşyası derken masraf yurdun en az iki katına çıkıyor. Ayrıca ev işleri — temizlik, alışveriş, yemek — zamanın önemli bir bölümünü alıyor ve ev arkadaşıyla anlaşmazlık çıkarsa dönem ortasında yeni ev aramak gerekebiliyor.\n\nUzmanlara göre doğru soru «hangisi daha iyi?» değil, «bana hangisi uygun?». Bütçesi sınırlı ve sosyal ortam arayan öğrenciye yurt, düzenine düşkün ve bütçesi yeterli olana ise ev daha mantıklı görünüyor.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main_idea",
+      "prompt": "Metnin ana düşüncesi aşağıdakilerden hangisidir?",
+      "options": [
+        "Doğru seçim öğrencinin ihtiyaçlarına ve bütçesine bağlıdır",
+        "Yurtta kalmak her zaman daha mantıklıdır",
+        "Ev kiralamak özgürlük sağladığı için en iyi seçenektir",
+        "Öğrenciler barınma sorununu çözemez"
+      ],
+      "answer": 0,
+      "rationale": "Финал «bana hangisi uygun?»; B/C — односторонние, D — нет в тексте."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Metne göre yurdun en büyük avantajı nedir?",
+      "options": [
+        "Ekonomik olması",
+        "Kurallarının olması",
+        "Sessiz bir ortam sunması",
+        "Şehir merkezinde olması"
+      ],
+      "answer": 0,
+      "rationale": "«en büyük avantajı ekonomik olması»; C — противоречит (gürültülü ortam)."
+    },
+    {
+      "id": "q3",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi metinde kiralık evin masrafları arasında SAYILMAMIŞTIR?",
+      "options": [
+        "Ulaşım ücreti",
+        "Kira ve depozito",
+        "Faturalar",
+        "Ev eşyası"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D перечислены; A — логичный расход, но не назван."
+    },
+    {
+      "id": "q4",
+      "type": "vocab_in_context",
+      "prompt": "Metindeki «bu özgürlüğün bedeli var» ifadesiyle anlatılmak istenen nedir?",
+      "options": [
+        "Özgürlüğün maddi ve manevi bir karşılığının olduğu",
+        "Ev sahibine ek ücret ödendiği",
+        "Özgürlüğün yasak olduğu",
+        "Kiraların sürekli arttığı"
+      ],
+      "answer": 0,
+      "rationale": "bedel — переносно (деньги + время + риски); B — буквализация."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Metne göre hangi öğrenci için YURT daha uygundur?",
+      "options": [
+        "Bütçesi dar olan ve yeni arkadaşlar edinmek isteyen",
+        "Sessizlikte çalışmak isteyen",
+        "Misafir ağırlamayı seven",
+        "Kendi yemeğini pişirmek isteyen"
+      ],
+      "answer": 0,
+      "rationale": "«bütçesi sınırlı ve sosyal ortam arayan»; B/C/D — профиль «евшника»."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

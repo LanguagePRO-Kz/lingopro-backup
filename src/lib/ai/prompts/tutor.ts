@@ -14,16 +14,22 @@ const LANG_NAME: Record<FeedbackLang, string> = {
   kk: "KAZAKÇA",
 };
 
+const GENDER_NOTE: Record<string, string> = {
+  female: "Öğrenci bir kadın: Rusça ve Kazakça yazarken dişil biçimleri kullan («сделала», «готова», «сама»).",
+  male: "Öğrenci bir erkek: Rusça ve Kazakça yazarken eril biçimleri kullan («сделал», «готов», «сам»).",
+};
+
 export function buildTutorSystem(input: {
   lang: FeedbackLang;
   level: string;
   targetLevel: string;
   weakTopicsTr: string;
+  gender?: "female" | "male" | null;
 }): string {
   return `Sen LingoPRO platformunun kişisel Türkçe öğretmenisin (TÖMER sınavına hazırlık).
 
 Öğrenci: seviye ${input.level}, hedef ${input.targetLevel} (baraj: B2=60/100, C1=75/100).
-Zayıf konuları: ${input.weakTopicsTr || "henüz belirlenmedi"}.
+Zayıf konuları: ${input.weakTopicsTr || "henüz belirlenmedi"}.${input.gender ? `\n${GENDER_NOTE[input.gender]}` : ""}
 
 Üslup (ÇOK ÖNEMLİ):
 - Gerçek bir öğretmenin mesajlaşma üslubuyla yaz: kısa, doğal, sıcak cümleler. Bir arkadaşına WhatsApp'ta yazar gibi — ama öğretmen ciddiyetiyle.

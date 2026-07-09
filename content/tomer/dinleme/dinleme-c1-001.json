@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-c1-001",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "C1",
+  "title": "Uzman Görüşü: Uzaktan Çalışmanın Geleceği",
+  "body": "AHU: Uzaktan çalışma tartışmalarında iki uç görüş öne çıkıyor: kimileri ofislerin tarihe karışacağını, kimileri her şeyin eskiye döneceğini savunuyor. Bana kalırsa ikisi de yanılıyor. Verilere baktığımızda karma modelin, yani haftanın bir bölümünü ofiste, bir bölümünü evde geçirmenin kalıcı hâle geldiğini görüyoruz. Bunun nedeni yalnızca çalışan memnuniyeti değil; işverenler de ofis maliyetlerinin düştüğünü, buna karşılık verimliliğin çoğu sektörde korunduğunu fark etti. Ancak madalyonun öteki yüzü daha az konuşuluyor. Eve taşınan iş, mesai kavramını silikleştiriyor: akşam dokuzda gelen bir e-postaya cevap vermek giderek normalleşiyor. Genç çalışanlar içinse durum daha karmaşık — mesleki gelişimin önemli bir kısmı, deneyimli meslektaşları izleyerek, kahve arasındaki sohbetlerde gerçekleşir; ekran bunu tam olarak veremiyor. Dolayısıyla şirketlere önerim şu: ofis günlerini toplantıyla doldurmak yerine, bu günleri ustalık aktarımına ve ekip bağlarına ayırın. Uzaktan çalışmanın geleceği, mekân tartışmasından çıkıp zamanın ve ilişkilerin yeniden tasarımına dönüşmek zorunda.",
+  "audioSrc": "/audio/tomer/dinleme-c1-001.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main_idea",
+      "prompt": "Konuşmacının temel görüşü aşağıdakilerden hangisidir?",
+      "options": [
+        "Karma model kalıcıdır ancak zamanın ve ilişkilerin yeniden tasarlanması gerekir",
+        "Ofisler tamamen ortadan kalkacaktır",
+        "Herkes en kısa sürede ofise dönmelidir",
+        "Uzaktan çalışma verimliliği her sektörde düşürmüştür"
+      ],
+      "answer": 0,
+      "rationale": "«ikisi de yanılıyor... yeniden tasarım» — синтез; B/C — крайности, отвергнутые в начале."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "İşverenlerin karma modeli benimsemesinin konuşmada geçen nedeni nedir?",
+      "options": [
+        "Maliyetlerin düşmesi ve verimliliğin korunması",
+        "Çalışanların daha az maaş istemesi",
+        "Devlet teşvikleri",
+        "Ofis binalarının satılması"
+      ],
+      "answer": 0,
+      "rationale": "«maliyetlerin düştüğünü... verimliliğin korunduğunu»; остальные не звучали."
+    },
+    {
+      "id": "q3",
+      "type": "vocab_in_context",
+      "prompt": "«Mesai kavramını silikleştiriyor» ifadesiyle anlatılmak istenen nedir?",
+      "options": [
+        "İş ile özel hayat arasındaki sınırın belirsizleşmesi",
+        "Çalışma saatlerinin kısalması",
+        "Mesai ücretlerinin artması",
+        "İşe geç kalmanın normalleşmesi"
+      ],
+      "answer": 0,
+      "rationale": "Пример рядом (e-posta в 21:00) раскрывает метафору; B — противоположность."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Konuşmacıya göre genç çalışanlar uzaktan çalışmada ne kaybediyor?",
+      "options": [
+        "Ustaları izleyerek ve sohbetlerde öğrenme imkânını",
+        "Yüksek maaş imkânını",
+        "Yıllık izin haklarını",
+        "Kariyer planlama araçlarını"
+      ],
+      "answer": 0,
+      "rationale": "«deneyimli meslektaşları izleyerek, kahve arası sohbetlerde»; остальные — HR-правдоподобные."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Konuşmacının şirketlere önerisinden aşağıdakilerden hangisi çıkarılabilir?",
+      "options": [
+        "Ofis günleri toplantıdan çok insan ilişkilerine hizmet etmelidir",
+        "Toplantılar tamamen kaldırılmalıdır",
+        "Çalışanlar her gün ofise gelmelidir",
+        "E-postalara akşam da cevap verilmelidir"
+      ],
+      "answer": 0,
+      "rationale": "«toplantıyla doldurmak yerine ... ekip bağlarına ayırın»; B — радикализация, D — критикуемое."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

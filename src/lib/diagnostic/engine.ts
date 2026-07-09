@@ -263,6 +263,7 @@ export type ResultInputV3 = {
   writingText: string;
   yazmaPromptId: string;
   minutesDaily: number;
+  gender?: "female" | "male" | null;
 };
 
 function routerAccuracyPct(state: RouterState): number {
@@ -354,6 +355,7 @@ export function computeResultV3(input: ResultInputV3): QuizResult {
     writingText: input.writingText,
     yazmaPromptId: input.yazmaPromptId,
     minutesDaily: input.minutesDaily,
+    gender: input.gender ?? null,
   };
 }
 

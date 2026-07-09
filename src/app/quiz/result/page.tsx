@@ -74,7 +74,7 @@ export default function QuizResultPage() {
       if (final.version === 3 && final.minutesDaily) {
         await supabase
           .from("profiles")
-          .update({ study_minutes_daily: final.minutesDaily })
+          .update({ study_minutes_daily: final.minutesDaily, ...(final.gender ? { gender: final.gender } : {}) })
           .eq("id", user.id);
       }
 

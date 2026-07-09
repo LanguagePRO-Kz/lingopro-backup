@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-b1-001",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "B1",
+  "title": "Kampüs Radyosu: Gönüllülük Projesi",
+  "body": "FATİH: Kampüs radyosundayız. Bugünkü konuğum, «Kitap Kardeşliği» projesinin kurucusu Ahu. Bu proje tam olarak nedir?\nAHU: Merhaba! Köy okullarındaki çocuklara kitap ulaştırıyoruz. Üç yıl önce beş kişiyle başladık, bugün iki yüzden fazla gönüllümüz var.\nFATİH: Kitapları nereden buluyorsunuz?\nAHU: Çoğunu bağış olarak topluyoruz. Kampüste kutularımız var, öğrenciler okudukları kitapları bırakıyor. Ayrıca her ay bir kitapçıyla anlaşıyoruz, satışlarının küçük bir bölümünü projeye ayırıyor.\nFATİH: Peki sadece kitap mı gönderiyorsunuz?\nAHU: Hayır, işin en güzel kısmı ziyaretler. Ayda bir köy okuluna gidiyoruz, çocuklarla birlikte okuyoruz, oyunlar oynuyoruz. Çocukların en çok buna ihtiyacı var: onlarla ilgilenen birine.\nFATİH: Gönüllü olmak isteyenler ne yapmalı?\nAHU: İnternet sitemizden formu doldurmaları yeterli. Tek şartımız süreklilik: ayda en az bir etkinliğe katılmak. Bir kere gelip kaybolmak çocuklar için iyi olmuyor, onlar insana alışıyor.",
+  "audioSrc": "/audio/tomer/dinleme-b1-001.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "«Kitap Kardeşliği» projesi ne yapıyor?",
+      "options": [
+        "Köy okullarındaki çocuklara kitap ulaştırıyor",
+        "Üniversitede kütüphane kuruyor",
+        "Çocuklara özel ders veriyor",
+        "Kitapçı açıyor"
+      ],
+      "answer": 0,
+      "rationale": "«köy okullarındaki çocuklara kitap ulaştırıyoruz»; C — обыгрывает визиты."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Kitapların çoğu nereden geliyor?",
+      "options": [
+        "Bağışlardan",
+        "Belediyeden",
+        "Kitapçının hediyelerinden",
+        "Okul bütçesinden"
+      ],
+      "answer": 0,
+      "rationale": "«çoğunu bağış olarak topluyoruz»; C — ловушка на договор с магазином (доля продаж)."
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Ahu'ya göre çocukların EN ÇOK neye ihtiyacı var?",
+      "options": [
+        "Kendileriyle ilgilenen insanlara",
+        "Yeni kitaplara",
+        "Bilgisayarlara",
+        "Yeni bir okul binasına"
+      ],
+      "answer": 0,
+      "rationale": "«en çok buna ihtiyacı var: onlarla ilgilenen birine»; B — тематическая ловушка."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Gönüllülerin tek şartı nedir?",
+      "options": [
+        "Ayda en az bir etkinliğe katılmak",
+        "Her hafta köye gitmek",
+        "Kitap bağışlamak",
+        "Üyelik ücreti ödemek"
+      ],
+      "answer": 0,
+      "rationale": "«tek şartımız süreklilik: ayda en az bir etkinliğe katılmak»; B — искажение частоты."
+    },
+    {
+      "id": "q5",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi konuşmada GEÇMEMEKTEDİR?",
+      "options": [
+        "Projenin devletten destek aldığı",
+        "Projenin üç yıl önce başladığı",
+        "Kampüste bağış kutuları olduğu",
+        "Ayda bir köy okuluna gidildiği"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D прозвучали; A — правдоподобно, но не упоминалось."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

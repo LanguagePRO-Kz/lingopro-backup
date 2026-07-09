@@ -1,0 +1,82 @@
+{
+  "id": "okuma-a1-001",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "A1",
+  "title": "Zeynep'in Bir Günü",
+  "body": "Zeynep her sabah saat yedide kalkıyor. Kahvaltıda peynir, zeytin ve ekmek yiyor, bir bardak çay içiyor. Saat sekizde evden çıkıyor ve otobüsle işe gidiyor. Yol yaklaşık yarım saat sürüyor. Zeynep bir kitapçıda çalışıyor; işini çok seviyor çünkü kitapları ve insanlarla konuşmayı seviyor.\n\nÖğle yemeğini genellikle iş arkadaşı Elif ile yiyor. Akşam saat altıda eve dönüyor. Yemekten sonra bazen dizi izliyor, bazen annesiyle telefonda konuşuyor. Hafta sonu çalışmıyor; cumartesi günleri yüzmeye gidiyor, pazar günleri ise evde dinleniyor ve yeni hafta için alışveriş yapıyor.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Zeynep işe nasıl gidiyor?",
+      "options": [
+        "Otobüsle",
+        "Arabayla",
+        "Yürüyerek",
+        "Metroyla"
+      ],
+      "answer": 0,
+      "rationale": "«otobüsle işe gidiyor»; остальные — типовые способы, в тексте их нет."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Zeynep işini neden seviyor?",
+      "options": [
+        "Kitapları ve insanlarla konuşmayı sevdiği için",
+        "Maaşı yüksek olduğu için",
+        "İşi eve yakın olduğu için",
+        "Arkadaşı Elif orada çalıştığı için"
+      ],
+      "answer": 0,
+      "rationale": "«çünkü kitapları ve insanlarla konuşmayı seviyor»; D — ловушка на Elif (коллега, но не причина)."
+    },
+    {
+      "id": "q3",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi Zeynep'in hafta sonu yaptığı işlerden BİRİ DEĞİLDİR?",
+      "options": [
+        "Sinemaya gitmek",
+        "Yüzmeye gitmek",
+        "Evde dinlenmek",
+        "Alışveriş yapmak"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D — в тексте (cumartesi yüzme, pazar dinlenme + alışveriş); A — правдоподобный досуг, в тексте нет."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Zeynep öğle yemeğini genellikle kiminle yiyor?",
+      "options": [
+        "İş arkadaşı Elif ile",
+        "Annesiyle",
+        "Yalnız",
+        "Komşusuyla"
+      ],
+      "answer": 0,
+      "rationale": "«iş arkadaşı Elif ile»; B — ловушка на маму (с ней разговор по телефону вечером)."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Metne göre Zeynep'in ev–iş yolculuğu ne kadar sürüyor?",
+      "options": [
+        "Yaklaşık otuz dakika",
+        "Bir saat",
+        "On dakika",
+        "İki saat"
+      ],
+      "answer": 0,
+      "rationale": "«yarım saat» = 30 минут — проверка понимания yarım; дистракторы — другие длительности."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

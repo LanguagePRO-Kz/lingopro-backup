@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-a2-001",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "A2",
+  "title": "Telefonda: Hafta Sonu Planı",
+  "body": "AHU: Alo, Fatih! Hafta sonu ne yapıyorsun? Cumartesi pikniğe gidelim mi?\nFATİH: Merhaba Ahu! Çok isterdim ama cumartesi çalışıyorum. Pazar günü boşum.\nAHU: Pazar da olur. Hava durumuna baktın mı?\nFATİH: Evet, pazar hava güneşli olacak, yirmi beş derece.\nAHU: Harika! Nereye gidelim? Göl kenarına mı, ormana mı?\nFATİH: Göl kenarı daha iyi. Orada masalar ve mangal yeri var. Bir de otobüs durağına yakın.\nAHU: Tamam. Ben sandviç ve meyve getiririm. Sen ne getirirsin?\nFATİH: Ben de içecek ve top getiririm, voleybol oynarız.\nAHU: Süper! Pazar sabahı saat onda durakta buluşalım mı?\nFATİH: Anlaştık, onda oradayım. Görüşürüz!",
+  "audioSrc": "/audio/tomer/dinleme-a2-001.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Pikniğe neden cumartesi değil pazar gidiyorlar?",
+      "options": [
+        "Fatih cumartesi çalıştığı için",
+        "Cumartesi hava kötü olacağı için",
+        "Ahu cumartesi meşgul olduğu için",
+        "Göl kenarı cumartesi kalabalık olduğu için"
+      ],
+      "answer": 0,
+      "rationale": "«cumartesi çalışıyorum»; B — ловушка на погоду (она про воскресенье)."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Göl kenarını neden seçiyorlar?",
+      "options": [
+        "Masa ve mangal yeri olduğu, durağa yakın olduğu için",
+        "Orman uzak olduğu için",
+        "Orada yüzmek serbest olduğu için",
+        "Giriş ücretsiz olduğu için"
+      ],
+      "answer": 0,
+      "rationale": "«masalar ve mangal yeri var... durağa yakın»; остальные не звучали."
+    },
+    {
+      "id": "q3",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi pikniğe götürecekleri şeylerden BİRİ DEĞİLDİR?",
+      "options": [
+        "Kek",
+        "Sandviç ve meyve",
+        "İçecek",
+        "Top"
+      ],
+      "answer": 0,
+      "rationale": "Ahu несёт сэндвичи и фрукты, Fatih — напитки и мяч; торт (типовая еда для пикника) не звучал."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Nerede ve saat kaçta buluşacaklar?",
+      "options": [
+        "Otobüs durağında, saat onda",
+        "Göl kenarında, saat onda",
+        "Ahu'nun evinde, saat dokuzda",
+        "Ormanda, öğlen"
+      ],
+      "answer": 0,
+      "rationale": "«saat onda durakta»; B — место пикника, но встреча на остановке."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Konuşmaya göre pazar günü hava nasıl olacak?",
+      "options": [
+        "Güneşli ve sıcak",
+        "Yağmurlu",
+        "Rüzgârlı ve serin",
+        "Karlı"
+      ],
+      "answer": 0,
+      "rationale": "«güneşli, yirmi beş derece» → тёплая; проверка чисел и лексики погоды."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

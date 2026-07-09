@@ -1,0 +1,21 @@
+{
+  "id": "yazma-a2-001",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "A2",
+  "title": "Davet Mesajı",
+  "body": "Bir arkadaşınızı doğum günü partinize davet eden bir mesaj yazınız (en az 60, en çok 80 kelime).\n\nMesajınızda partinin gününü, saatini ve yerini belirtin; arkadaşınıza nasıl geleceğini kısaca anlatın.",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  },
+  "constraints": {
+    "minWords": 60,
+    "maxWords": 80,
+    "genre": "mesaj"
+  }
+}

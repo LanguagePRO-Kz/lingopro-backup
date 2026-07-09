@@ -1,0 +1,27 @@
+{
+  "id": "tomer-a2-001",
+  "source": "original",
+  "license": null,
+  "level": "A2",
+  "title": "TÖMER Deneme Sınavı · A2 · No. 1",
+  "sections": {
+    "dinleme": [
+      "dinleme-a2-001"
+    ],
+    "okuma": [
+      "okuma-a2-001"
+    ],
+    "yazma": [
+      "yazma-a2-001",
+      "yazma-a2-002"
+    ],
+    "konusma": [
+      "konusma-a2-001"
+    ]
+  },
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

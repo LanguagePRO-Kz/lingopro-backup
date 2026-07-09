@@ -1,0 +1,21 @@
+{
+  "id": "yazma-a2-002",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "A2",
+  "title": "Geçen Tatilim",
+  "body": "Geçen tatilinizi anlatan bir metin yazınız (en az 70, en çok 90 kelime).\n\nNereye gittiniz, kiminle gittiniz, neler yaptınız, tatil nasıl geçti? Geçmiş zaman kullanın.",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  },
+  "constraints": {
+    "minWords": 70,
+    "maxWords": 90,
+    "genre": "anlatım"
+  }
+}
