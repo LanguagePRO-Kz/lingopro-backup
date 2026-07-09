@@ -134,10 +134,10 @@ export type Motivation = { line: string; note: string };
 
 const M = {
   zero: {
-    ru: { line: "Hadi başlayalım! 💪", note: "Сегодня ещё ноль заданий. Начни с одного — даже 10 минут двигают тебя к C1." },
-    en: { line: "Hadi başlayalım! 💪", note: "Zero tasks today. Start with one — even 10 minutes move you toward C1." },
-    tr: { line: "Hadi başlayalım! 💪", note: "Bugün hiç görev yok. Bir tanesiyle başla — 10 dakika bile seni C1'e yaklaştırır." },
-    kk: { line: "Hadi başlayalım! 💪", note: "Бүгін бір де тапсырма жоқ. Біреуінен баста — тіпті 10 минут C1-ге жақындатады." },
+    ru: { line: "Hadi başlayalım! 💪", note: "Сегодня ещё ноль заданий. Начни с одного — даже 10 минут двигают тебя к цели." },
+    en: { line: "Hadi başlayalım! 💪", note: "Zero tasks today. Start with one — even 10 minutes move you toward your goal." },
+    tr: { line: "Hadi başlayalım! 💪", note: "Bugün hiç görev yok. Bir tanesiyle başla — 10 dakika bile seni hedefine yaklaştırır." },
+    kk: { line: "Hadi başlayalım! 💪", note: "Бүгін бір де тапсырма жоқ. Біреуінен баста — тіпті 10 минут мақсатыңа жақындатады." },
   },
   some: {
     ru: { line: "Aferin, devam et! 👏", note: "Хорошее начало! Доведи день до конца — осталось совсем немного." },
@@ -159,11 +159,13 @@ const M = {
   },
 } as const;
 
-export function motivate(locale: Locale, done: number, total: number, str: number): Motivation {
+export function motivate(locale: Locale, done: number, total: number, str: number, hadActivity = false): Motivation {
   let k: keyof typeof M;
   if (done >= total && total > 0) k = "done";
   else if (done > 0) k = "some";
-  else if (str === 0) k = "comeback";
+  // «пропустил пару дней» — честно только когда активность реально БЫЛА;
+  // новичку с нулевой историей врать про пропуск нельзя
+  else if (str === 0 && hadActivity) k = "comeback";
   else k = "zero";
   return M[k][locale];
 }

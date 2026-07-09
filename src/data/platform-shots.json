@@ -1,0 +1,30 @@
+{
+  "speaking": {
+    "src": "/platform/speaking.png",
+    "route": "/dashboard/speaking/push"
+  },
+  "tutor": {
+    "src": "/platform/tutor.png",
+    "route": "/dashboard/tutor"
+  },
+  "plan": {
+    "src": "/platform/plan.png",
+    "route": "/dashboard/plan"
+  },
+  "exam": {
+    "src": "/platform/exam.png",
+    "route": "/dashboard/mock"
+  },
+  "feedback": {
+    "src": "/platform/feedback.png",
+    "route": "/dashboard/grammar"
+  },
+  "stats": {
+    "src": "/platform/stats.png",
+    "route": "/dashboard/stats"
+  },
+  "vocab": {
+    "src": "/platform/vocab.png",
+    "route": "/dashboard/vocabulary"
+  }
+}

@@ -47,3 +47,5 @@ next-env.d.ts
 # local tooling
 /.claude
 /.codegraph
+.demo-account.json
+.shots-debug/

@@ -175,7 +175,7 @@ export default function PlanPage() {
   const doneCount = tasks.filter((t) => t.completed).length;
   const str = computeStreak(history);
   const plan = PLANS[result.plan];
-  const mot = motivate(locale, doneCount, tasks.length, str);
+  const mot = motivate(locale, doneCount, tasks.length, str, totalTasksDone(history) > 0);
   const weak = [...result.skills].sort((a, b) => a.percent - b.percent).slice(0, 3);
   const weekIdx = route ? currentWeekIndex(route, todayISO()) : 0;
   const shownWeeks = route ? route.weeks.slice(0, Math.max(8, weekIdx)) : [];
