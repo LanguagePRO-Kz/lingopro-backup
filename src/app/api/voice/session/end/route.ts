@@ -128,8 +128,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // profile serves both billing (timezone) and the review (gendered address)
-  const { data: profile } = await supabase.from("profiles").select("timezone, gender").eq("id", user.id).maybeSingle();
+  // profile serves both billing (timezone) and the review (gendered address);
+  // gender is read in ISOLATION — the column ships with migration 0006, and
+  // bundled here a missing column would 400 the timezone (billing day) too
+  const [{ data: profile }, { data: genderRow }] = await Promise.all([
+    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("gender").eq("id", user.id).maybeSingle(),
+  ]);
 
   let settle: { ok?: boolean; from_base?: number; from_credits?: number; uncovered?: number } = {};
   if (minutes > 0) {
@@ -167,7 +172,7 @@ export async function POST(req: Request) {
     const result = await callAI({
       task: "voice_review",
       feedbackLang: lang,
-      system: buildVoiceReviewSystem(lang, (profile?.gender as "female" | "male" | null) ?? null),
+      system: buildVoiceReviewSystem(lang, (genderRow?.gender as "female" | "male" | null) ?? null),
       messages: [
         {
           role: "user",

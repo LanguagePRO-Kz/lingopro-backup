@@ -90,11 +90,17 @@ const stageIdx = (id: StageId) => STAGES.findIndex((s) => s.id === id);
 
 /* -------------------------------- Constants ------------------------------ */
 
+// founder's pace scale: 15 is the useful minimum, past ~4 h/day nobody
+// sustains — same choices as in settings (PACE_CHOICES)
 const MINUTE_OPTIONS: { minutes: number; labelKey: QuizTKey }[] = [
   { minutes: 15, labelKey: "min15" },
   { minutes: 30, labelKey: "min30" },
   { minutes: 45, labelKey: "min45" },
   { minutes: 60, labelKey: "min60" },
+  { minutes: 90, labelKey: "min90" },
+  { minutes: 120, labelKey: "min120" },
+  { minutes: 180, labelKey: "min180" },
+  { minutes: 240, labelKey: "min240" },
 ];
 
 const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [
@@ -407,26 +413,38 @@ export default function QuizPage() {
                     ) : (
                       <div className="rounded-2xl border border-[var(--color-brand)]/40 bg-[var(--color-brand)]/[0.05] p-4">
                         <div className="text-xs font-medium text-[var(--color-muted)]">{qt(locale, "tlPickDate")}</div>
-                        <div className="mt-2 flex gap-2">
-                          <input
-                            type="date"
-                            value={examDate}
-                            min={new Date().toISOString().slice(0, 10)}
-                            onChange={(e) => setExamDate(e.target.value)}
-                            className="flex-1 rounded-xl border border-black/[0.1] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-brand)]"
-                          />
-                          <button
-                            type="button"
-                            disabled={!examDate}
-                            onClick={() => {
-                              stashExamPlan({ targetLevel, examDateMode: "exact", examDate });
-                              setOnbStep(4);
-                            }}
-                            className="btn-primary rounded-xl px-4 py-2 text-sm disabled:opacity-40"
-                          >
-                            {qt(locale, "tlConfirm")}
-                          </button>
-                        </div>
+                        <input
+                          type="date"
+                          value={examDate}
+                          min={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setExamDate(e.target.value)}
+                          className="mt-2 w-full rounded-xl border border-black/[0.1] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-brand)]"
+                        />
+                        {/* locked vs movable → the honest plan needs to know
+                            whether "postpone" is even on the table */}
+                        {examDate && (
+                          <>
+                            <div className="mt-3 text-xs font-medium text-[var(--color-muted)]">{qt(locale, "tlFlexQ")}</div>
+                            <div className="mt-2 flex flex-col gap-2">
+                              {([
+                                { flexible: true, key: "tlFlex" as const, emoji: "🔄" },
+                                { flexible: false, key: "tlFixed" as const, emoji: "📌" },
+                              ]).map((o) => (
+                                <button
+                                  key={o.key}
+                                  type="button"
+                                  onClick={() => {
+                                    stashExamPlan({ targetLevel, examDateMode: "exact", examDate, examDateFlexible: o.flexible });
+                                    setOnbStep(4);
+                                  }}
+                                  className="rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-left text-sm font-medium text-[var(--color-foreground)] transition-all hover:border-[var(--color-brand)]/60"
+                                >
+                                  {o.emoji} {qt(locale, o.key)}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -449,7 +467,7 @@ export default function QuizPage() {
                         className="flex flex-col items-start rounded-2xl border border-black/[0.07] bg-black/[0.02] px-4 py-3.5 text-left transition-all hover:border-[var(--color-brand)]/60 hover:bg-[var(--color-brand)]/[0.05]"
                       >
                         <span className="text-base font-bold text-[var(--color-foreground)]">
-                          {m.minutes === 60 ? "60+" : m.minutes} {qt(locale, "minPerDay")}
+                          {m.minutes} {qt(locale, "minPerDay")}
                         </span>
                         <span className="text-xs text-[var(--color-muted)]">{qt(locale, m.labelKey)}</span>
                       </button>

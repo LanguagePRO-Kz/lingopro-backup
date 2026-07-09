@@ -13,6 +13,9 @@ export type ExamPlan = {
   examDateMode: ExamDateMode;
   examDate?: string; // YYYY-MM-DD, mode = exact
   examHorizonMonths?: 1 | 3 | 6; // mode = approx
+  /** exact mode only: false = the date is locked (enrolled/registered) →
+   * the honest plan switches to mobilization instead of "postpone" */
+  examDateFlexible?: boolean;
 };
 
 const KEY = "lingopro:examPlan";
@@ -59,6 +62,12 @@ export async function saveExamPlanToProfile(p: ExamPlan): Promise<void> {
         exam_horizon_months: p.examDateMode === "approx" ? (p.examHorizonMonths ?? null) : null,
       })
       .eq("id", user.id);
+    // ISOLATED write: the column arrives with migration 0006 — one missing
+    // column would 400 the whole update above, so it gets its own statement
+    await supabase
+      .from("profiles")
+      .update({ exam_date_flexible: p.examDateMode === "exact" ? (p.examDateFlexible ?? null) : null })
+      .eq("id", user.id);
   } catch {
     /* best-effort */
   }
@@ -79,8 +88,16 @@ export async function fetchExamPlan(): Promise<
       .eq("id", user.id)
       .maybeSingle();
     if (!data) return null;
+    // ISOLATED read (migration 0006): pre-migration this errors alone and
+    // the plan degrades to "flexible unknown" without killing the select above
+    const { data: flex, error: flexErr } = await supabase
+      .from("profiles")
+      .select("exam_date_flexible")
+      .eq("id", user.id)
+      .maybeSingle();
     return {
       hasProfile: true,
+      examDateFlexible: flexErr ? undefined : ((flex?.exam_date_flexible as boolean | null) ?? undefined),
       level: (data.level as string | null) ?? null,
       targetLevel: data.target_level === "B2" ? "B2" : "C1",
       examDateMode: (["exact", "approx", "unknown"].includes(data.exam_date_mode as string)

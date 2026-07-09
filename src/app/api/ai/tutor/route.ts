@@ -60,12 +60,15 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
-  const [{ data: profile }, { data: weak }] = await Promise.all([
+  // gender is read in ISOLATION: the column ships with migration 0006, and
+  // bundled here a missing column would 400 the level/goal context too
+  const [{ data: profile }, { data: genderRow }, { data: weak }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("quiz_result, target_level, gender")
+      .select("quiz_result, target_level")
       .eq("id", quota.userId)
       .maybeSingle(),
+    supabase.from("profiles").select("gender").eq("id", quota.userId).maybeSingle(),
     supabase
       .from("topic_mastery")
       .select("topic")
@@ -84,7 +87,7 @@ export async function POST(req: Request) {
     task: "tutor_chat",
     feedbackLang: lang,
     system: buildTutorSystem({
-      gender: (profile?.gender as "female" | "male" | null) ?? null,
+      gender: (genderRow?.gender as "female" | "male" | null) ?? null,
       lang,
       level: quiz?.level ?? "A2",
       targetLevel: (profile?.target_level as string | null) ?? "B2",

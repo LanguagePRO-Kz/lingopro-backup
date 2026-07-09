@@ -13,8 +13,9 @@ import { withYazmaReview } from "@/lib/diagnostic/engine";
 import { attachKonusmaScore } from "@/lib/diagnostic/result";
 import { validateWritingReview } from "@/lib/ai/prompts/writing-review";
 import { YAZMA_PROMPTS } from "@/data/diagnostic-bank";
-import { clearStashedExamPlan, loadStashedExamPlan, saveExamPlanToProfile } from "@/lib/exam-plan";
+import { clearStashedExamPlan, daysToExam, fetchExamPlan, loadStashedExamPlan, saveExamPlanToProfile, type ExamPlan } from "@/lib/exam-plan";
 import { awardXp, XP } from "@/lib/xp";
+import { PlanVerdictCard } from "@/components/PlanVerdictCard";
 
 /**
  * Post-diagnostic result page. Requires auth (→ /login otherwise). The
@@ -30,6 +31,9 @@ export default function QuizResultPage() {
   const [result, setResult] = useState<QuizResult | null>(null);
   const [status, setStatus] = useState<"loading" | "ready">("loading");
   const [yazmaChecking, setYazmaChecking] = useState(false);
+  // goal/date context for the honest plan verdict (stash on a fresh
+  // diagnostic, profile on a retake visit)
+  const [examPlan, setExamPlan] = useState<ExamPlan | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +76,12 @@ export default function QuizResultPage() {
       // v3: onboarding minutes → profile BEFORE the dashboard can generate a
       // route (awaited: the route inputs must see the real minutes, not 30)
       if (final.version === 3 && final.minutesDaily) {
-        await supabase
-          .from("profiles")
-          .update({ study_minutes_daily: final.minutesDaily, ...(final.gender ? { gender: final.gender } : {}) })
-          .eq("id", user.id);
+        await supabase.from("profiles").update({ study_minutes_daily: final.minutesDaily }).eq("id", user.id);
+        // ISOLATED: gender arrives with migration 0006 — bundled into the
+        // update above, a missing column would 400 the minutes write too
+        if (final.gender) {
+          void supabase.from("profiles").update({ gender: final.gender }).eq("id", user.id).then();
+        }
       }
 
       // persist the onboarding goal/date choice (block D)
@@ -83,6 +89,12 @@ export default function QuizResultPage() {
       if (stashed) {
         await saveExamPlanToProfile(stashed);
         clearStashedExamPlan();
+        if (!cancelled) setExamPlan(stashed);
+      } else {
+        // retake visit — the choice already lives in the profile
+        void fetchExamPlan().then((p) => {
+          if (p && !cancelled) setExamPlan(p);
+        });
       }
 
       if (cancelled) return;
@@ -142,9 +154,28 @@ export default function QuizResultPage() {
     );
   }
 
+  // honest plan verdict, right under the level (founder: the verdict comes
+  // BEFORE the route). Mastery credit deliberately omitted here — the seed
+  // just landed; settings shows the credited version later.
+  const verdict = examPlan ? (
+    <PlanVerdictCard
+      level={result.routerLevel ?? result.level}
+      targetLevel={examPlan.targetLevel}
+      minutesDaily={result.minutesDaily ?? 30}
+      daysLeft={
+        examPlan.examDateMode === "exact"
+          ? daysToExam(examPlan)
+          : examPlan.examDateMode === "approx" && examPlan.examHorizonMonths
+            ? examPlan.examHorizonMonths * 30
+            : null
+      }
+      examDateFlexible={examPlan.examDateMode === "exact" ? (examPlan.examDateFlexible ?? true) : true}
+    />
+  ) : null;
+
   return (
     <PageShell>
-      <ResultView result={result} yazmaChecking={yazmaChecking} />
+      <ResultView result={result} yazmaChecking={yazmaChecking} planVerdict={verdict} />
     </PageShell>
   );
 }

@@ -420,7 +420,16 @@ function V3SectionAccordion({
 
 /* ------------------------------ Result view ------------------------------ */
 /** The full diagnostic result UI. Shared by /results and /quiz/result. */
-export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazmaChecking?: boolean }) {
+export function ResultView({
+  result,
+  yazmaChecking,
+  planVerdict,
+}: {
+  result: QuizResult;
+  yazmaChecking?: boolean;
+  /** honest plan verdict card — right after the level, before everything else */
+  planVerdict?: React.ReactNode;
+}) {
   const { exam } = useExam();
   const { locale } = useI18n();
   const router = useRouter();
@@ -526,6 +535,10 @@ export function ResultView({ result, yazmaChecking }: { result: QuizResult; yazm
           <p className="mx-auto mt-1 max-w-md text-xs text-[var(--color-muted)]">{qt(locale, "cefrCapNote")}</p>
         )}
       </motion.div>
+
+      {/* ============ 1b. Honest plan verdict (founder: right after the
+           result, before the route) ============ */}
+      {planVerdict && <div className="mt-6">{planVerdict}</div>}
 
       {/* ============ 2. Sections (v3) / skill bars (legacy) ============ */}
       {isV3 && sections ? (

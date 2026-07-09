@@ -9,6 +9,7 @@ import { LEVELS } from "@/data/types";
 import { TaskModal } from "@/components/TaskModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StartChecklist } from "@/components/StartChecklist";
+import { PlanCheckpoint } from "@/components/PlanCheckpoint";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
   loadDashboardData,
@@ -290,6 +291,10 @@ export default function DashboardHome() {
             </Link>
           </div>
         </div>
+
+        {/* honest checkpoint: locked exam date + goal doesn't fit → the
+            mobilization forecast, never a silent overpromise */}
+        <PlanCheckpoint />
 
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="font-semibold text-[var(--color-foreground)]">{completedCount}/{total} {c.done}</span>

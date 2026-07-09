@@ -14,7 +14,8 @@ import {
   needsRegen,
   type RouteInputs,
 } from "../src/lib/plan/route";
-import { assessFeasibility } from "../src/lib/plan/feasibility";
+import { assessPlan, hoursNeeded, paceChoiceFor, STEP_HOURS, KK_NATIVE_FACTOR } from "../src/lib/plan/feasibility";
+import { TOPICS } from "../src/lib/ai/topics";
 import { buildDay, dueReviews, mocksForDay, type MasteryRow } from "../src/lib/plan/layout";
 import { dayNeedsRebuild, generateDailyPlan } from "../src/lib/daily-plan";
 import { TOPIC_IDS } from "../src/lib/ai/topics";
@@ -94,19 +95,45 @@ console.log("— needsRegen —");
   check("no route → true", needsRegen(null, baseInputs));
 }
 
-console.log("— feasibility —");
+console.log("— honest plan: CEFR hours ladder —");
 {
-  // 10 topics × 90 min / (45 × 0.7) = 900/31.5 ≈ 29 days needed
-  const ok = assessFeasibility({ remainingTopics: 10, minutesDaily: 45, daysLeft: 60 });
-  check("plenty of time → ok", ok.verdict === "ok", ok.verdict);
-  const tight = assessFeasibility({ remainingTopics: 10, minutesDaily: 45, daysLeft: 30 });
-  check("just fits → tight", tight.verdict === "tight", tight.verdict);
-  const not = assessFeasibility({ remainingTopics: 10, minutesDaily: 15, daysLeft: 30, todayIso: TODAY });
-  check("15 min & 30 days → notEnough", not.verdict === "notEnough", not.verdict);
-  check("offers minutesNeeded", not.verdict === "notEnough" && (not.minutesNeeded ?? 0) > 15);
-  check("offers dateNeeded", not.verdict === "notEnough" && !!not.dateNeeded);
-  const unk = assessFeasibility({ remainingTopics: 10, minutesDaily: 30, daysLeft: null });
-  check("no date → unknown verdict", unk.verdict === "unknown");
+  check("A0→C1 = 860 h", hoursNeeded({ level: "A0", targetLevel: "C1" }) === 860, String(hoursNeeded({ level: "A0", targetLevel: "C1" })));
+  check("A1→C1 = 780 h", hoursNeeded({ level: "A1", targetLevel: "C1" }) === 780);
+  check("B1→B2 = step config", hoursNeeded({ level: "B1", targetLevel: "B2" }) === STEP_HOURS.B2);
+  const kk = hoursNeeded({ level: "A1", targetLevel: "C1", kkNative: true });
+  check("kk speaker ×0.75", kk === 780 * KK_NATIVE_FACTOR, String(kk));
+  // mastery credit: ALL step topics mastered → step halved (grammar ≈ half the work)
+  const b2Topics = TOPICS.filter((t) => t.level === "B2" && t.id !== "other").map((t) => t.id);
+  const credited = hoursNeeded({ level: "B1", targetLevel: "B2", masteredTopics: b2Topics });
+  check("full mastery → 50% of the step", credited === STEP_HOURS.B2 / 2, String(credited));
+  const partial = hoursNeeded({ level: "B1", targetLevel: "B2", masteredTopics: b2Topics.slice(0, 3) });
+  check("partial mastery → proportional credit", partial < STEP_HOURS.B2 && partial > credited, String(partial));
+}
+
+console.log("— honest plan: verdicts (founder's case: A1→C1, 3 мес, 45 мин) —");
+{
+  const not = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 45, daysLeft: 90, todayIso: TODAY });
+  check("A1→C1 in 90d @45min → notEnough", not.verdict === "notEnough", not.verdict);
+  check("resource ≈ 57 h", not.haveHours === 57, String(not.haveHours));
+  check("needed pace beyond human limits", (not.minutesNeeded ?? 0) > 240, String(not.minutesNeeded));
+  check("…so no pace choice is offered", paceChoiceFor(not.minutesNeeded!) === null);
+  check("honest dateNeeded exists & is future", !!not.dateNeeded && Date.parse(not.dateNeeded!) > Date.parse(TODAY));
+  check("months honest (~40)", not.monthsNeeded >= 35 && not.monthsNeeded <= 45, String(not.monthsNeeded));
+  check("forecast: no full level closes", not.reachableLevel === null);
+  check("…but visible progress toward A2", not.nextStepShare > 0.4, String(not.nextStepShare));
+
+  const reach = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 60, daysLeft: 365, todayIso: TODAY });
+  check("A1→C1 in 1y @60min → notEnough but B1 reachable", reach.verdict === "notEnough" && reach.reachableLevel === "B1", `${reach.verdict}/${reach.reachableLevel}`);
+
+  const tight = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 90, daysLeft: 365 });
+  check("A2→B2 in 1y @90min → tight (86%)", tight.verdict === "tight", `${tight.verdict}/${tight.loadPct}%`);
+  const ok = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 120, daysLeft: 365 });
+  check("A2→B2 in 1y @120min → ok", ok.verdict === "ok", `${ok.verdict}/${ok.loadPct}%`);
+
+  const unk = assessPlan({ level: "A1", targetLevel: "B2", minutesDaily: 30, daysLeft: null });
+  check("no date → unknown + months forecast", unk.verdict === "unknown" && unk.monthsNeeded > 0, String(unk.monthsNeeded));
+
+  check("paceChoiceFor rounds up to offered values", paceChoiceFor(61) === 90 && paceChoiceFor(240) === 240 && paceChoiceFor(241) === null);
 }
 
 console.log("— day layout —");
@@ -155,7 +182,7 @@ console.log("— day layout —");
 console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80-min day) —");
 {
   // template path (no route yet) — every supported pace, a week of days
-  for (const budget of [15, 30, 45, 60]) {
+  for (const budget of [15, 30, 45, 60, 90, 120, 180, 240]) {
     let ok = true;
     let detail = "";
     for (let day = 1; day <= 7; day++) {
@@ -177,7 +204,7 @@ console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80
 
   // route path — non-mock load respects each pace too
   const route = fallbackRoute(baseInputs, TODAY);
-  for (const budget of [15, 30, 45, 60]) {
+  for (const budget of [15, 30, 45, 60, 90, 120, 180, 240]) {
     let ok = true;
     let detail = "";
     for (let day = 1; day <= 7; day++) {

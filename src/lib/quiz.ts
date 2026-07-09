@@ -413,6 +413,15 @@ const T = {
   tlExact: { ru: "Знаю точную дату", en: "I know the exact date", tr: "Kesin tarihi biliyorum", kk: "Нақты күнін білемін" },
   tlPickDate: { ru: "Выбери дату экзамена", en: "Pick your exam date", tr: "Sınav tarihini seç", kk: "Емтихан күнін таңда" },
   tlConfirm: { ru: "Подтвердить", en: "Confirm", tr: "Onayla", kk: "Растау" },
+  // locked vs movable exam date → honest plan scenario B vs A
+  tlFlexQ: {
+    ru: "Эту дату можно перенести, если понадобится?",
+    en: "Can this date move if needed?",
+    tr: "Gerekirse bu tarih ertelenebilir mi?",
+    kk: "Қажет болса, бұл күнді ауыстыруға бола ма?",
+  },
+  tlFlex: { ru: "Да, могу перенести", en: "Yes, I can move it", tr: "Evet, erteleyebilirim", kk: "Иә, ауыстыра аламын" },
+  tlFixed: { ru: "Нет, дата жёсткая — уже есть запись", en: "No, it's locked — I'm registered", tr: "Hayır, kesin — kaydım var", kk: "Жоқ, бекітілген — тіркеліп қойғанмын" },
   // minutes per day (onboarding)
   onbMinutes: { ru: "Сколько минут в день готов заниматься?", en: "How many minutes a day can you study?", tr: "Günde kaç dakika çalışabilirsin?", kk: "Күніне қанша минут айналыса аласың?" },
   minutesNote: {
@@ -425,6 +434,10 @@ const T = {
   min30: { ru: "Стабильный", en: "Steady", tr: "Düzenli", kk: "Тұрақты" },
   min45: { ru: "Уверенный", en: "Confident", tr: "Yoğun", kk: "Сенімді" },
   min60: { ru: "Интенсив", en: "Intensive", tr: "Çok yoğun", kk: "Интенсив" },
+  min90: { ru: "Усиленный", en: "Boosted", tr: "Takviyeli", kk: "Күшейтілген" },
+  min120: { ru: "Решительный", en: "Determined", tr: "Kararlı", kk: "Табанды" },
+  min180: { ru: "Погружение", en: "Immersion", tr: "Tam yoğunluk", kk: "Терең дайындық" },
+  min240: { ru: "Мобилизация", en: "All-in", tr: "Seferberlik", kk: "Жұмылдыру" },
   minPerDay: { ru: "мин/день", en: "min/day", tr: "dk/gün", kk: "мин/күн" },
   // v3 stages
   stRouter: { ru: "Определение уровня", en: "Level check", tr: "Seviye belirleme", kk: "Деңгейді анықтау" },
