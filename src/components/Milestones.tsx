@@ -73,14 +73,22 @@ export function Milestones({ history }: { history: DayRow[] }) {
   useEffect(() => {
     let active = true;
     const found: Toast[] = [];
+    // founder verification: /dashboard?motivator=1 replays the CURRENT real
+    // state as toasts (still only real facts — just shown again)
+    let forced = false;
+    try {
+      forced = new URLSearchParams(window.location.search).get("motivator") === "1";
+    } catch {
+      /* ignore */
+    }
 
     // 1) streak thresholds — from the same real history the dashboard shows
     const streak = computeStreak(history);
     const celebrated = parseInt(lsGet(LS_STREAK) ?? "0", 10) || 0;
-    const hit = [...STREAK_STEPS].reverse().find((s) => streak >= s && s > celebrated);
+    const hit = [...STREAK_STEPS].reverse().find((s) => streak >= s && (forced || s > celebrated));
     if (hit) {
       found.push({ id: `streak-${hit}`, emoji: "🔥", text: c.streak(hit) });
-      lsSet(LS_STREAK, String(hit));
+      if (!forced) lsSet(LS_STREAK, String(hit));
     }
 
     void (async () => {
@@ -91,7 +99,11 @@ export function Milestones({ history }: { history: DayRow[] }) {
       if (!mErr) {
         const now = (mastered ?? []).map((r) => r.topic as string);
         const prevRaw = lsGet(LS_MASTERED);
-        if (prevRaw == null) {
+        if (forced) {
+          for (const t of now.slice(0, 2)) {
+            found.push({ id: `topic-${t}`, emoji: "✅", text: c.topic(topicById(t)?.label[locale] ?? t) });
+          }
+        } else if (prevRaw == null) {
           lsSet(LS_MASTERED, JSON.stringify(now)); // first run: seed silently
         } else {
           const prev = new Set<string>(JSON.parse(prevRaw) as string[]);
@@ -111,7 +123,9 @@ export function Milestones({ history }: { history: DayRow[] }) {
       if (!kErr) {
         const rows = (mocks ?? []) as { total: number }[];
         const prevRaw = lsGet(LS_MOCK);
-        if (prevRaw == null) {
+        if (forced && rows.length > 0) {
+          found.push({ id: "mock-latest", emoji: "🎯", text: c.mockFirst(rows[rows.length - 1].total) });
+        } else if (prevRaw == null) {
           lsSet(LS_MOCK, JSON.stringify({ n: rows.length, best: Math.max(0, ...rows.map((r) => r.total)) }));
         } else if (rows.length > 0) {
           const prev = JSON.parse(prevRaw) as { n: number; best: number };
@@ -130,6 +144,8 @@ export function Milestones({ history }: { history: DayRow[] }) {
         found.slice(0, 3).forEach((t, i) => {
           setTimeout(() => active && setToasts((cur) => cur.filter((x) => x.id !== t.id)), 7000 + i * 800);
         });
+      } else if (active) {
+        console.info("[motivator] Milestones: no NEW real events since the last visit — replay current state with /dashboard?motivator=1");
       }
     })();
 

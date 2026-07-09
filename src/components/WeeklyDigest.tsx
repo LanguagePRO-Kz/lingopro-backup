@@ -70,9 +70,14 @@ export function WeeklyDigest({ history }: { history: DayRow[] }) {
   const prevMonday = addDaysISO(thisMonday, -7);
   const lsKey = `lingopro:digest:${thisMonday}`;
 
+  // founder verification: /dashboard?motivator=1 shows the digest with the
+  // real numbers regardless of the dismissal/new-account gates
+  const [forced, setForced] = useState(false);
+
   useEffect(() => {
     let active = true;
     try {
+      setForced(new URLSearchParams(window.location.search).get("motivator") === "1");
       setDismissed(window.localStorage.getItem(lsKey) === "1");
     } catch {
       /* stays hidden */
@@ -92,8 +97,14 @@ export function WeeklyDigest({ history }: { history: DayRow[] }) {
   }, [lsKey, prevMonday, thisMonday]);
 
   // only accounts that existed before this week get a digest
-  if (!history.some((r) => r.date < thisMonday)) return null;
-  if (dismissed) return null;
+  if (!forced && !history.some((r) => r.date < thisMonday)) {
+    console.info("[motivator] WeeklyDigest hidden: no history before this Monday (new account) — force with /dashboard?motivator=1");
+    return null;
+  }
+  if (!forced && dismissed) {
+    console.info("[motivator] WeeklyDigest hidden: dismissed this week — force with /dashboard?motivator=1");
+    return null;
+  }
 
   const week = history.filter((r) => r.date >= prevMonday && r.date < thisMonday);
   const tasksDone = week.reduce((s, r) => s + r.completedCount, 0);

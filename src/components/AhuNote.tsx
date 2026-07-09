@@ -44,7 +44,10 @@ export function AhuNote({ streak, history }: { streak: number; history: DayRow[]
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ feedbackLang: locale }),
         });
-        if (!res.ok) return; // quota/no AI → the template fallback stays
+        if (!res.ok) {
+          console.info(`[motivator] AhuNote: AI note unavailable (HTTP ${res.status}) — honest template fallback shown`);
+          return; // quota/no AI → the template fallback stays
+        }
         const data = (await res.json()) as { text?: string };
         if (!data.text || !active) return;
         setAiText(data.text);

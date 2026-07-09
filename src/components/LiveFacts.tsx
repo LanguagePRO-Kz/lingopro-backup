@@ -68,7 +68,11 @@ export function LiveFacts({ streak, levelRaw }: { streak: number; levelRaw: stri
   if (examDays != null) chips.push(c.exam(examDays));
   if (streak >= 2) chips.push(c.streak(streak));
   if (topics) chips.push(c.topics(topics.done, topics.all, topics.target));
-  if (chips.length === 0) return null;
+  if (chips.length === 0) {
+    // observable reason instead of a silent no-show (onboarding lesson)
+    console.info(`[motivator] LiveFacts hidden: no exam date${streak < 2 ? ", streak < 2" : ""}, topics not loaded yet`);
+    return null;
+  }
 
   return (
     <div className="mt-3 flex flex-wrap gap-2">
