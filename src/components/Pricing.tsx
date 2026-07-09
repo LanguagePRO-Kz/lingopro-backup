@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import type { PackageId } from "@/lib/billing";
-import { currencyFor, fmtMoney, planRow } from "@/lib/pricing";
+import { currencyFor, fmtMoney, planRow, savingsPct } from "@/lib/pricing";
 import { SectionHeading } from "./ui/SectionHeading";
 import { Gift } from "lucide-react";
-import { PricingTicker } from "./PricingTicker";
 import { StaggerGroup, StaggerItem, Reveal } from "./ui/Reveal";
 
-type Pkg = { id: PackageId; name: string; note: string; badge?: string };
+type Pkg = { id: PackageId; name: string; badge?: string };
 type Content = {
   title: string;
   subtitle: string;
@@ -18,6 +17,9 @@ type Content = {
   cta: string;
   features: string[];
   packages: Pkg[];
+  fullAccess: string;
+  save: (n: number) => string;
+  saveMax: (n: number) => string;
   bannerText: string;
   bannerStrong: string;
   bannerCta: string;
@@ -32,7 +34,7 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
     features: [
       "AI-диагностика уровня",
       "Персональный план подготовки",
-      "AI-преподаватель без лимитов",
+      "AI-преподаватель 24/7",
       "Разговорная практика и произношение",
       "Проверка письменных заданий",
       "Пробные экзамены TÖMER",
@@ -40,10 +42,13 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Статистика и прогресс",
     ],
     packages: [
-      { id: "1m", name: "1 месяц", note: "Полный доступ ко всем функциям" },
-      { id: "3m", name: "3 месяца", note: "Экономия 40%", badge: "Популярный" },
-      { id: "6m", name: "6 месяцев", note: "Максимальная экономия" },
+      { id: "1m", name: "1 месяц" },
+      { id: "3m", name: "3 месяца", badge: "Популярный" },
+      { id: "6m", name: "6 месяцев" },
     ],
+    fullAccess: "Полный доступ ко всем функциям",
+    save: (n: number) => `Экономия ${n}%`,
+    saveMax: (n: number) => `Максимальная экономия — ${n}%`,
     bannerText: "Пройди бесплатную диагностику и получи скидку на любой пакет",
     bannerStrong: "−30%",
     bannerCta: "Пройти диагностику →",
@@ -56,7 +61,7 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
     features: [
       "AI level diagnostic",
       "Personal preparation plan",
-      "Unlimited AI tutor",
+      "AI tutor 24/7",
       "Speaking practice & pronunciation",
       "Written assignment review",
       "Mock TÖMER exams",
@@ -64,10 +69,13 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Statistics & progress",
     ],
     packages: [
-      { id: "1m", name: "1 month", note: "Full access to all features" },
-      { id: "3m", name: "3 months", note: "Save 40%", badge: "Popular" },
-      { id: "6m", name: "6 months", note: "Maximum savings" },
+      { id: "1m", name: "1 month" },
+      { id: "3m", name: "3 months", badge: "Popular" },
+      { id: "6m", name: "6 months" },
     ],
+    fullAccess: "Full access to all features",
+    save: (n: number) => `Save ${n}%`,
+    saveMax: (n: number) => `Maximum savings — ${n}%`,
     bannerText: "Take the free diagnostic and get a discount on any package",
     bannerStrong: "−30%",
     bannerCta: "Take the diagnostic →",
@@ -80,7 +88,7 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
     features: [
       "AI seviye tanısı",
       "Kişisel hazırlık planı",
-      "Sınırsız AI öğretmen",
+      "7/24 AI öğretmen",
       "Konuşma pratiği ve telaffuz",
       "Yazılı ödev değerlendirmesi",
       "Deneme TÖMER sınavları",
@@ -88,10 +96,13 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "İstatistik ve ilerleme",
     ],
     packages: [
-      { id: "1m", name: "1 ay", note: "Tüm özelliklere tam erişim" },
-      { id: "3m", name: "3 ay", note: "%40 tasarruf", badge: "Popüler" },
-      { id: "6m", name: "6 ay", note: "Maksimum tasarruf" },
+      { id: "1m", name: "1 ay" },
+      { id: "3m", name: "3 ay", badge: "Popüler" },
+      { id: "6m", name: "6 ay" },
     ],
+    fullAccess: "Tüm özelliklere tam erişim",
+    save: (n: number) => `%${n} tasarruf`,
+    saveMax: (n: number) => `En yüksek tasarruf — %${n}`,
     bannerText: "Ücretsiz tanıyı tamamla ve her pakette indirim kazan",
     bannerStrong: "−30%",
     bannerCta: "Tanıya başla →",
@@ -104,7 +115,7 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
     features: [
       "Деңгейдің AI-диагностикасы",
       "Жеке дайындық жоспары",
-      "Шектеусіз AI-мұғалім",
+      "24/7 AI-мұғалім",
       "Сөйлеу практикасы және айтылым",
       "Жазба тапсырмаларды тексеру",
       "TÖMER сынақ емтихандары",
@@ -112,10 +123,13 @@ const CONTENT: { ru: Content; en: Content; tr: Content; kk: Content } = {
       "Статистика және прогресс",
     ],
     packages: [
-      { id: "1m", name: "1 ай", note: "Барлық функцияларға толық қолжетімділік" },
-      { id: "3m", name: "3 ай", note: "40% үнемдеу", badge: "Танымал" },
-      { id: "6m", name: "6 ай", note: "Максималды үнемдеу" },
+      { id: "1m", name: "1 ай" },
+      { id: "3m", name: "3 ай", badge: "Танымал" },
+      { id: "6m", name: "6 ай" },
     ],
+    fullAccess: "Барлық функцияларға толық қолжетімділік",
+    save: (n: number) => `${n}% үнемдеу`,
+    saveMax: (n: number) => `Ең көп үнемдеу — ${n}%`,
     bannerText: "Тегін диагностикадан өт және кез келген пакетке жеңілдік ал",
     bannerStrong: "−30%",
     bannerCta: "Диагностикадан өту →",
@@ -138,16 +152,15 @@ export function Pricing() {
       <div className="mx-auto max-w-6xl">
         <SectionHeading eyebrow={c.title} title={c.title} subtitle={c.subtitle} />
 
-        {/* names + live counter ticker */}
-        <Reveal className="mt-10">
-          <PricingTicker />
-        </Reveal>
-
-        {/* packages */}
-        <StaggerGroup className="mt-8 grid items-stretch gap-6 lg:grid-cols-3">
+        {/* packages — savings computed from the real prices, never hand-typed */}
+        <StaggerGroup className="mt-12 grid items-stretch gap-6 lg:grid-cols-3">
           {c.packages.map((p) => {
             const popular = !!p.badge;
             const row = planRow(cur, p.id);
+            const note =
+              p.id === "1m" ? c.fullAccess
+              : p.id === "6m" ? c.saveMax(savingsPct(cur, p.id))
+              : c.save(savingsPct(cur, p.id));
             return (
               <StaggerItem key={p.id} className={popular ? "lg:-mt-4" : ""}>
                 <div
@@ -168,7 +181,7 @@ export function Pricing() {
                     <span className="text-[20px] font-bold">{fmtMoney(cur, row.perDay)}</span>
                     <span className="text-[16px]">{pd.post}</span>
                   </div>
-                  <p className="mt-3 text-sm font-medium text-[var(--color-brand)]">{p.note}</p>
+                  <p className="mt-3 text-sm font-medium text-[var(--color-brand)]">{note}</p>
                   <Link
                     href="/register"
                     className={`mt-7 rounded-full px-5 py-3 text-center text-sm font-semibold transition-all ${

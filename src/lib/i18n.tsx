@@ -74,13 +74,13 @@ const ru = {
       },
       {
         n: "02",
-        title: "Персональный план",
-        text: "Получаешь программу на 30, 60 или 90 дней с ежедневными задачами под твою цель и срок.",
+        title: "Честный план",
+        text: "Получаешь план под твою цель и дату экзамена: ежедневные задачи и реальный срок — без обещаний «C1 за месяц».",
       },
       {
         n: "03",
-        title: "Адаптивная подготовка",
-        text: "Каждый день план перестраивается под результаты — слабые темы подтягиваются, сильные закрепляются.",
+        title: "Занятия с AI-преподавателем",
+        text: "Ahu объясняет, тренирует Speaking и Writing и каждый день перестраивает план под твои результаты: слабое подтягивается, сильное закрепляется.",
       },
     ],
   },
@@ -176,8 +176,8 @@ const ru = {
     leagueValue: "Сапфировая",
   },
   certificates: {
-    title: "Реальные результаты наших студентов",
-    subtitle: "Сертификаты, полученные после подготовки на платформе",
+    title: "Студенты нашей методики — с сертификатами TÖMER",
+    subtitle: "Реальные сертификаты студентов нашей офлайн-школы Language PRO. Теперь эта методика — в платформе.",
     certWord: "Сертификат",
     studentWord: "Студент",
     levelWord: "Уровень",
@@ -230,7 +230,7 @@ const ru = {
         desc: "Полноценная подготовка с адаптивным планом.",
         features: [
           "Персональный план 30/60/90 дней",
-          "AI-преподаватель без лимитов",
+          "AI-преподаватель 24/7",
           "Разговорная практика и анализ произношения",
           "Проверка письменных заданий",
         ],
@@ -267,7 +267,7 @@ const ru = {
       },
       {
         q: "Связан ли LingoPRO с TÖMER официально?",
-        a: "Да. LingoPRO является официальным партнёром TÖMER и работает с его экзаменационными материалами и стандартами оценки.",
+        a: "Нет. LingoPRO не аффилирован с TÖMER — мы готовим к экзамену по его открытому формату и критериям оценки.",
       },
       {
         q: "Можно ли пользоваться бесплатно?",
@@ -299,7 +299,7 @@ const ru = {
     },
     rights: "Все права защищены.",
     disclaimer:
-      "LingoPRO — официальный партнёр TÖMER. Названия экзаменов принадлежат соответствующим правообладателям.",
+      "LingoPRO — независимая платформа подготовки, не аффилированная с TÖMER. Названия экзаменов принадлежат соответствующим правообладателям.",
   },
   pages: {
     back: "На главную",
@@ -419,13 +419,13 @@ const kk: Dict = {
       },
       {
         n: "02",
-        title: "Жеке жоспар",
-        text: "Мақсатың мен мерзіміңе сай күнделікті тапсырмалары бар 30, 60 немесе 90 күндік бағдарлама аласың.",
+        title: "Адал жоспар",
+        text: "Мақсатың мен емтихан күніне сай жоспар аласың: күнделікті тапсырмалар және нақты мерзім — «бір айда C1» деген уәдесіз.",
       },
       {
         n: "03",
-        title: "Бейімделетін дайындық",
-        text: "Жоспар нәтижеге қарай күн сайын қайта құрылады — әлсіз тақырыптар күшейтіледі, мықтылары бекітіледі.",
+        title: "AI-мұғаліммен сабақтар",
+        text: "Ahu түсіндіреді, Speaking пен Writing-ті жаттықтырады және жоспарды күн сайын нәтижеңе қарай қайта құрады: әлсізі күшейтіледі, мықтысы бекітіледі.",
       },
     ],
   },
@@ -521,8 +521,8 @@ const kk: Dict = {
     leagueValue: "Сапфир",
   },
   certificates: {
-    title: "Біздің студенттердің нақты нәтижелері",
-    subtitle: "Платформада дайындалғаннан кейін алынған сертификаттар",
+    title: "Біздің әдістеменің студенттері — TÖMER сертификаттарымен",
+    subtitle: "Language PRO офлайн мектебіміз студенттерінің нақты сертификаттары. Енді осы әдістеме — платформада.",
     certWord: "Сертификат",
     studentWord: "Студент",
     levelWord: "Деңгей",
@@ -611,7 +611,7 @@ const kk: Dict = {
       },
       {
         q: "LingoPRO TÖMER-мен ресми байланысты ма?",
-        a: "Иә. LingoPRO — TÖMER-дің ресми серіктесі және оның емтихан материалдары мен бағалау стандарттарымен жұмыс істейді.",
+        a: "Жоқ. LingoPRO TÖMER-мен аффилиирленбеген — біз емтиханның ашық форматы мен бағалау критерийлері бойынша дайындаймыз.",
       },
       {
         q: "Тегін пайдалануға бола ма?",
@@ -643,7 +643,7 @@ const kk: Dict = {
     },
     rights: "Барлық құқық қорғалған.",
     disclaimer:
-      "LingoPRO — TÖMER-дің ресми серіктесі. Емтихан атаулары тиісті құқық иелеріне тиесілі.",
+      "LingoPRO — TÖMER-мен аффилиирленбеген тәуелсіз дайындық платформасы. Емтихан атаулары тиісті құқық иелеріне тиесілі.",
   },
   pages: {
     back: "Басты бетке",
@@ -759,13 +759,13 @@ const en: Dict = {
       },
       {
         n: "02",
-        title: "Personal plan",
-        text: "Get a 30, 60 or 90-day program with daily tasks tailored to your goal and deadline.",
+        title: "An honest plan",
+        text: "Get a plan built around your goal and exam date: daily tasks and a realistic timeline — no “C1 in a month” promises.",
       },
       {
         n: "03",
-        title: "Adaptive prep",
-        text: "Your plan rebuilds daily from results — weak topics get reinforced, strong ones locked in.",
+        title: "Lessons with your AI tutor",
+        text: "Ahu explains, drills your Speaking and Writing, and rebuilds the plan daily from your results — weak topics get reinforced, strong ones locked in.",
       },
     ],
   },
@@ -861,8 +861,8 @@ const en: Dict = {
     leagueValue: "Sapphire",
   },
   certificates: {
-    title: "Real results from our students",
-    subtitle: "Certificates earned after preparing on the platform",
+    title: "Our method's students — with TÖMER certificates",
+    subtitle: "Real certificates earned by students of our offline school Language PRO. That same method now powers this platform.",
     certWord: "Certificate",
     studentWord: "Student",
     levelWord: "Level",
@@ -914,7 +914,7 @@ const en: Dict = {
         desc: "Full preparation with an adaptive plan.",
         features: [
           "Personal 30/60/90-day plan",
-          "Unlimited AI tutor",
+          "AI tutor 24/7",
           "Speaking practice & pronunciation analysis",
           "Writing task review",
         ],
@@ -951,7 +951,7 @@ const en: Dict = {
       },
       {
         q: "Is LingoPRO officially affiliated with TÖMER?",
-        a: "Yes. LingoPRO is an official partner of TÖMER and works with its exam materials and scoring standards.",
+        a: "No. LingoPRO is not affiliated with TÖMER — we prepare you for the exam based on its public format and scoring criteria.",
       },
       {
         q: "Can I use it for free?",
@@ -983,7 +983,7 @@ const en: Dict = {
     },
     rights: "All rights reserved.",
     disclaimer:
-      "LingoPRO is an official partner of TÖMER. Exam names belong to their respective owners.",
+      "LingoPRO is an independent prep platform, not affiliated with TÖMER. Exam names belong to their respective owners.",
   },
   pages: {
     back: "Back home",
@@ -1099,13 +1099,13 @@ const tr: Dict = {
       },
       {
         n: "02",
-        title: "Kişisel plan",
-        text: "Hedefine ve süresine göre günlük görevlerle 30, 60 veya 90 günlük bir program al.",
+        title: "Dürüst bir plan",
+        text: "Hedefine ve sınav tarihine göre bir plan al: günlük görevler ve gerçekçi bir süre — “bir ayda C1” vaadi yok.",
       },
       {
         n: "03",
-        title: "Uyarlanabilir hazırlık",
-        text: "Planın sonuçlara göre her gün yeniden kurulur — zayıf konular güçlendirilir, güçlüler pekiştirilir.",
+        title: "AI öğretmenle dersler",
+        text: "Ahu anlatır, Speaking ve Writing'ini çalıştırır ve planı her gün sonuçlarına göre yeniden kurar — zayıf konular güçlenir, güçlüler pekişir.",
       },
     ],
   },
@@ -1201,8 +1201,8 @@ const tr: Dict = {
     leagueValue: "Safir",
   },
   certificates: {
-    title: "Öğrencilerimizin gerçek sonuçları",
-    subtitle: "Platformda hazırlandıktan sonra alınan sertifikalar",
+    title: "Metodumuzun öğrencileri — TÖMER belgeleriyle",
+    subtitle: "Offline okulumuz Language PRO öğrencilerinin gerçek belgeleri. Aynı metot artık bu platformda.",
     certWord: "Sertifika",
     studentWord: "Öğrenci",
     levelWord: "Seviye",
@@ -1254,7 +1254,7 @@ const tr: Dict = {
         desc: "Uyarlanabilir planla tam hazırlık.",
         features: [
           "Kişisel 30/60/90 günlük plan",
-          "Sınırsız AI öğretmen",
+          "7/24 AI öğretmen",
           "Konuşma pratiği ve telaffuz analizi",
           "Yazılı görev kontrolü",
         ],
@@ -1291,7 +1291,7 @@ const tr: Dict = {
       },
       {
         q: "LingoPRO TÖMER ile resmi olarak bağlantılı mı?",
-        a: "Evet. LingoPRO, TÖMER'in resmi ortağıdır ve onun sınav materyalleri ile değerlendirme standartlarıyla çalışır.",
+        a: "Hayır. LingoPRO, TÖMER ile bağlantılı değildir — sınava, herkese açık formatı ve puanlama kriterlerine göre hazırlarız.",
       },
       {
         q: "Ücretsiz kullanabilir miyim?",
@@ -1323,7 +1323,7 @@ const tr: Dict = {
     },
     rights: "Tüm hakları saklıdır.",
     disclaimer:
-      "LingoPRO, TÖMER'in resmi ortağıdır. Sınav adları ilgili sahiplerine aittir.",
+      "LingoPRO, TÖMER ile bağlantısı olmayan bağımsız bir hazırlık platformudur. Sınav adları ilgili sahiplerine aittir.",
   },
   pages: {
     back: "Ana sayfa",

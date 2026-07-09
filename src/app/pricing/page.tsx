@@ -11,8 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { pick, pluralize } from "@/lib/localized";
 import { loadResult, saveResult, PLANS, LEVEL_ORDER, levelIndex, type QuizResult } from "@/lib/quiz";
 import { type PackageId } from "@/lib/billing";
-import { PRICING, currencyFor, fmtMoney, planRow, type Currency } from "@/lib/pricing";
-import { PricingTicker } from "@/components/PricingTicker";
+import { PRICING, currencyFor, fmtMoney, planRow, savingsPct, type Currency } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
 import { EarlyAccessModal } from "@/components/EarlyAccessModal";
@@ -33,14 +32,15 @@ const T = {
     toGoal: "До цели C1 —",
     levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
     choosePlan: "Выберите план подготовки",
-    earlyNote: "Ранний доступ: оплата откроется при запуске. Сейчас вход — по коду доступа.",
+    earlyNote: "Оплата откроется при запуске платформы.",
     discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
     names: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } as Record<string, string>,
-    badges: { "3m": "Экономия 50%", "6m": "Максимальная экономия" } as Record<string, string>,
+    save: (n: number) => `Экономия ${n}%`,
+    saveMax: (n: number) => `Максимальная экономия — ${n}%`,
     features: [
       "AI-диагностика уровня",
       "Персональный план подготовки",
-      "AI-преподаватель без лимитов",
+      "AI-преподаватель 24/7",
       "Разговорная практика и произношение",
       "Проверка письменных заданий",
       "Пробные экзамены TÖMER",
@@ -63,14 +63,15 @@ const T = {
     toGoal: "To the C1 goal —",
     levels: (n: number) => (n === 1 ? "level" : "levels"),
     choosePlan: "Choose a prep plan",
-    earlyNote: "Early access: card payments open at launch. For now, entry is by access code.",
+    earlyNote: "Card payments open at launch.",
     discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
     names: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } as Record<string, string>,
-    badges: { "3m": "Save 50%", "6m": "Best value" } as Record<string, string>,
+    save: (n: number) => `Save ${n}%`,
+    saveMax: (n: number) => `Maximum savings — ${n}%`,
     features: [
       "AI level diagnostic",
       "Personal preparation plan",
-      "Unlimited AI tutor",
+      "AI tutor 24/7",
       "Speaking practice & pronunciation",
       "Written assignment review",
       "Mock TÖMER exams",
@@ -93,14 +94,15 @@ const T = {
     toGoal: "C1 hedefine —",
     levels: () => "seviye",
     choosePlan: "Bir hazırlık planı seç",
-    earlyNote: "Erken erişim: kart ödemeleri lansmanda açılacak. Şimdilik giriş erişim koduyla.",
+    earlyNote: "Kart ödemeleri lansmanda açılacak.",
     discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
     names: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } as Record<string, string>,
-    badges: { "3m": "%50 tasarruf", "6m": "En iyi değer" } as Record<string, string>,
+    save: (n: number) => `%${n} tasarruf`,
+    saveMax: (n: number) => `En yüksek tasarruf — %${n}`,
     features: [
       "AI seviye tanısı",
       "Kişisel hazırlık planı",
-      "Sınırsız AI öğretmen",
+      "7/24 AI öğretmen",
       "Konuşma pratiği ve telaffuz",
       "Yazılı ödev değerlendirmesi",
       "Deneme TÖMER sınavları",
@@ -123,14 +125,15 @@ const T = {
     toGoal: "C1 мақсатына дейін —",
     levels: () => "деңгей",
     choosePlan: "Дайындық жоспарын таңда",
-    earlyNote: "Ерте қолжетімділік: карта төлемдері іске қосылғанда ашылады. Әзірге кіру — қолжетімділік кодымен.",
+    earlyNote: "Карта төлемдері платформа іске қосылғанда ашылады.",
     discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
     names: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } as Record<string, string>,
-    badges: { "3m": "50% үнемдеу", "6m": "Ең тиімді" } as Record<string, string>,
+    save: (n: number) => `${n}% үнемдеу`,
+    saveMax: (n: number) => `Ең көп үнемдеу — ${n}%`,
     features: [
       "Деңгейдің AI-диагностикасы",
       "Жеке дайындық жоспары",
-      "Шектеусіз AI-мұғалім",
+      "24/7 AI-мұғалім",
       "Сөйлеу практикасы және айтылым",
       "Жазба тапсырмаларды тексеру",
       "TÖMER сынақ емтихандары",
@@ -261,16 +264,14 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* names + live counter ticker */}
-        <div className="mt-8">
-          <PricingTicker />
-        </div>
-
-        {/* packages */}
-        <div className="mt-6 grid items-stretch gap-6 lg:grid-cols-3">
+        {/* packages — savings computed from the real prices, never hand-typed */}
+        <div className="mt-8 grid items-stretch gap-6 lg:grid-cols-3">
           {plans.map((p) => {
             const popular = !!p.popular;
-            const badge = c.badges[p.id];
+            const badge =
+              p.id === "3m" ? c.save(savingsPct(cur, p.id))
+              : p.id === "6m" ? c.saveMax(savingsPct(cur, p.id))
+              : undefined;
             return (
               <motion.div
                 key={p.id}

@@ -10,11 +10,18 @@ import { Hero3D } from "./Hero3D";
 export function Hero() {
   const { t, locale } = useI18n();
   const { exam } = useExam();
-  const partnerLabel = pick(locale, {
-    ru: `Официальный партнёр ${exam.name}`,
-    en: `Official partner of ${exam.name}`,
-    tr: `${exam.name} resmi partneri`,
-    kk: `${exam.name} ресми серіктесі`,
+  // no partnership claim — the honest edge is strict format fidelity
+  const formatLabel = pick(locale, {
+    ru: `Готовим строго по формату и критериям ${exam.name}`,
+    en: `Prep built strictly around the ${exam.name} format and scoring criteria`,
+    tr: `${exam.name} formatına ve değerlendirme kriterlerine birebir uygun hazırlık`,
+    kk: `${exam.name} форматы мен критерийлеріне қатаң сай дайындаймыз`,
+  });
+  const freeLabel = pick(locale, {
+    ru: "Бесплатно · ~15 минут · без карты",
+    en: "Free · ~15 minutes · no card required",
+    tr: "Ücretsiz · ~15 dakika · kart gerekmez",
+    kk: "Тегін · ~15 минут · карта қажет емес",
   });
   const copy = pick(locale, {
     ru: { titleLead: "Сдай", titleTail: "с первого раза", subtitle: "AI-диагностика, персональный план и преподаватель 24/7.", platform: "Платформа" },
@@ -80,19 +87,22 @@ export function Hero() {
             </a>
           </motion.div>
 
-          <motion.p
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.7, delay: 0.32 }}
-            className="mt-4 flex items-center justify-center gap-1.5 text-xs text-[var(--color-muted)] lg:justify-start"
+            className="mt-4 flex flex-col items-center gap-1.5 text-xs text-[var(--color-muted)] lg:items-start"
           >
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-brand-2)]/15 text-[var(--color-brand-2)]">
-              <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 7.5L6 11l5.5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            {partnerLabel}
-          </motion.p>
+            <p>{freeLabel}</p>
+            <p className="flex items-center gap-1.5">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-brand-2)]/15 text-[var(--color-brand-2)]">
+                <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
+                  <path d="M2.5 7.5L6 11l5.5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              {formatLabel}
+            </p>
+          </motion.div>
         </div>
 
         <motion.div
