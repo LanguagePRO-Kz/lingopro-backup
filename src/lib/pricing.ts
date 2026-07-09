@@ -5,8 +5,8 @@
  *
  * `disc`/`discPerDay` are the fixed 30% post-diagnostic prices (given, not
  * computed, so rounding matches the design across both currencies).
- * USD mirrors KZT at ≈512 ₸/$ with psychological rounding, keeping the
- * package savings identical across currencies (3m ≈ −28%, 6m ≈ −46%).
+ * USD: founder-set discounted tier $29.99/$59.99/$89.99 (≈473 ₸/$),
+ * base = discounted ÷ 0.7 with .99 rounding; global grid to be tuned later.
  */
 
 import type { Locale } from "./i18n";
@@ -35,9 +35,9 @@ export const PRICING: Record<Currency, { sym: string; plans: PlanRow[] }> = {
   usd: {
     sym: "$",
     plans: [
-      { id: "1m", price: 39, perDay: 1.3, disc: 27, discPerDay: 0.9 },
-      { id: "3m", price: 84, perDay: 0.93, disc: 59, discPerDay: 0.66, popular: true },
-      { id: "6m", price: 126, perDay: 0.7, disc: 88, discPerDay: 0.49 },
+      { id: "1m", price: 42.99, perDay: 1.43, disc: 29.99, discPerDay: 1 },
+      { id: "3m", price: 85.99, perDay: 0.96, disc: 59.99, discPerDay: 0.67, popular: true },
+      { id: "6m", price: 128.99, perDay: 0.72, disc: 89.99, discPerDay: 0.5 },
     ],
   },
 };
