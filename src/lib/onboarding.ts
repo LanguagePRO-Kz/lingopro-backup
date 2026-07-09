@@ -69,15 +69,11 @@ export async function fetchOnboarded(): Promise<boolean> {
     if (!user) return false;
     const { data, error } = await supabase.from("profiles").select("onboarded_at").eq("id", user.id).maybeSingle();
     if (error) return false; // column not migrated yet → LS-only behaviour
-    const done = !!data?.onboarded_at;
-    if (done) {
-      try {
-        window.localStorage.setItem(LS_ONBOARDED, "1");
-      } catch {
-        /* ignore */
-      }
-    }
-    return done;
+    // NB: deliberately NO caching to LS here. The old auto-cache raced the
+    // settings reset (LS cleared → profile null-write still in flight → read
+    // saw the stale timestamp → re-cached "1") and buried the checklist
+    // FOREVER (founder-reported). LS is written only by an explicit dismiss.
+    return !!data?.onboarded_at;
   } catch {
     return false;
   }

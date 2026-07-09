@@ -227,6 +227,8 @@ export default function DashboardHome() {
     return (
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
+        {/* the welcome must be reachable even before the plan loads */}
+        <StartChecklist level={levelRaw} firstTaskDone={totalTasksDone(history) > 0} />
       </div>
     );
   }

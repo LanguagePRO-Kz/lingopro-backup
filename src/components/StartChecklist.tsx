@@ -92,11 +92,24 @@ export function StartChecklist({ level, firstTaskDone }: { level: string; firstT
 
   useEffect(() => {
     let active = true;
-    fetchOnboarded().then((done) => {
-      if (!active || done) return;
+    // guaranteed test entrance: /dashboard?checklist=1 shows the card
+    // regardless of any stored flags (founder verification / debugging)
+    const forced = new URLSearchParams(window.location.search).get("checklist") === "1";
+    if (forced) {
       setVisible(true);
       void fetchChecklistProgress().then((p) => active && setProgress(p));
-    });
+    } else {
+      fetchOnboarded().then((done) => {
+        if (!active) return;
+        if (done) {
+          // observable reason instead of a silent no-show
+          console.info("[onboarding] checklist hidden: dismissed earlier (reset in settings or open /dashboard?checklist=1)");
+          return;
+        }
+        setVisible(true);
+        void fetchChecklistProgress().then((p) => active && setProgress(p));
+      });
+    }
     // the student comes back from a section → the tick flips right away
     const refresh = () => void fetchChecklistProgress().then((p) => active && setProgress(p));
     window.addEventListener("focus", refresh);

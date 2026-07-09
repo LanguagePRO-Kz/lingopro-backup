@@ -389,12 +389,15 @@ export default function SettingsPage() {
       <Section title={c.help}>
         <button
           type="button"
-          onClick={() => {
-            void setOnboarded(false); // re-opens the checklist + resets section hints
+          disabled={hintsReset}
+          onClick={async () => {
+            // AWAITED: navigating away before the profile null-write landed
+            // used to race the dashboard read and re-bury the checklist
+            await setOnboarded(false); // re-opens the checklist + resets hints
             setHintsReset(true);
             setTimeout(() => setHintsReset(false), 2500);
           }}
-          className="btn-ghost w-fit rounded-full px-5 py-2.5 text-sm font-medium"
+          className="btn-ghost w-fit rounded-full px-5 py-2.5 text-sm font-medium disabled:opacity-60"
         >
           {hintsReset ? c.helpResetDone : c.helpReset}
         </button>
