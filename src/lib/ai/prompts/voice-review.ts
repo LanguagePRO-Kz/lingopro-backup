@@ -29,7 +29,7 @@ Görev: SADECE öğrencinin söylediklerini değerlendir.
 ÖNEMLİ: Telaffuz yazılı dökümden DEĞERLENDİRİLEMEZ — telaffuz hakkında hiçbir şey yazma, uydurma.
 
 Kurallar:
-1. "summary" (2-3 cümle), ölçüt yorumları ("comment"), hata açıklamaları ("rule", "explanation") ve "next_steps" ${langName} olacak. Alıntılar Türkçe kalır.
+1. "summary" (2-3 cümle), ölçüt yorumları ("comment"), hata açıklamaları ("rule", "explanation") ve "next_steps" ${langName} olacak — ana dili ${langName} olan eğitimli birinin yazdığı gibi DOĞAL, akıcı ve dilbilgisi açısından KUSURSUZ. Makine çevirisi tadı, kalıp ifade, yapay/devrik cümle YASAK. Alıntılar Türkçe kalır.
 2. Hatalar YALNIZCA öğrencinin cümlelerinden: TAM alıntı (quote) → doğru biçim (correction) → kuralın adı (rule) → kısa açıklama (explanation). En önemli 3-7 hatayı seç, hata UYDURMA.
 3. "topic" alanı YALNIZCA şu listeden: ${TOPICS.map((t) => t.id).join(", ")}.
 4. "topics_worked": derste gerçekten çalışılan konular (aynı listeden, hedef konuları ve dökümü dikkate al).

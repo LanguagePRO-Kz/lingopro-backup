@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:engine": "npx -y tsx scripts/test-diagnostic-engine.ts",
-    "test:plan": "npx -y tsx scripts/test-plan-engine.ts"
+    "test:plan": "npx -y tsx scripts/test-plan-engine.ts",
+    "test:voice": "npx -y tsx scripts/test-voice-review.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
