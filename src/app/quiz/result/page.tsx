@@ -13,7 +13,7 @@ import { withYazmaReview } from "@/lib/diagnostic/engine";
 import { attachKonusmaScore } from "@/lib/diagnostic/result";
 import { validateWritingReview } from "@/lib/ai/prompts/writing-review";
 import { YAZMA_PROMPTS } from "@/data/diagnostic-bank";
-import { clearStashedExamPlan, daysToExam, fetchExamPlan, loadStashedExamPlan, saveExamPlanToProfile, type ExamPlan } from "@/lib/exam-plan";
+import { clearStashedExamPlan, daysToExam, fetchExamPlan, loadStashedExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamPlan } from "@/lib/exam-plan";
 import { awardXp, XP } from "@/lib/xp";
 import { PlanVerdictCard } from "@/components/PlanVerdictCard";
 
@@ -34,6 +34,8 @@ export default function QuizResultPage() {
   // goal/date context for the honest plan verdict (stash on a fresh
   // diagnostic, profile on a retake visit)
   const [examPlan, setExamPlan] = useState<ExamPlan | null>(null);
+  // pace override after "raise the pace" is applied from the verdict card
+  const [minutesOverride, setMinutesOverride] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,12 +158,18 @@ export default function QuizResultPage() {
 
   // honest plan verdict, right under the level (founder: the verdict comes
   // BEFORE the route). Mastery credit deliberately omitted here — the seed
-  // just landed; settings shows the credited version later.
+  // just landed; settings shows the credited version later. The buttons SAVE
+  // for real (founder bug: the verdict said "интенсив" while the plan kept
+  // building 30-min days) — the dashboard rebuilds route + day on next open.
+  const applyExamPlan = async (next: ExamPlan) => {
+    await saveExamPlanToProfile(next);
+    setExamPlan(next);
+  };
   const verdict = examPlan ? (
     <PlanVerdictCard
       level={result.routerLevel ?? result.level}
       targetLevel={examPlan.targetLevel}
-      minutesDaily={result.minutesDaily ?? 30}
+      minutesDaily={minutesOverride ?? result.minutesDaily ?? 30}
       daysLeft={
         examPlan.examDateMode === "exact"
           ? daysToExam(examPlan)
@@ -170,6 +178,18 @@ export default function QuizResultPage() {
             : null
       }
       examDateFlexible={examPlan.examDateMode === "exact" ? (examPlan.examDateFlexible ?? true) : true}
+      onApplyMinutes={(m) => {
+        void saveStudyMinutes(m).then(() => {
+          try {
+            window.sessionStorage.removeItem("lp:route-requested"); // route regen on next dashboard open
+          } catch {
+            /* ignore */
+          }
+        });
+        setMinutesOverride(m);
+      }}
+      onApplyTarget={() => void applyExamPlan({ ...examPlan, targetLevel: "B2" })}
+      onApplyDate={(d) => void applyExamPlan({ ...examPlan, examDateMode: "exact", examDate: d, examDateFlexible: examPlan.examDateFlexible ?? true })}
     />
   ) : null;
 

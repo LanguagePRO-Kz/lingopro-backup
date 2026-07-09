@@ -13,7 +13,6 @@
  */
 
 import type { Locale } from "@/lib/i18n";
-import type { Level } from "@/data/types";
 import { topicById } from "@/lib/ai/topics";
 import { skillLabel, type DailyTask, type DayRow, type Skill } from "@/lib/daily-plan";
 import { currentWeekIndex, daysLeftFrom, type StudyRoute } from "./route";
@@ -237,24 +236,30 @@ export function buildDay(input: {
   }
 
   /* 5 — top-up so light days still reach the promised budget
-         (skipped in the finale: only reviews + mocks by design, §5) */
-  const fillers: Skill[] = finale ? [] : ["vocabulary", "reading", "listening"];
-  for (const skill of fillers) {
-    if (spent >= budget * (1 - BUDGET_TOLERANCE)) break;
-    if (tasks.some((t) => t.skill === skill)) continue;
-    const spec = TASK_MINUTES[skill];
-    if (!fits(spec.minutes)) continue;
-    push({
-      id: `${skill}-fill`,
-      skill,
-      title: skillLabel(skill, locale),
-      level: route.inputs.level,
-      taskId: `${skill}-${route.inputs.level}-d${dayNumber}`,
-      seed: dayNumber,
-      count: spec.count,
-      estimatedMinutes: spec.minutes,
-      kind: "regular",
-    });
+         (skipped in the finale: only reviews + mocks by design, §5).
+         Big budgets take several passes — one pass capped every day at
+         ~60 min, so 90/120 in settings never changed the plan
+         (founder-reported); repeats get their own taskId/seed. */
+  const fillers: Skill[] = finale ? [] : ["vocabulary", "reading", "listening", "writing"];
+  for (let pass = 0; pass < 6 && spent < budget * (1 - BUDGET_TOLERANCE); pass++) {
+    for (const skill of fillers) {
+      if (spent >= budget * (1 - BUDGET_TOLERANCE)) break;
+      if (pass === 0 && tasks.some((t) => t.skill === skill)) continue;
+      const spec = TASK_MINUTES[skill];
+      if (!fits(spec.minutes)) continue;
+      const nth = tasks.filter((t) => t.skill === skill).length + 1;
+      push({
+        id: `${skill}-fill${nth > 1 ? nth : ""}`,
+        skill,
+        title: skillLabel(skill, locale),
+        level: route.inputs.level,
+        taskId: nth === 1 ? `${skill}-${route.inputs.level}-d${dayNumber}` : `${skill}-${route.inputs.level}-d${dayNumber}-${nth}`,
+        seed: nth === 1 ? dayNumber : dayNumber * 10 + nth,
+        count: spec.count,
+        estimatedMinutes: spec.minutes,
+        kind: "regular",
+      });
+    }
   }
 
   return tasks;

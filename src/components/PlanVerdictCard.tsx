@@ -14,13 +14,18 @@ import {
 
 /**
  * The honest plan verdict — one card for every surface (diagnostic result,
- * settings, dashboard checkpoint). Coach tone, never a lie:
+ * settings, dashboard checkpoint). Coach tone, never a lie.
  *
- *   scenario A (date can move / no exact date): when the goal doesn't fit,
- *   three REAL alternatives — pace / target / date, as buttons when the
- *   parent can apply them;
- *   scenario B (locked date): no "postpone" — an honest forecast of what IS
- *   reachable plus a mobilization plan.
+ * Founder methodology (07.2026): OWNING a level and PASSING the exam are two
+ * different axes. Proficiency grows slowly (hours ladder); exam-format
+ * readiness (task types, strategies, timing) trains fast and genuinely
+ * raises the odds of scoring above one's "pure" level. The verdict never
+ * says "C1 impossible" — it forecasts BOTH axes:
+ *
+ *   scenario A (date can move / no exact date): honest "full proficiency
+ *   doesn't fit" + three REAL alternatives — pace / target / date;
+ *   scenario B (locked date): no "postpone" — proficiency forecast + format
+ *   readiness + a mobilization plan aimed at passing the test.
  */
 
 const T = {
@@ -32,24 +37,30 @@ const T = {
     tight: (need: number, have: number) =>
       `Впритык: ~${need} ч работы при ресурсе ~${have} ч. Реально — но без пропусков: план дня, каждый день.`,
     aHead: (m: number, lvl: string, tgt: string, need: number, have: number, months: number) =>
-      `Честно: при ${m} мин/день путь ${lvl} → ${tgt} к этой дате не выходит — нужно ~${need} ч, ресурс ~${have} ч. Обычно это ~${months} мес работы. Варианты — выбирай:`,
+      `Честно: при ${m} мин/день выйти на полное владение ${tgt} к этой дате не получится — нужно ~${need} ч, ресурс ~${have} ч (обычно это ~${months} мес). Варианты — выбирай:`,
     aPace: (pace: number) => `Поднять темп до ${pace} мин/день — тогда успеваешь к своей дате.`,
-    aPaceNo: (tgt: string) => `Даже 4 часа в день не дадут ${tgt} к этой дате — темпом это не решить.`,
+    aPaceNo: (tgt: string) => `Даже 2 часа в день не дадут полного владения ${tgt} к этой дате — темпом это не решить.`,
     aTarget: `Цель B2 к этой дате — реально. Для учёбы и работы B2 обычно достаточно.`,
     aDate: (d: string) => `Оставить темп и цель, но сдвинуть дату: реалистично — ${d}.`,
+    aFormat:
+      `И честно про сам экзамен: сдать тест — отдельный навык. Формат, стратегии и тайминг натаскиваются быстро и повышают шансы сдать выше «чистого» уровня — в плане это пробники и разборы.`,
     bHead: (lvl: string, tgt: string, days: number, months: number) =>
-      `Дата зафиксирована — работаем на максимум. Скажу как есть: ${lvl} → ${tgt} за ${days} дней — крайне амбициозно, обычно нужно ~${months} мес. Гарантий нет, многое зависит от тебя. Честный расклад:`,
-    bReach: (reach: string) => `К экзамену реально выйти на уверенный ${reach}.`,
+      `Дата зафиксирована — работаем на максимум. Скажу как есть: полное владение ${tgt} за ${days} дней нереально (обычно ~${months} мес). Но сдача экзамена — отдельный навык: формат, стратегии, тайм-менеджмент. Целенаправленная натаска реально повышает шансы. Честный расклад по двум осям:`,
+    bReach: (reach: string) => `Владение к экзамену: реально выйти на уверенный ${reach}.`,
     bReachNext: (reach: string, next: string) =>
-      `К экзамену реально выйти на уверенный ${reach}, а при полной дисциплине — подступиться к ${next}.`,
-    bReachPart: (next: string) => `К экзамену реально пройти заметную часть пути к ${next} — прогноз честный, без сказок.`,
-    bPace: (pace: number, tgt: string) => `Хочешь дотянуться до ${tgt} — нужно ${pace} мин/день, каждый день.`,
-    bPaceNo: (tgt: string) => `Даже при 240 мин/день ${tgt} к этой дате не выходит — фокус на максимум достижимого.`,
-    bMust: "Без чего не получится: план дня — каждый день · 3 голосовых урока в неделю · повторение слабых тем — в их день.",
+      `Владение к экзамену: уверенный ${reach}, при полной дисциплине — подступ к ${next}.`,
+    bReachPart: (next: string) => `Владение к экзамену: заметная часть пути к ${next} — честно, без сказок.`,
+    bFormatFull:
+      `Формат экзамена: успеешь отработать полностью — все секции, типы заданий, тайминг. Это твой главный рычаг на баллы.`,
+    bFormatPart: (pct: number) =>
+      `Формат экзамена: успеешь отработать ~${pct}% — фокус на самые весомые типы заданий. Каждый пробник добавляет к шансам.`,
+    bPace: (pace: number, tgt: string) => `Дотянуть владение до ${tgt} — это ${pace} мин/день, каждый день.`,
+    bPaceMax: `Максимальный реальный темп — 120 мин/день: до полного владения он не дотянет, но поднимет и уровень, и готовность к формату.`,
+    bPaceAtMax: `Темп уже на максимуме (120 мин/день) — дальше решают дисциплина, пробники и слабые темы.`,
+    bMust: "Без чего не получится: план дня — каждый день · 3 голосовых урока в неделю · пробники по расписанию · повторение слабых тем — в их день.",
     compact: (reach: string, m: number) =>
-      `Дата зафиксирована · честный прогноз к экзамену: ${reach}. План — на максимум: ${m} мин/день, каждый день на счету.`,
+      `Дата зафиксирована · честный прогноз: владение — ${reach}, формат экзамена — отрабатываем в плане. Темп ${m} мин/день, каждый день на счету.`,
     apply: "Выбрать",
-    minPerDay: "мин/день",
   },
   en: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
@@ -59,24 +70,30 @@ const T = {
     tight: (need: number, have: number) =>
       `Tight: ~${need} h of work against ~${have} h of resource. Doable — but no skipped days: the daily plan, every day.`,
     aHead: (m: number, lvl: string, tgt: string, need: number, have: number, months: number) =>
-      `Honestly: at ${m} min/day, ${lvl} → ${tgt} doesn't fit this date — ~${need} h needed, ~${have} h available. This path usually takes ~${months} months. Real options — your call:`,
+      `Honestly: at ${m} min/day, full ${tgt} proficiency doesn't fit this date — ~${need} h needed, ~${have} h available (usually ~${months} months). Real options — your call:`,
     aPace: (pace: number) => `Raise the pace to ${pace} min/day — then you make your date.`,
-    aPaceNo: (tgt: string) => `Even 4 hours a day won't reach ${tgt} by this date — pace alone can't solve it.`,
+    aPaceNo: (tgt: string) => `Even 2 hours a day won't buy full ${tgt} proficiency by this date — pace alone can't solve it.`,
     aTarget: `Target B2 by this date — realistic. For study and work, B2 is usually enough.`,
     aDate: (d: string) => `Keep the pace and the goal, move the date: realistically — ${d}.`,
+    aFormat:
+      `And honestly about the exam itself: passing the test is a separate skill. Format, strategies and timing train fast and raise your odds of scoring above your "pure" level — that's the mocks and reviews in your plan.`,
     bHead: (lvl: string, tgt: string, days: number, months: number) =>
-      `The date is locked — so we go all in. Straight talk: ${lvl} → ${tgt} in ${days} days is extremely ambitious; it usually takes ~${months} months. No guarantees — a lot depends on you. The honest picture:`,
-    bReach: (reach: string) => `By the exam you can realistically reach a solid ${reach}.`,
+      `The date is locked — so we go all in. Straight talk: full ${tgt} proficiency in ${days} days is unrealistic (usually ~${months} months). But passing the exam is a separate skill: format, strategies, time management — targeted training genuinely raises your odds. The honest picture, both axes:`,
+    bReach: (reach: string) => `Proficiency by the exam: a solid ${reach} is realistic.`,
     bReachNext: (reach: string, next: string) =>
-      `By the exam you can realistically reach a solid ${reach} — and with full discipline, close in on ${next}.`,
-    bReachPart: (next: string) => `By the exam you can realistically cover a good part of the road to ${next} — an honest forecast, no fairy tales.`,
-    bPace: (pace: number, tgt: string) => `Want a real shot at ${tgt}? That takes ${pace} min/day, every day.`,
-    bPaceNo: (tgt: string) => `Even at 240 min/day, ${tgt} doesn't fit this date — focus on the reachable maximum.`,
-    bMust: "Non-negotiables: the daily plan — every day · 3 voice lessons a week · weak-topic reviews on their day.",
+      `Proficiency by the exam: a solid ${reach}; with full discipline — closing in on ${next}.`,
+    bReachPart: (next: string) => `Proficiency by the exam: a good part of the road to ${next} — honestly, no fairy tales.`,
+    bFormatFull:
+      `Exam format: you have time to master it fully — every section, task type and the timing. That's your main lever for points.`,
+    bFormatPart: (pct: number) =>
+      `Exam format: you can cover ~${pct}% — focus on the highest-weight task types. Every mock adds to your odds.`,
+    bPace: (pace: number, tgt: string) => `Pushing proficiency to ${tgt} takes ${pace} min/day, every day.`,
+    bPaceMax: `The maximum realistic pace is 120 min/day: it won't buy full proficiency, but it lifts both your level and your format readiness.`,
+    bPaceAtMax: `You're already at the maximum pace (120 min/day) — from here it's discipline, mocks and weak topics.`,
+    bMust: "Non-negotiables: the daily plan — every day · 3 voice lessons a week · mocks on schedule · weak-topic reviews on their day.",
     compact: (reach: string, m: number) =>
-      `Date locked · honest exam forecast: ${reach}. The plan runs at maximum: ${m} min/day, every day counts.`,
+      `Date locked · honest forecast: proficiency — ${reach}, exam format — trained in the plan. Pace ${m} min/day, every day counts.`,
     apply: "Apply",
-    minPerDay: "min/day",
   },
   tr: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
@@ -86,24 +103,30 @@ const T = {
     tight: (need: number, have: number) =>
       `Sıkışık: ~${have} saatlik kaynağa karşı ~${need} saatlik iş. Olur — ama gün kaçırmadan: günün planı, her gün.`,
     aHead: (m: number, lvl: string, tgt: string, need: number, have: number, months: number) =>
-      `Dürüstçe: günde ${m} dk ile ${lvl} → ${tgt} bu tarihe sığmıyor — ~${need} saat gerek, ~${have} saat var. Bu yol genelde ~${months} ay sürer. Gerçek seçenekler — karar senin:`,
+      `Dürüstçe: günde ${m} dk ile bu tarihe kadar TAM ${tgt} hâkimiyeti olmaz — ~${need} saat gerek, ~${have} saat var (genelde ~${months} ay). Gerçek seçenekler — karar senin:`,
     aPace: (pace: number) => `Tempoyu günde ${pace} dakikaya çıkar — o zaman tarihine yetişirsin.`,
-    aPaceNo: (tgt: string) => `Günde 4 saat bile bu tarihe kadar ${tgt} getirmez — bunu tempo çözmez.`,
+    aPaceNo: (tgt: string) => `Günde 2 saat bile bu tarihe kadar tam ${tgt} hâkimiyeti getirmez — bunu tempo çözmez.`,
     aTarget: `Bu tarihe kadar B2 hedefi — gerçekçi. Eğitim ve iş için B2 genelde yeterli.`,
     aDate: (d: string) => `Tempoyu ve hedefi koru, tarihi kaydır: gerçekçi olan — ${d}.`,
+    aFormat:
+      `Sınavın kendisi hakkında da dürüst olalım: sınavı GEÇMEK ayrı bir beceridir. Format, strateji ve zamanlama hızla öğrenilir ve "saf" seviyenin üstünde puan alma şansını artırır — plandaki denemeler ve analizler bunun için.`,
     bHead: (lvl: string, tgt: string, days: number, months: number) =>
-      `Tarih kesin — o zaman maksimum çalışıyoruz. Açık konuşayım: ${days} günde ${lvl} → ${tgt} son derece iddialı; genelde ~${months} ay gerekir. Garanti yok — çoğu sana bağlı. Dürüst tablo:`,
-    bReach: (reach: string) => `Sınava kadar sağlam bir ${reach} seviyesine çıkmak gerçekçi.`,
+      `Tarih kesin — o zaman maksimum çalışıyoruz. Açık konuşayım: ${days} günde TAM ${tgt} hâkimiyeti gerçekçi değil (genelde ~${months} ay). Ama sınavı geçmek ayrı bir beceri: format, strateji, zaman yönetimi — hedefli çalışma şansı gerçekten artırır. İki eksende dürüst tablo:`,
+    bReach: (reach: string) => `Sınava kadar hâkimiyet: sağlam bir ${reach} gerçekçi.`,
     bReachNext: (reach: string, next: string) =>
-      `Sınava kadar sağlam bir ${reach} gerçekçi; tam disiplinle ${next} seviyesine yaklaşırsın.`,
-    bReachPart: (next: string) => `Sınava kadar ${next} yolunun önemli bir kısmını almak gerçekçi — dürüst tahmin, masal yok.`,
-    bPace: (pace: number, tgt: string) => `${tgt} için gerçek bir şans istiyorsan: günde ${pace} dk, her gün.`,
-    bPaceNo: (tgt: string) => `Günde 240 dk ile bile ${tgt} bu tarihe sığmıyor — ulaşılabilir maksimuma odaklan.`,
-    bMust: "Olmazsa olmazlar: günün planı — her gün · haftada 3 sesli ders · zayıf konu tekrarları — kendi gününde.",
+      `Sınava kadar hâkimiyet: sağlam ${reach}; tam disiplinle ${next} seviyesine yaklaşırsın.`,
+    bReachPart: (next: string) => `Sınava kadar hâkimiyet: ${next} yolunun önemli bir kısmı — dürüstçe, masal yok.`,
+    bFormatFull:
+      `Sınav formatı: tamamını çalışmaya vaktin var — tüm bölümler, soru tipleri, zamanlama. Puan için ana kaldıracın bu.`,
+    bFormatPart: (pct: number) =>
+      `Sınav formatı: ~%${pct}'ini çalışabilirsin — en ağırlıklı soru tiplerine odaklan. Her deneme şansı artırır.`,
+    bPace: (pace: number, tgt: string) => `Hâkimiyeti ${tgt} seviyesine taşımak: günde ${pace} dk, her gün.`,
+    bPaceMax: `Gerçekçi maksimum tempo günde 120 dk: tam hâkimiyet getirmez ama hem seviyeyi hem format hazırlığını yükseltir.`,
+    bPaceAtMax: `Tempo zaten maksimumda (günde 120 dk) — bundan sonrası disiplin, denemeler ve zayıf konular.`,
+    bMust: "Olmazsa olmazlar: günün planı — her gün · haftada 3 sesli ders · programındaki denemeler · zayıf konu tekrarları — kendi gününde.",
     compact: (reach: string, m: number) =>
-      `Tarih kesin · dürüst sınav tahmini: ${reach}. Plan maksimumda: günde ${m} dk, her gün sayılır.`,
+      `Tarih kesin · dürüst tahmin: hâkimiyet — ${reach}, sınav formatı — planda çalışılıyor. Tempo günde ${m} dk, her gün sayılır.`,
     apply: "Uygula",
-    minPerDay: "dk/gün",
   },
   kk: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
@@ -113,24 +136,30 @@ const T = {
     tight: (need: number, have: number) =>
       `Тығыз: ~${have} сағат қорға ~${need} сағат жұмыс. Болады — бірақ бір күн де жібермей: күн жоспары, күн сайын.`,
     aHead: (m: number, lvl: string, tgt: string, need: number, have: number, months: number) =>
-      `Шынын айтқанда: күніне ${m} минутпен ${lvl} → ${tgt} бұл күнге сыймайды — ~${need} сағат керек, ~${have} сағат бар. Бұл жол әдетте ~${months} айға созылады. Нақты нұсқалар — таңдау сенікі:`,
+      `Шынын айтқанда: күніне ${m} минутпен бұл күнге дейін ${tgt} деңгейін ТОЛЫҚ меңгеру мүмкін емес — ~${need} сағат керек, ~${have} сағат бар (әдетте ~${months} ай). Нақты нұсқалар — таңдау сенікі:`,
     aPace: (pace: number) => `Қарқынды күніне ${pace} минутқа көтер — сонда өз күніңе үлгересің.`,
-    aPaceNo: (tgt: string) => `Күніне 4 сағат та бұл күнге дейін ${tgt} бермейді — мұны қарқын шешпейді.`,
+    aPaceNo: (tgt: string) => `Күніне 2 сағат та бұл күнге дейін ${tgt} деңгейін толық меңгертпейді — мұны қарқын шешпейді.`,
     aTarget: `Бұл күнге дейін B2 мақсаты — нақты қол жетімді. Оқу мен жұмысқа әдетте B2 жеткілікті.`,
     aDate: (d: string) => `Қарқын мен мақсатты сақтап, күнді жылжыт: шынайысы — ${d}.`,
+    aFormat:
+      `Емтиханның өзі туралы да шынын айтайын: тестті ТАПСЫРУ — бөлек дағды. Формат, стратегия мен таймингті тез үйренуге болады, бұл «таза» деңгейден жоғары балл алу мүмкіндігін арттырады — жоспардағы сынамалар мен талдаулар сол үшін.`,
     bHead: (lvl: string, tgt: string, days: number, months: number) =>
-      `Күн бекітілген — демек максимум жұмыс істейміз. Ашығын айтайын: ${days} күнде ${lvl} → ${tgt} — өте өршіл, әдетте ~${months} ай керек. Кепілдік жоқ — көбі өзіңе байланысты. Адал көрініс:`,
-    bReach: (reach: string) => `Емтиханға дейін нық ${reach} деңгейіне шығу — нақты қол жетімді.`,
+      `Күн бекітілген — демек максимум жұмыс істейміз. Ашығын айтайын: ${days} күнде ${tgt} деңгейін ТОЛЫҚ меңгеру мүмкін емес (әдетте ~${months} ай). Бірақ емтихан тапсыру — бөлек дағды: формат, стратегия, тайм-менеджмент — мақсатты дайындық мүмкіндікті шынымен арттырады. Екі бағыт бойынша адал көрініс:`,
+    bReach: (reach: string) => `Емтиханға дейінгі деңгей: нық ${reach} — нақты қол жетімді.`,
     bReachNext: (reach: string, next: string) =>
-      `Емтиханға дейін нық ${reach} — нақты; толық тәртіппен ${next} деңгейіне жақындайсың.`,
-    bReachPart: (next: string) => `Емтиханға дейін ${next} жолының едәуір бөлігін жүріп өту — нақты болжам, ертегісіз.`,
-    bPace: (pace: number, tgt: string) => `${tgt} үшін нақты мүмкіндік керек пе — күніне ${pace} минут, күн сайын.`,
-    bPaceNo: (tgt: string) => `Күніне 240 минутпен де ${tgt} бұл күнге сыймайды — қол жетімді максимумға шоғырлан.`,
-    bMust: "Онсыз болмайды: күн жоспары — күн сайын · аптасына 3 дауысты сабақ · әлсіз тақырыптарды қайталау — өз күнінде.",
+      `Емтиханға дейінгі деңгей: нық ${reach}; толық тәртіппен ${next} деңгейіне жақындайсың.`,
+    bReachPart: (next: string) => `Емтиханға дейінгі деңгей: ${next} жолының едәуір бөлігі — адал, ертегісіз.`,
+    bFormatFull:
+      `Емтихан форматы: толық меңгеруге уақыт бар — барлық бөлімдер, тапсырма түрлері, тайминг. Балл үшін басты тұтқаң — осы.`,
+    bFormatPart: (pct: number) =>
+      `Емтихан форматы: ~${pct}%-ын меңгеріп үлгересің — ең салмақты тапсырма түрлеріне шоғырлан. Әр сынама мүмкіндікті арттырады.`,
+    bPace: (pace: number, tgt: string) => `Деңгейді ${tgt}-ге жеткізу үшін: күніне ${pace} минут, күн сайын.`,
+    bPaceMax: `Нақты максимум қарқын — күніне 120 минут: толық меңгеруге жеткізбейді, бірақ деңгейді де, форматқа дайындықты да көтереді.`,
+    bPaceAtMax: `Қарқын онсыз да максимумда (күніне 120 минут) — әрі қарай тәртіп, сынамалар мен әлсіз тақырыптар шешеді.`,
+    bMust: "Онсыз болмайды: күн жоспары — күн сайын · аптасына 3 дауысты сабақ · кесте бойынша сынамалар · әлсіз тақырыптарды қайталау — өз күнінде.",
     compact: (reach: string, m: number) =>
-      `Күн бекітілген · емтиханға адал болжам: ${reach}. Жоспар — максимумда: күніне ${m} минут, әр күн есепте.`,
+      `Күн бекітілген · адал болжам: деңгей — ${reach}, емтихан форматы — жоспарда пысықталады. Қарқын күніне ${m} минут, әр күн есепте.`,
     apply: "Таңдау",
-    minPerDay: "мин/күн",
   },
 };
 
@@ -236,7 +265,8 @@ export function PlanVerdictCard({
   /* ------------------------- notEnough: A or B ------------------------- */
 
   if (!fixed) {
-    // scenario A — the date can move: honest "doesn't fit" + real choices
+    // scenario A — the date can move: honest "full proficiency doesn't fit"
+    // + real choices; passing the test itself is a separate, faster skill
     return (
       <div className={`flex flex-col gap-2.5 rounded-2xl px-4 py-3.5 text-sm leading-relaxed ${tone}`}>
         <p>{c.aHead(minutesDaily, level, targetLevel, plan.needHours, plan.haveHours, plan.monthsNeeded)}</p>
@@ -256,25 +286,40 @@ export function PlanVerdictCard({
             {onApplyDate && <ApplyBtn label={c.apply} onClick={() => onApplyDate(plan.dateNeeded!)} />}
           </div>
         )}
+        <p className="text-xs opacity-90">{c.aFormat}</p>
       </div>
     );
   }
 
-  // scenario B — locked date: no "postpone", mobilization + honest forecast
+  // scenario B — locked date: no "postpone"; forecast BOTH axes (proficiency
+  // + exam-format readiness) and mobilize toward passing the test
   return (
     <div className={`flex flex-col gap-2.5 rounded-2xl px-4 py-3.5 text-sm leading-relaxed ${tone}`}>
       <p>{c.bHead(level, targetLevel, plan.daysLeft ?? 0, plan.monthsNeeded)}</p>
       <p className="font-semibold">
-        🎯{" "}
+        📈{" "}
         {reachLabel
           ? plan.nextStepShare >= 0.4 && nextAfterReach
             ? c.bReachNext(reachLabel, nextAfterReach)
             : c.bReach(reachLabel)
           : c.bReachPart(nextAfterReach ?? targetLevel)}
       </p>
+      <p className="font-semibold">
+        🎯 {(plan.formatReadiness ?? 0) >= 100 ? c.bFormatFull : c.bFormatPart(Math.max(5, plan.formatReadiness ?? 0))}
+      </p>
       <div className="flex items-center justify-between gap-3 rounded-xl bg-white/50 px-3 py-2">
-        <span>⏱ {paceFits ? c.bPace(paceUp!, targetLevel) : c.bPaceNo(targetLevel)}</span>
+        <span>
+          ⏱{" "}
+          {paceFits
+            ? c.bPace(paceUp!, targetLevel)
+            : minutesDaily < MAX_SUSTAINABLE_MINUTES
+              ? c.bPaceMax
+              : c.bPaceAtMax}
+        </span>
         {paceFits && onApplyMinutes && <ApplyBtn label={c.apply} onClick={() => onApplyMinutes(paceUp!)} />}
+        {!paceFits && minutesDaily < MAX_SUSTAINABLE_MINUTES && onApplyMinutes && (
+          <ApplyBtn label={c.apply} onClick={() => onApplyMinutes(MAX_SUSTAINABLE_MINUTES)} />
+        )}
       </div>
       <p className="text-xs opacity-90">{c.bMust}</p>
     </div>

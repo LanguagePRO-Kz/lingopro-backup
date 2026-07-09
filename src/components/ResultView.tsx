@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -20,6 +20,8 @@ import {
   type QuizResult,
 } from "@/lib/quiz";
 import { topicById } from "@/lib/ai/topics";
+import { fetchExamPlan, type ExamPlan } from "@/lib/exam-plan";
+import { assessPlan, type StudentLevel } from "@/lib/plan/feasibility";
 
 function barColor(percent: number) {
   if (percent >= 70) return { from: "#16a34a", to: "#22c55e" };
@@ -434,6 +436,19 @@ export function ResultView({
   const { locale } = useI18n();
   const router = useRouter();
 
+  // real goal/date/pace from the profile — the personal-plan block must
+  // reflect the student's actual inputs, not a static "6–12 мес · 30 мин"
+  const [examPlan, setExamPlan] = useState<(ExamPlan & { minutesDaily: number | null }) | null>(null);
+  useEffect(() => {
+    let active = true;
+    void fetchExamPlan().then((p) => {
+      if (p && active) setExamPlan(p);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // full reset: a fresh diagnostic always starts at module 1
   function retake() {
     clearProgress();
@@ -794,13 +809,43 @@ export function ResultView({
         </div>
       </div>
 
-      {/* ============ 5. Personal plan ============ */}
+      {/* ============ 5. Personal plan — REAL inputs (goal/date/pace from
+           the profile), the static template line was founder-reported as a
+           lie next to the honest verdict ============ */}
       <div className="glass mt-6 rounded-3xl p-7">
-        <h2 className="text-lg font-semibold text-[var(--color-foreground)]">{qt(locale, "planToC1")}</h2>
+        <h2 className="text-lg font-semibold text-[var(--color-foreground)]">
+          {examPlan
+            ? {
+                ru: `Твой персональный план до ${examPlan.targetLevel}`,
+                en: `Your personal plan to ${examPlan.targetLevel}`,
+                tr: `Kişisel planın — hedef ${examPlan.targetLevel}`,
+                kk: `Жеке жоспарың — мақсат ${examPlan.targetLevel}`,
+              }[locale]
+            : qt(locale, "planToC1")}
+        </h2>
         <div className="mt-3 rounded-2xl bg-gradient-to-br from-[var(--color-brand)]/[0.08] to-[var(--color-brand-2)]/[0.08] p-5">
           <div className="text-xl font-bold text-[var(--color-foreground)]">{plan.title[locale]}</div>
           <div className="mt-1 text-sm font-medium text-[var(--color-brand)]">
-            {result.level} → C1 · {plan.desc[locale]}
+            {examPlan
+              ? (() => {
+                  const minutes = Math.min(120, examPlan.minutesDaily ?? result.minutesDaily ?? 30);
+                  const timeline =
+                    examPlan.examDateMode === "exact" && examPlan.examDate
+                      ? new Intl.DateTimeFormat(locale === "kk" ? "kk-KZ" : locale, { day: "numeric", month: "short", year: "numeric" }).format(new Date(examPlan.examDate))
+                      : `~${
+                          examPlan.examDateMode === "approx" && examPlan.examHorizonMonths
+                            ? examPlan.examHorizonMonths
+                            : assessPlan({
+                                level: result.level as StudentLevel,
+                                targetLevel: examPlan.targetLevel,
+                                minutesDaily: minutes,
+                                daysLeft: null,
+                                kkNative: locale === "kk",
+                              }).monthsNeeded
+                        } ${qt(locale, "monthsShort")}`;
+                  return `${result.level} → ${examPlan.targetLevel} · ${timeline} · ${minutes} ${qt(locale, "minPerDay")}`;
+                })()
+              : `${result.level} → C1 · ${plan.desc[locale]}`}
           </div>
 
           <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">

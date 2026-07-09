@@ -435,10 +435,9 @@ const T = {
   min45: { ru: "Уверенный", en: "Confident", tr: "Yoğun", kk: "Сенімді" },
   min60: { ru: "Интенсив", en: "Intensive", tr: "Çok yoğun", kk: "Интенсив" },
   min90: { ru: "Усиленный", en: "Boosted", tr: "Takviyeli", kk: "Күшейтілген" },
-  min120: { ru: "Решительный", en: "Determined", tr: "Kararlı", kk: "Табанды" },
-  min180: { ru: "Погружение", en: "Immersion", tr: "Tam yoğunluk", kk: "Терең дайындық" },
-  min240: { ru: "Мобилизация", en: "All-in", tr: "Seferberlik", kk: "Жұмылдыру" },
+  min120: { ru: "Максимум", en: "Maximum", tr: "Maksimum", kk: "Максимум" },
   minPerDay: { ru: "мин/день", en: "min/day", tr: "dk/gün", kk: "мин/күн" },
+  monthsShort: { ru: "мес", en: "mo", tr: "ay", kk: "ай" },
   // v3 stages
   stRouter: { ru: "Определение уровня", en: "Level check", tr: "Seviye belirleme", kk: "Деңгейді анықтау" },
   stDinleme: { ru: "Аудирование", en: "Listening", tr: "Dinleme", kk: "Тыңдалым" },

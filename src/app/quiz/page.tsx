@@ -90,8 +90,9 @@ const stageIdx = (id: StageId) => STAGES.findIndex((s) => s.id === id);
 
 /* -------------------------------- Constants ------------------------------ */
 
-// founder's pace scale: 15 is the useful minimum, past ~4 h/day nobody
-// sustains — same choices as in settings (PACE_CHOICES)
+// founder's pace scale: 15 is the useful minimum, the PLAN caps at 2 h/day
+// (nobody sustains more — extra practice is a soft bonus, not plan); same
+// choices as in settings (PACE_CHOICES)
 const MINUTE_OPTIONS: { minutes: number; labelKey: QuizTKey }[] = [
   { minutes: 15, labelKey: "min15" },
   { minutes: 30, labelKey: "min30" },
@@ -99,8 +100,6 @@ const MINUTE_OPTIONS: { minutes: number; labelKey: QuizTKey }[] = [
   { minutes: 60, labelKey: "min60" },
   { minutes: 90, labelKey: "min90" },
   { minutes: 120, labelKey: "min120" },
-  { minutes: 180, labelKey: "min180" },
-  { minutes: 240, labelKey: "min240" },
 ];
 
 const SELF_LEVELS: { id: string; label: QuizTKey; hint: string }[] = [

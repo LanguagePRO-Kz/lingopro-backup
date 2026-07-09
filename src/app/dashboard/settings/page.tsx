@@ -20,6 +20,8 @@ const T = {
     city: "Город", country: "Страна", cityPh: "Например, Алматы", countryPh: "Например, Казахстан",
     exam: "Экзамен", chosenExam: "Выбранный экзамен", target: "Целевой уровень", examDate: "Дата экзамена",
     pace: "Минут в день", paceNote: "Дневной план пересоберётся под новый темп при следующем открытии дашборда.",
+    bonusTitle: "Хочется больше двух часов?",
+    bonusBody: "Сверх плана — мягкая практика, без давления: повторяй слова в транспорте, слушай турецкие подкасты, вечером — серия сериала с субтитрами. Это бонус, не обязательство.",
     dateFlexQ: "Эту дату можно перенести?",
     dateFlex: "Могу перенести", dateFixed: "Жёсткая — уже есть запись",
     dateExact: "Точная дата", dateApprox: "Примерно", dateUnknown: "Не знаю", months: "мес", examSaved: "Сохранено ✓", saveExam: "Сохранить",
@@ -33,6 +35,8 @@ const T = {
     city: "City", country: "Country", cityPh: "e.g. Almaty", countryPh: "e.g. Kazakhstan",
     exam: "Exam", chosenExam: "Selected exam", target: "Target level", examDate: "Exam date",
     pace: "Minutes per day", paceNote: "Your daily plan rebuilds to the new pace the next time you open the dashboard.",
+    bonusTitle: "Want more than two hours?",
+    bonusBody: "Beyond the plan — soft practice, zero pressure: review words on the commute, listen to Turkish podcasts, watch an episode with subtitles in the evening. A bonus, not an obligation.",
     dateFlexQ: "Can this date move?",
     dateFlex: "I can move it", dateFixed: "Locked — I'm registered",
     dateExact: "Exact date", dateApprox: "Approx.", dateUnknown: "Not sure", months: "mo", examSaved: "Saved ✓", saveExam: "Save",
@@ -46,6 +50,8 @@ const T = {
     city: "Şehir", country: "Ülke", cityPh: "örn. Almatı", countryPh: "örn. Kazakistan",
     exam: "Sınav", chosenExam: "Seçilen sınav", target: "Hedef seviye", examDate: "Sınav tarihi",
     pace: "Günde dakika", paceNote: "Günlük plan, panoyu bir sonraki açışında yeni tempoya göre yeniden kurulur.",
+    bonusTitle: "İki saatten fazlasını mı istiyorsun?",
+    bonusBody: "Planın ötesi — baskısız, yumuşak pratik: yolda kelime tekrar et, Türkçe podcast dinle, akşam altyazılı bir bölüm izle. Bu bir bonus, zorunluluk değil.",
     dateFlexQ: "Bu tarih ertelenebilir mi?",
     dateFlex: "Erteleyebilirim", dateFixed: "Kesin — kaydım var",
     dateExact: "Kesin tarih", dateApprox: "Yaklaşık", dateUnknown: "Bilmiyorum", months: "ay", examSaved: "Kaydedildi ✓", saveExam: "Kaydet",
@@ -59,6 +65,8 @@ const T = {
     city: "Қала", country: "Ел", cityPh: "мыс. Алматы", countryPh: "мыс. Қазақстан",
     exam: "Емтихан", chosenExam: "Таңдалған емтихан", target: "Мақсатты деңгей", examDate: "Емтихан күні",
     pace: "Күніне минут", paceNote: "Күнделікті жоспар келесі жолы дашбордты ашқанда жаңа қарқынға сай қайта құрылады.",
+    bonusTitle: "Екі сағаттан көп айналысқың келе ме?",
+    bonusBody: "Жоспардан тыс — қысымсыз, жұмсақ практика: жолда сөздерді қайтала, түрікше подкаст тыңда, кешке субтитрмен бір серия көр. Бұл бонус, міндет емес.",
     dateFlexQ: "Бұл күнді ауыстыруға бола ма?",
     dateFlex: "Ауыстыра аламын", dateFixed: "Бекітілген — тіркелгенмін",
     dateExact: "Нақты күн", dateApprox: "Шамамен", dateUnknown: "Білмеймін", months: "ай", examSaved: "Сақталды ✓", saveExam: "Сақтау",
@@ -140,7 +148,8 @@ export default function SettingsPage() {
       setExamDate(p.examDate ?? "");
       setDateFlexible(p.examDateFlexible ?? null);
       if (p.examHorizonMonths) setHorizon(p.examHorizonMonths);
-      if (p.minutesDaily) setMinutes(p.minutesDaily);
+      // 180/240 saved before the 2h cap → shown (and re-saved) as 120
+      if (p.minutesDaily) setMinutes(Math.min(120, p.minutesDaily));
       setLevel(p.level);
     });
     createClient()
@@ -319,6 +328,12 @@ export default function SettingsPage() {
             ))}
           </div>
           <p className="text-xs text-[var(--color-muted)]">{c.paceNote}</p>
+          {/* founder: the PLAN caps at 2 h/day; beyond that — soft bonus
+              practice, stated without pressure */}
+          <div className="rounded-2xl bg-black/[0.03] px-4 py-3">
+            <div className="text-xs font-semibold text-[var(--color-foreground)]">🌿 {c.bonusTitle}</div>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--color-muted)]">{c.bonusBody}</p>
+          </div>
         </div>
 
         {/* honest consequence of the chosen pace/date/target — live, before

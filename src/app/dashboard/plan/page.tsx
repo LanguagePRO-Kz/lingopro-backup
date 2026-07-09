@@ -5,7 +5,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { loadResult, PLANS, type QuizResult } from "@/lib/quiz";
+import { loadResult, PLANS, qt, type QuizResult } from "@/lib/quiz";
+import { fetchExamPlan, type ExamPlan } from "@/lib/exam-plan";
+import { assessPlan, type StudentLevel } from "@/lib/plan/feasibility";
 import {
   todaysTasks,
   loadProgress,
@@ -92,11 +94,21 @@ export default function PlanPage() {
   const [progress, setProgress] = useState<Progress>({});
   const [tip, setTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
+  // real goal/date/pace — the goal card must show the student's actual
+  // inputs, not the static template (founder-reported)
+  const [examPlan, setExamPlan] = useState<(ExamPlan & { minutesDaily: number | null }) | null>(null);
 
   useEffect(() => {
     setResult(loadResult());
     setProgress(loadProgress());
     setReady(true);
+    let active = true;
+    void fetchExamPlan().then((p) => {
+      if (p && active) setExamPlan(p);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (!ready) {
@@ -167,16 +179,36 @@ export default function PlanPage() {
         <h1 className="text-2xl font-bold tracking-tight">{c.title}</h1>
       </div>
 
-      {/* goal */}
+      {/* goal — real target/date/pace from the profile, honest-plan months
+          when there is no date (the static template lied next to them) */}
       <div className="rounded-3xl bg-gradient-to-br from-[#5b4bd6] to-[#3a1d9c] p-6 text-white">
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-4xl font-bold">{result.level} → C1</div>
+            <div className="text-4xl font-bold">{result.level} → {examPlan?.targetLevel ?? "C1"}</div>
             <div className="mt-1 text-sm text-white/70">{plan.title[locale]}</div>
           </div>
           <div className="text-right text-sm text-white/80">
             <div className="text-[10px] uppercase tracking-wide text-white/50">{c.duration}</div>
-            {plan.months[locale]}
+            {examPlan
+              ? (() => {
+                  const minutes = Math.min(120, examPlan.minutesDaily ?? result.minutesDaily ?? 30);
+                  const timeline =
+                    examPlan.examDateMode === "exact" && examPlan.examDate
+                      ? new Intl.DateTimeFormat(locale === "kk" ? "kk-KZ" : locale, { day: "numeric", month: "short", year: "numeric" }).format(new Date(examPlan.examDate))
+                      : `~${
+                          examPlan.examDateMode === "approx" && examPlan.examHorizonMonths
+                            ? examPlan.examHorizonMonths
+                            : assessPlan({
+                                level: result.level as StudentLevel,
+                                targetLevel: examPlan.targetLevel,
+                                minutesDaily: minutes,
+                                daysLeft: null,
+                                kkNative: locale === "kk",
+                              }).monthsNeeded
+                        } ${qt(locale, "monthsShort")}`;
+                  return `${timeline} · ${minutes} ${qt(locale, "minPerDay")}`;
+                })()
+              : plan.months[locale]}
           </div>
         </div>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
@@ -184,7 +216,7 @@ export default function PlanPage() {
         </div>
         <div className="mt-1.5 flex justify-between text-xs text-white/70">
           <span>{result.level} {c.goalNow}</span>
-          <span>C1 {c.goalTarget}</span>
+          <span>{examPlan?.targetLevel ?? "C1"} {c.goalTarget}</span>
         </div>
       </div>
 

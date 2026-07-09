@@ -153,11 +153,16 @@ function specsForBudget(budget: number, dayNumber: number): Spec[] {
 
   const specs: Spec[] = [];
   let spent = 0;
-  for (const s of [...core, ...rotated]) {
-    if (spent + s.minutes > budget * (1 + BUDGET_TOLERANCE)) continue;
-    specs.push(s);
-    spent += s.minutes;
-    if (spent >= budget * (1 - BUDGET_TOLERANCE)) break;
+  // big budgets repeat the tail (2nd reading, 2nd listening…) — the old
+  // single pass silently capped every day at ~60 min, so 90/120 chosen in
+  // settings never changed the plan (founder-reported)
+  for (let pass = 0; pass < 6 && spent < budget * (1 - BUDGET_TOLERANCE); pass++) {
+    for (const s of pass === 0 ? [...core, ...rotated] : rotated) {
+      if (spent + s.minutes > budget * (1 + BUDGET_TOLERANCE)) continue;
+      specs.push(s);
+      spent += s.minutes;
+      if (spent >= budget * (1 - BUDGET_TOLERANCE)) break;
+    }
   }
   return specs.length ? specs : [core[0]];
 }
@@ -170,19 +175,27 @@ function rampLevel(base: Level, dayNumber: number): Level {
 /** Generate the day's tasks for a given level + minute budget (deterministic). */
 export function generateDailyPlan(userLevel: Level, minutesDaily: number, dayNumber: number, locale: Locale): DailyTask[] {
   const level = rampLevel(userLevel, dayNumber);
-  return specsForBudget(minutesDaily, dayNumber).map((spec, i) => ({
-    id: `${spec.skill}-${i}`,
-    skill: spec.skill,
-    title: NAMES[spec.skill][locale],
-    description: "",
-    level,
-    taskId: `${spec.skill}-${level}-d${dayNumber}`,
-    seed: dayNumber,
-    count: spec.count,
-    estimatedMinutes: spec.minutes,
-    completed: false,
-    order: i + 1,
-  }));
+  const seen: Record<string, number> = {};
+  return specsForBudget(minutesDaily, dayNumber).map((spec, i) => {
+    // a big budget repeats skills — every repeat gets its own task/seed so
+    // the content differs and results never collide on one taskId
+    const nth = (seen[spec.skill] = (seen[spec.skill] ?? 0) + 1);
+    return {
+      id: `${spec.skill}-${i}`,
+      skill: spec.skill,
+      title: NAMES[spec.skill][locale],
+      description: "",
+      level,
+      taskId: nth === 1 ? `${spec.skill}-${level}-d${dayNumber}` : `${spec.skill}-${level}-d${dayNumber}-${nth}`,
+      // first occurrence keeps the historical seed — an unchanged pace must
+      // not reshuffle anyone's current day on deploy
+      seed: nth === 1 ? dayNumber : dayNumber * 10 + nth,
+      count: spec.count,
+      estimatedMinutes: spec.minutes,
+      completed: false,
+      order: i + 1,
+    };
+  });
 }
 
 /* ------------------------- Streak / week helpers ------------------------- */
@@ -476,6 +489,10 @@ export async function loadDashboardData(locale: Locale): Promise<{
       await supabase.from("profiles").update({ study_minutes_daily: minutesDaily }).eq("id", user.id);
     }
     if (minutesDaily == null && profile) minutesDaily = 30;
+    // founder decision 07.2026: the PLAN maxes out at 2 h/day (nobody
+    // sustains more); accounts that saved 180/240 earlier get clamped —
+    // anything beyond is soft bonus practice, not plan
+    if (minutesDaily != null && minutesDaily > 120) minutesDaily = 120;
   } catch {
     history = Object.values(lsAll()).filter((r) => r.date >= from);
   }

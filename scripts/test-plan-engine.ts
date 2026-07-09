@@ -133,7 +133,19 @@ console.log("— honest plan: verdicts (founder's case: A1→C1, 3 мес, 45 м
   const unk = assessPlan({ level: "A1", targetLevel: "B2", minutesDaily: 30, daysLeft: null });
   check("no date → unknown + months forecast", unk.verdict === "unknown" && unk.monthsNeeded > 0, String(unk.monthsNeeded));
 
-  check("paceChoiceFor rounds up to offered values", paceChoiceFor(61) === 90 && paceChoiceFor(240) === 240 && paceChoiceFor(241) === null);
+  check("paceChoiceFor rounds up, capped at 120", paceChoiceFor(61) === 90 && paceChoiceFor(120) === 120 && paceChoiceFor(121) === null);
+}
+
+console.log("— honest plan: exam-format readiness (passing ≠ owning the level) —");
+{
+  // 90 days @45min: full C1 proficiency is out of reach, but ~half the
+  // format work fits — the verdict must forecast BOTH axes
+  const b = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 45, daysLeft: 90 });
+  check("format readiness computed", b.formatReadiness != null && b.formatReadiness > 30 && b.formatReadiness < 70, String(b.formatReadiness));
+  const full = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 120, daysLeft: 113 });
+  check("113d @120min → format fully trainable", full.formatReadiness === 100, String(full.formatReadiness));
+  const noDate = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 45, daysLeft: null });
+  check("no date → format readiness null", noDate.formatReadiness === null);
 }
 
 console.log("— day layout —");
@@ -181,20 +193,27 @@ console.log("— day layout —");
 
 console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80-min day) —");
 {
-  // template path (no route yet) — every supported pace, a week of days
-  for (const budget of [15, 30, 45, 60, 90, 120, 180, 240]) {
+  // template path (no route yet) — every supported pace, a week of days.
+  // BOTH bounds: the old single-pass filler silently capped days at ~60 min,
+  // so 90/120 chosen in settings never changed the plan (founder-reported)
+  for (const budget of [15, 30, 45, 60, 90, 120]) {
     let ok = true;
     let detail = "";
     for (let day = 1; day <= 7; day++) {
       const tasks = generateDailyPlan("A2", budget, day, "ru");
       const spent = tasks.reduce((s, t) => s + t.estimatedMinutes, 0);
-      if (spent > budget * 1.1 + 0.001) {
+      if (spent > budget * 1.1 + 0.001 || spent < budget * 0.9 - 4) {
         ok = false;
         detail = `day ${day}: ${spent} min for a ${budget}-min pace`;
         break;
       }
+      if (new Set(tasks.map((t) => t.taskId)).size !== tasks.length) {
+        ok = false;
+        detail = `day ${day}: duplicate taskIds`;
+        break;
+      }
     }
-    check(`template ${budget} min/day stays ≤ +10%`, ok, detail);
+    check(`template ${budget} min/day fills ±10%`, ok, detail);
   }
   // variety: a 30-min week still touches the rotating skills
   const weekSkills = new Set(
@@ -202,24 +221,36 @@ console.log("— chosen minutes ARE the plan size (founder bug: 45 chosen → 80
   );
   check("30-min week rotates ≥4 skills", weekSkills.size >= 4, [...weekSkills].join(","));
 
-  // route path — non-mock load respects each pace too
+  // route path — non-mock load respects each pace too, both bounds
   const route = fallbackRoute(baseInputs, TODAY);
-  for (const budget of [15, 30, 45, 60, 90, 120, 180, 240]) {
+  for (const budget of [15, 30, 45, 60, 90, 120]) {
     let ok = true;
     let detail = "";
     for (let day = 1; day <= 7; day++) {
       const tasks = buildDay({ route, date: plusDays(day - 1), dayNumber: day, mastery: [], history: [], minutesDaily: budget, locale: "ru" });
-      const spent = tasks
+      const nonMock = tasks
         .filter((t) => t.kind !== "mock_full" && t.kind !== "mock_section")
         .reduce((s, t) => s + t.estimatedMinutes, 0);
-      if (spent > budget * 1.1 + 0.001) {
+      const total = tasks.reduce((s, t) => s + t.estimatedMinutes, 0);
+      // upper bound on non-mock load (mocks may exceed: exam realism);
+      // lower bound on the WHOLE day — a mock counts as the day's work
+      if (nonMock > budget * 1.1 + 0.001 || total < budget * 0.9 - 4) {
         ok = false;
-        detail = `day ${day}: ${spent} min non-mock for a ${budget}-min pace`;
+        detail = `day ${day}: ${nonMock} min non-mock / ${total} total for a ${budget}-min pace`;
+        break;
+      }
+      if (new Set(tasks.map((t) => t.taskId)).size !== tasks.length) {
+        ok = false;
+        detail = `day ${day}: duplicate taskIds`;
         break;
       }
     }
-    check(`route day ${budget} min/day stays ≤ +10% (non-mock)`, ok, detail);
+    check(`route day ${budget} min/day fills ±10% (non-mock)`, ok, detail);
   }
+  // the founder's live repro: a 55-60-min day must REBUILD at pace 120
+  check("60-min day at pace 120 → rebuild fires", dayNeedsRebuild(60, 120));
+  const day120 = generateDailyPlan("A2", 120, 3, "ru").reduce((s, t) => s + t.estimatedMinutes, 0);
+  check(`…and the rebuilt day is ~120 (${day120} min)`, day120 >= 104 && day120 <= 132, String(day120));
 }
 
 console.log("— pace change in settings rebuilds today (founder bug: 45→60 kept a 48-min day) —");

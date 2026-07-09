@@ -39,10 +39,20 @@ export const DISCIPLINE = 0.85;
  * listening, writing practice fill the rest) → mastery discount cap. */
 export const MASTERY_DISCOUNT_CAP = 0.5;
 
-/** Pace choices offered everywhere (founder: 15 is the useful minimum,
- * beyond ~4 h/day nobody sustains). */
-export const PACE_CHOICES = [15, 30, 45, 60, 90, 120, 180, 240] as const;
-export const MAX_SUSTAINABLE_MINUTES = 240;
+/**
+ * PASSING the exam is a separate skill from OWNING the level (founder
+ * methodology, 07.2026): task formats, section strategies and timing are
+ * trainable fast and genuinely raise the odds of scoring above one's "pure"
+ * proficiency. The ladder above measures proficiency; these two measure
+ * format readiness. CONFIG — the methodologist tunes both.
+ */
+export const FORMAT_HOURS = 30; // full TÖMER format training: all sections, task types, timing
+export const FORMAT_SHARE = 0.25; // share of the resource the plan dedicates to mocks/format work
+
+/** Pace choices offered everywhere (founder: 15 is the useful minimum, and
+ * nobody sustains beyond 2 h/day — extra practice is a soft bonus, not plan). */
+export const PACE_CHOICES = [15, 30, 45, 60, 90, 120] as const;
+export const MAX_SUSTAINABLE_MINUTES = 120;
 
 /** The quiz can report A0; the ladder starts one rung below A1. */
 export type StudentLevel = "A0" | Level;
@@ -102,6 +112,9 @@ export type HonestPlan = {
   reachableLevel: Level | null;
   /** progress into the step AFTER reachableLevel, 0..1 — "подступ к B2" */
   nextStepShare: number;
+  /** exam-FORMAT readiness by the date, 0..100 (null without a date):
+   * separate axis from proficiency — task types/strategies/timing train fast */
+  formatReadiness: number | null;
 };
 
 export function assessPlan(input: {
@@ -135,6 +148,7 @@ export function assessPlan(input: {
       dateNeeded,
       reachableLevel: null,
       nextStepShare: 0,
+      formatReadiness: null,
     };
   }
 
@@ -158,6 +172,8 @@ export function assessPlan(input: {
   }
 
   const minutesNeeded = Math.ceil((needHours * 60) / (Math.max(1, daysLeft) * DISCIPLINE));
+  // the second, faster axis: how much of the exam FORMAT fits before the date
+  const formatReadiness = Math.min(100, Math.round(((haveHours * FORMAT_SHARE) / FORMAT_HOURS) * 100));
 
   return {
     verdict,
@@ -170,6 +186,7 @@ export function assessPlan(input: {
     dateNeeded,
     reachableLevel,
     nextStepShare,
+    formatReadiness,
   };
 }
 
