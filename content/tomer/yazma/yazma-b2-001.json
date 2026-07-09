@@ -1,0 +1,21 @@
+{
+  "id": "yazma-b2-001",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "B2",
+  "title": "Kompozisyon: Teknoloji ve İnsan İlişkileri",
+  "body": "Aşağıdaki konu hakkında en az 150, en çok 200 kelimelik bir kompozisyon yazınız.\n\n«Teknoloji insanları birbirine yaklaştırıyor mu, yoksa uzaklaştırıyor mu?»\n\nYazınızda görüşünüzü açıkça belirtin, en az iki gerekçe sunun ve gerekçelerinizi örneklerle destekleyin. Giriş, gelişme ve sonuç bölümlerine dikkat edin.",
+  "audioSrc": null,
+  "questions": [],
+  "constraints": {
+    "minWords": 150,
+    "maxWords": 200,
+    "genre": "kompozisyon"
+  },
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

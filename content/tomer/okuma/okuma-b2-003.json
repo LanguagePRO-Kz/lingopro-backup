@@ -1,0 +1,82 @@
+{
+  "id": "okuma-b2-003",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "B2",
+  "title": "Kent Bahçeleri: Betonun Arasında Yeşil",
+  "body": "Büyük şehirlerde yaşayanların doğayla bağı her geçen gün zayıflıyor. Yüksek binaların arasında yeşile hasret kalan kent sakinleri için son yıllarda umut verici bir uygulama yaygınlaşıyor: kent bahçeleri. Belediyelerin ya da mahalle derneklerinin öncülüğünde kurulan bu ortak alanlarda, isteyen herkes küçük bir parselde sebze ve meyve yetiştirebiliyor.\n\nİlk bakışta bu bahçelerin amacı gıda üretimi gibi görünse de, araştırmalar asıl kazanımın başka yerde olduğunu gösteriyor: sosyal bağlar. Birbirini tanımayan komşular aynı toprağı işlerken tanışıyor, deneyimlerini paylaşıyor ve mahalleye aidiyet duygusu güçleniyor. Emekliler kendilerini yeniden üretken hissederken, çocuklar domatesin markette değil toprakta yetiştiğini ilk kez burada görüyor.\n\nElbette her şey sorunsuz ilerlemiyor. Kent bahçeleri, değeri hızla artan şehir arazileri üzerinde kurulduğu için sürekli yapılaşma baskısı altında. Kimi belediyeler bahçeleri geçici projeler olarak görüyor ve birkaç yıl sonra alanı imara açabiliyor. Uzmanlar, bu alanların kalıcı olabilmesi için kent planlarında «yeşil altyapı» statüsüyle korunması gerektiğini savunuyor; aksi hâlde bugün filizlenen dayanışmanın yarın bir inşaat sahasına dönüşmesi işten bile değil.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main_idea",
+      "prompt": "Metnin ana düşüncesi aşağıdakilerden hangisidir?",
+      "options": [
+        "Kent bahçeleri gıda üretiminin ötesinde toplumsal yararlar sağlamakta, ancak geleceği güvence altında bulunmamaktadır",
+        "Şehirde sebze yetiştirmek ekonomik açıdan kârlı bir uğraştır",
+        "Belediyeler kent bahçelerinin yaygınlaşmasına karşı çıkmaktadır",
+        "Doğayla gerçek bir bağ ancak kırsalda yaşayarak kurulabilir"
+      ],
+      "answer": 0,
+      "rationale": "Охватывает оба стержня текста (социальная ценность + угроза застройки); B сужает до экономики, C — искажение «kimi belediyeler geçici görüyor», D — не утверждается."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Araştırmalara göre kent bahçelerinin asıl kazanımı nedir?",
+      "options": [
+        "Sosyal bağların güçlenmesi",
+        "Gıda üretiminin artması",
+        "Arazi değerinin yükselmesi",
+        "Belediye gelirlerinin çoğalması"
+      ],
+      "answer": 0,
+      "rationale": "«asıl kazanımın başka yerde olduğunu gösteriyor: sosyal bağlar»; B — ловушка на «ilk bakışta amacı gıda üretimi gibi görünse de»; C — из текста, но как угроза, не выгода."
+    },
+    {
+      "id": "q3",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi metinde kent bahçelerinin yararları arasında GEÇMEMEKTEDİR?",
+      "options": [
+        "Hava kirliliğini azaltması",
+        "Komşuların tanışmasını sağlaması",
+        "Emeklilere üretkenlik duygusu kazandırması",
+        "Çocuklara sebzenin gerçek kaynağını göstermesi"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D — из второго абзаца; A — экологически правдоподобно для «зелёной» темы, но в тексте нет ни слова о воздухе."
+    },
+    {
+      "id": "q4",
+      "type": "vocab_in_context",
+      "prompt": "Metindeki «yapılaşma baskısı» ifadesiyle anlatılmak istenen aşağıdakilerden hangisidir?",
+      "options": [
+        "Arazilerin inşaata açılması yönündeki talep ve zorlama",
+        "Binaların fiziksel ağırlığının toprağa etkisi",
+        "Belediyelerin bahçe sahiplerinden vergi istemesi",
+        "Bahçelerde çalışmanın bedensel zorluğu"
+      ],
+      "answer": 0,
+      "rationale": "Контекст «değeri hızla artan araziler … alanı imara açabiliyor» раскрывает метафору; B — буквальное прочтение baskı, C/D обыгрывают слова текста."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Metnin son cümlesinden aşağıdaki yargılardan hangisi çıkarılabilir?",
+      "options": [
+        "Koruma sağlanmazsa bahçelerin kolayca yok olabileceği",
+        "İnşaat sektörünün mahalle dayanışmasını desteklediği",
+        "Bahçelerin zamanla kendiliğinden genişleyeceği",
+        "Mahalle sakinlerinin yapılaşmadan memnun olduğu"
+      ],
+      "answer": 0,
+      "rationale": "«aksi hâlde … inşaat sahasına dönüşmesi işten bile değil» — вывод об уязвимости; B/D противоречат тону, C — беспочвенный оптимизм."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

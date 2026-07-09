@@ -156,6 +156,28 @@ export default function DashboardHome() {
     return () => window.removeEventListener("focus", creditVoiceTask);
   }, []);
 
+  // same pattern for mocks (audit #10): a finished mock section sets the flag,
+  // the day's mock task gets credited when the student returns to the plan
+  useEffect(() => {
+    function creditMockTask() {
+      if (window.localStorage.getItem("lingopro:mock-done") !== todayISO()) return;
+      setToday((prev) => {
+        if (!prev) return prev;
+        const idx = prev.tasks.findIndex((t) => (t.kind === "mock_section" || t.kind === "mock_full") && !t.completed);
+        if (idx === -1) return prev;
+        const tasks = prev.tasks.map((t, i) => (i === idx ? { ...t, completed: true } : t));
+        const row: DayRow = { ...prev, tasks, completedCount: tasks.filter((t) => t.completed).length };
+        void saveDay(row);
+        setHistory((h) => h.map((r) => (r.date === row.date ? row : r)));
+        window.dispatchEvent(new CustomEvent("lp:daily-updated", { detail: { completed: row.completedCount, total: row.total } }));
+        return row;
+      });
+    }
+    creditMockTask();
+    window.addEventListener("focus", creditMockTask);
+    return () => window.removeEventListener("focus", creditMockTask);
+  }, []);
+
   function completeTask(task: DailyTask, result: { score: number; maxScore: number; answers: unknown }) {
     setActiveTask(null);
     if (!today) return;

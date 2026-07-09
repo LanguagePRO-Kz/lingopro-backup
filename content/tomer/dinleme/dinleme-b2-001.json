@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-b2-001",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "B2",
+  "title": "Radyo Söyleşisi: Arıcılıkla Geçen Bir Ömür",
+  "body": "FATİH: Sevgili dinleyiciler, bugünkü konuğumuz otuz yıldır arıcılık yapan Ayşe Hanım. Hoş geldiniz. Bu mesleğe nasıl başladınız?\nAHU: Hoş bulduk. Aslında mesleği babamdan devraldım. Çocukken yazlarımız yaylada, kovanların arasında geçerdi. Üniversitede gıda mühendisliği okudum ama mezun olunca şehirde ofis işinde çalışmak bana göre olmadığını anladım ve köye döndüm.\nFATİH: Peki bu otuz yılda meslek nasıl değişti?\nAHU: İnanılmaz değişti. Eskiden her şey tecrübeyle yürürdü; şimdi kovanların içindeki sıcaklığı telefondan takip ediyoruz. Ama teknolojiden daha önemli bir değişim var: iklim. Çiçeklenme dönemleri artık öngörülemiyor. Geçen yıl erken gelen don yüzünden rekoltemizin neredeyse yarısını kaybettik.\nFATİH: Gençlere bu mesleği önerir misiniz?\nAHU: Öneririm ama bir şartla: sabırlı olacaklar. Arıcılık, emeğinin karşılığını hemen vermeyen bir iş. İlk üç yıl kazanç beklememek gerekiyor. Buna karşılık doğayla iç içe, kimseye bağımlı olmadan yaşıyorsunuz. Bir de şunu söyleyeyim: Balı pazarlamak, üretmekten daha zor. O yüzden gençlerin işin ticaret tarafını da öğrenmesi şart.",
+  "audioSrc": "/audio/tomer/dinleme-b2-001.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Ayşe Hanım arıcılığa nasıl başlamıştır?",
+      "options": [
+        "Mesleği babasından devralarak",
+        "Üniversitede arıcılık eğitimi alarak",
+        "Belediyenin kursuna katılarak",
+        "Emekli olduktan sonra hobi olarak"
+      ],
+      "answer": 0,
+      "rationale": "«mesleği babamdan devraldım»; B — ловушка на упомянутый университет (но специальность другая), C/D — правдоподобные типовые пути."
+    },
+    {
+      "id": "q2",
+      "type": "inference",
+      "prompt": "Ayşe Hanım'ın köye dönme sebebi aşağıdakilerden hangisidir?",
+      "options": [
+        "Ofis hayatının kendisine uygun olmadığını fark etmesi",
+        "Şehirde iş bulamaması",
+        "Babasının ısrar etmesi",
+        "Gıda mühendisliğini sevmemesi"
+      ],
+      "answer": 0,
+      "rationale": "«ofis işinde çalışmak bana göre olmadığını anladım» — вывод; B/C/D не звучали, но житейски правдоподобны."
+    },
+    {
+      "id": "q3",
+      "type": "detail",
+      "prompt": "Konuşmaya göre meslekteki en önemli değişim nedir?",
+      "options": [
+        "İklimin öngörülemez hâle gelmesi",
+        "Kovan teknolojisinin gelişmesi",
+        "Bal fiyatlarının artması",
+        "Gençlerin mesleğe ilgisinin azalması"
+      ],
+      "answer": 0,
+      "rationale": "«teknolojiden daha önemli bir değişim var: iklim» — вопрос проверяет иерархию, дистрактор B — тоже прозвучавший, но второстепенный факт (классическая TÖMER-ловушка)."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Geçen yıl rekoltenin yaklaşık yarısının kaybedilmesinin sebebi nedir?",
+      "options": [
+        "Erken gelen don",
+        "Kovanlardaki hastalık",
+        "Aşırı sıcaklar",
+        "Pazarlama sorunları"
+      ],
+      "answer": 0,
+      "rationale": "«erken gelen don yüzünden»; C — климатически правдоподобно, но противоположно; D — из финала беседы, не о рекольте."
+    },
+    {
+      "id": "q5",
+      "type": "inference",
+      "prompt": "Ayşe Hanım'a göre arıcılığa başlayacak bir gencin en çok neye hazırlıklı olması gerekir?",
+      "options": [
+        "İlk yıllarda kazanç elde edememeye",
+        "Şehirden tamamen kopmaya",
+        "Yüksek başlangıç masraflarına",
+        "Yalnız çalışmanın zorluğuna"
+      ],
+      "answer": 0,
+      "rationale": "«İlk üç yıl kazanç beklememek gerekiyor» + «sabırlı olacaklar»; B/D — искажения прозвучавших «доброжелательных» тезисов, C — не упоминалось."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

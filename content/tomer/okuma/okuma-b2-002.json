@@ -1,0 +1,82 @@
+{
+  "id": "okuma-b2-002",
+  "source": "original",
+  "license": null,
+  "skill": "okuma",
+  "level": "B2",
+  "title": "Dijital Detoks: Telefonu Bırakmak Yetmiyor",
+  "body": "Akıllı telefonlar hayatımızı kolaylaştırırken yeni bir tartışmayı da beraberinde getirdi: sürekli çevrim içi olma hâli. Araştırmalar, ortalama bir kullanıcının telefonunu günde seksenden fazla kez kontrol ettiğini gösteriyor. Bildirim sesleri, kısa videolar ve sosyal medya akışları dikkatimizi o kadar sık bölüyor ki uzmanlar artık «parçalanmış dikkat» kavramından söz ediyor. Üstelik bu durum yalnızca verimliliği değil, uyku düzenini ve yüz yüze ilişkileri de olumsuz etkiliyor.\n\nBu tabloya tepki olarak son yıllarda «dijital detoks» uygulamaları yaygınlaşmaya başladı. Kimi kullanıcılar hafta sonları telefonlarını tamamen kapatıyor, kimileri ekran süresini sınırlayan uygulamalardan destek alıyor. Hatta bazı oteller, telefonunu resepsiyona teslim eden misafirlerine indirim yaparak «teknolojisiz tatil» paketleri satmaya başladı. İlk bakışta çelişkili görünse de, teknolojiden uzaklaşmak isteyenlere yine teknolojinin araçlarıyla ve teknoloji sektörünün yöntemleriyle çözüm sunuluyor.\n\nAncak uzmanlara göre asıl mesele telefonu bırakmak değil, onunla kurulan ilişkiyi değiştirmek. Kısa süreli bir uzaklaşmanın ardından eski alışkanlıklara dönülüyorsa detoksun kalıcı bir yararı olmuyor. Bu nedenle uzmanlar, yasaklamak yerine bilinçli kullanım alışkanlıkları geliştirmeyi; örneğin yemek masasında ve yatak odasında telefona yer vermemeyi öneriyor.",
+  "audioSrc": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Metne göre «parçalanmış dikkat» kavramının ortaya çıkma nedeni nedir?",
+      "options": [
+        "Dikkatin bildirimler ve akışlarla sık sık bölünmesi",
+        "Telefon ekranlarının küçülmesi",
+        "İnsanların uykusuz kalması",
+        "Kısa videoların kalitesinin düşmesi"
+      ],
+      "answer": 0,
+      "rationale": "«dikkatimizi o kadar sık bölüyor ki … 'parçalanmış dikkat'» — C — следствие из текста, поданное как причина (классическая ловушка); B/D не упоминались."
+    },
+    {
+      "id": "q2",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi metinde sürekli çevrim içi olmanın olumsuz etkileri arasında SAYILMAMIŞTIR?",
+      "options": [
+        "Göz sağlığının bozulması",
+        "Verimliliğin düşmesi",
+        "Uyku düzeninin bozulması",
+        "Yüz yüze ilişkilerin zayıflaması"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D перечислены в конце первого абзаца; A — правдоподобное бытовое следствие экранов, в тексте отсутствует."
+    },
+    {
+      "id": "q3",
+      "type": "detail",
+      "prompt": "Metne göre «teknolojisiz tatil» paketlerinin ilk bakışta çelişkili görünmesinin sebebi nedir?",
+      "options": [
+        "Teknolojiden uzaklaşma isteğine yine teknoloji temelli çözümler sunulması",
+        "Otellerin telefon kullanımını tamamen yasaklaması",
+        "Detoks uygulamalarının ücretli olması",
+        "Misafirlerin tatilde çalışmaya devam etmesi"
+      ],
+      "answer": 0,
+      "rationale": "«teknolojiden uzaklaşmak isteyenlere yine teknolojinin araçlarıyla … çözüm sunuluyor»; B — искажение (сдача телефона добровольна, за скидку), C/D не из текста."
+    },
+    {
+      "id": "q4",
+      "type": "inference",
+      "prompt": "Uzmanların yaklaşımıyla ilgili aşağıdakilerden hangisi söylenebilir?",
+      "options": [
+        "Kısıtlamadan çok alışkanlık değişimini savunmaktadırlar",
+        "Telefonların tamamen bırakılmasını istemektedirler",
+        "Detoks uygulamalarını zararlı bulmaktadırlar",
+        "Sorumluluğu teknoloji şirketlerine yüklemektedirler"
+      ],
+      "answer": 0,
+      "rationale": "«yasaklamak yerine bilinçli kullanım alışkanlıkları geliştirmeyi öneriyor» — вывод; B — прямое искажение «asıl mesele telefonu bırakmak değil»; C/D не прозвучали."
+    },
+    {
+      "id": "q5",
+      "type": "vocab_in_context",
+      "prompt": "Metindeki «bu tabloya tepki olarak» ifadesinde geçen «tablo» sözcüğüyle anlatılmak istenen aşağıdakilerden hangisidir?",
+      "options": [
+        "İçinde bulunulan genel durum",
+        "Duvara asılan bir sanat eseri",
+        "Araştırma sonuçlarını gösteren çizelge",
+        "Telefon ekranındaki görüntü"
+      ],
+      "answer": 0,
+      "rationale": "Переносное значение «картина/положение дел»; C — сильный дистрактор (в абзаце есть araştırmalar и цифры), B — буквальное значение, D — обыгрывает тему."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

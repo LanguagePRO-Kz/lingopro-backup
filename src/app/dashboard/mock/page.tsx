@@ -1,360 +1,507 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { MOCK_EXAMS } from "@/data/mock-exams";
-import { shuffleQuestionMap } from "@/lib/shuffle";
-import { useTTS } from "@/hooks/useTTS";
-import type { Level, MockExam, Question } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
+import { createClient } from "@/lib/supabase/client";
+import { todayISO } from "@/lib/daily-plan";
+import {
+  TOMER_EXAMS,
+  sectionUnits,
+  scoreOutOf25,
+  type TomerExam,
+  type TomerSection,
+  type TomerUnit,
+} from "@/data/tomer-exams";
 
-const LEVELS: Level[] = ["A2", "B2", "C1"];
+/**
+ * Mock runner (UX audit #9) — honest TÖMER format from the reviewed content
+ * bank: real Okuma texts (not grammar drills), Dinleme with exam-style audio
+ * (plays twice, like the real thing), Yazma scored /25 by the AI examiner,
+ * Konuşma in the live voice lesson. Every finished section persists to
+ * mock_results, so route milestones actually see mock progress.
+ */
 
 const T = {
   ru: {
-    title: "Пробные тесты TÖMER", sub: "Полный формат экзамена: Okuma · Dinleme · Yazma · Konuşma",
-    done: "пройдено", all: "Все", unfinished: "Непройденные", allLevels: "Все уровни",
-    start: "Начать тест", exit: "Выйти", min: "мин",
-    okuma: "Чтение", dinleme: "Аудирование", yazma: "Письмо", konusma: "Говорение",
-    finishSection: "Завершить раздел →", finishExam: "Завершить тест", transcript: "Транскрипт",
-    writeHere: "Напишите ответ на турецком…", words: "слов", minWords: "минимум",
-    results: "Результаты теста", overall: "Общий уровень", sectionScore: "Баллы по разделам",
-    correctOf: "верных", submitted: "отправлено", notDone: "не выполнено", backToList: "К списку тестов", empty: "Нет тестов по выбранным фильтрам.",
+    title: "Пробный TÖMER", sub: "Формат экзамена: 4 секции, каждая оценивается из 25. Оригинальные материалы в официальном формате.",
+    sections: { dinleme: "Dinleme · Аудирование", okuma: "Okuma · Чтение", yazma: "Yazma · Письмо", konusma: "Konuşma · Говорение" },
+    start: "Начать", redo: "Пройти ещё раз", scoreOf: "из 25", total: "Итог", totalHint: "Итог /100 появится, когда будут оценены все 4 секции.",
+    listenHint: "Запись играет дважды — как на экзамене.", playsLeft: (n: number) => `осталось прослушиваний: ${n}`,
+    q: "Вопрос", ofQ: "из", next: "Дальше", finishSection: "Завершить секцию",
+    sectionDone: "Секция завершена", correctAnswers: "Правильных ответов", back: "К секциям",
+    yazmaWords: "слов", yazmaSubmit: "Отправить на проверку", yazmaChecking: "AI-экзаменатор проверяет…",
+    yazmaTask: "Задание", yazmaScored: "Оценка", yazmaNeedBoth: "Оценка секции — среднее двух заданий.",
+    yazmaErr: "Не получилось проверить — текст на месте, попробуй отправить ещё раз.",
+    konusmaBody: "Говорение проходит живым уроком с AI-преподавателем: 3 части, как на TÖMER. Оценка по критериям придёт после урока.",
+    konusmaGo: "Начать голосовой экзамен",
+    sourceOriginal: "Оригинальные материалы в формате TÖMER",
   },
   en: {
-    title: "Mock TÖMER tests", sub: "Full exam format: Okuma · Dinleme · Yazma · Konuşma",
-    done: "done", all: "All", unfinished: "Unfinished", allLevels: "All levels",
-    start: "Start test", exit: "Exit", min: "min",
-    okuma: "Reading", dinleme: "Listening", yazma: "Writing", konusma: "Speaking",
-    finishSection: "Finish section →", finishExam: "Finish test", transcript: "Transcript",
-    writeHere: "Write your answer in Turkish…", words: "words", minWords: "minimum",
-    results: "Test results", overall: "Overall level", sectionScore: "Section scores",
-    correctOf: "correct", submitted: "submitted", notDone: "not done", backToList: "To test list", empty: "No tests match the selected filters.",
+    title: "TÖMER mock exam", sub: "Exam format: 4 sections, each scored out of 25. Original materials in the official format.",
+    sections: { dinleme: "Dinleme · Listening", okuma: "Okuma · Reading", yazma: "Yazma · Writing", konusma: "Konuşma · Speaking" },
+    start: "Start", redo: "Retake", scoreOf: "of 25", total: "Total", totalHint: "The /100 total appears once all 4 sections are scored.",
+    listenHint: "The recording plays twice — like the real exam.", playsLeft: (n: number) => `plays left: ${n}`,
+    q: "Question", ofQ: "of", next: "Next", finishSection: "Finish section",
+    sectionDone: "Section finished", correctAnswers: "Correct answers", back: "To sections",
+    yazmaWords: "words", yazmaSubmit: "Submit for review", yazmaChecking: "The AI examiner is reviewing…",
+    yazmaTask: "Task", yazmaScored: "Score", yazmaNeedBoth: "The section score is the average of both tasks.",
+    yazmaErr: "Review failed — your text is safe, try submitting again.",
+    konusmaBody: "Speaking runs as a live lesson with the AI teacher: 3 parts, TÖMER-style. The criteria-based score arrives after the lesson.",
+    konusmaGo: "Start the speaking exam",
+    sourceOriginal: "Original materials in the TÖMER format",
   },
   tr: {
-    title: "Deneme TÖMER testleri", sub: "Tam sınav formatı: Okuma · Dinleme · Yazma · Konuşma",
-    done: "tamamlandı", all: "Tümü", unfinished: "Tamamlanmamış", allLevels: "Tüm seviyeler",
-    start: "Teste başla", exit: "Çık", min: "dk",
-    okuma: "Okuma", dinleme: "Dinleme", yazma: "Yazma", konusma: "Konuşma",
-    finishSection: "Bölümü tamamla →", finishExam: "Testi bitir", transcript: "Metin",
-    writeHere: "Cevabını Türkçe yaz…", words: "kelime", minWords: "en az",
-    results: "Test sonuçları", overall: "Genel seviye", sectionScore: "Bölüm puanları",
-    correctOf: "doğru", submitted: "gönderildi", notDone: "yapılmadı", backToList: "Test listesine", empty: "Seçilen filtrelere uygun test yok.",
+    title: "TÖMER Deneme Sınavı", sub: "Sınav formatı: 4 bölüm, her biri 25 üzerinden. Resmî formatta özgün materyaller.",
+    sections: { dinleme: "Dinleme", okuma: "Okuma", yazma: "Yazma", konusma: "Konuşma" },
+    start: "Başla", redo: "Tekrar çöz", scoreOf: "/ 25", total: "Toplam", totalHint: "4 bölümün tamamı puanlanınca /100 toplam görünür.",
+    listenHint: "Kayıt iki kez çalar — gerçek sınavdaki gibi.", playsLeft: (n: number) => `kalan dinleme: ${n}`,
+    q: "Soru", ofQ: "/", next: "Sonraki", finishSection: "Bölümü bitir",
+    sectionDone: "Bölüm bitti", correctAnswers: "Doğru cevap", back: "Bölümlere dön",
+    yazmaWords: "kelime", yazmaSubmit: "İncelemeye gönder", yazmaChecking: "AI sınav uzmanı inceliyor…",
+    yazmaTask: "Görev", yazmaScored: "Puan", yazmaNeedBoth: "Bölüm puanı iki görevin ortalamasıdır.",
+    yazmaErr: "İnceleme başarısız — metnin duruyor, tekrar göndermeyi dene.",
+    konusmaBody: "Konuşma, AI öğretmenle canlı derste yapılır: TÖMER tarzı 3 bölüm. Ölçütlere göre puan dersten sonra gelir.",
+    konusmaGo: "Konuşma sınavını başlat",
+    sourceOriginal: "TÖMER formatında özgün materyaller",
   },
   kk: {
-    title: "Сынақ TÖMER тесттері", sub: "Толық емтихан форматы: Okuma · Dinleme · Yazma · Konuşma",
-    done: "өтілді", all: "Барлығы", unfinished: "Аяқталмаған", allLevels: "Барлық деңгей",
-    start: "Тестті бастау", exit: "Шығу", min: "мин",
-    okuma: "Оқу", dinleme: "Тыңдалым", yazma: "Жазу", konusma: "Сөйлеу",
-    finishSection: "Бөлімді аяқтау →", finishExam: "Тестті аяқтау", transcript: "Мәтін",
-    writeHere: "Жауабыңды түрікше жаз…", words: "сөз", minWords: "кемінде",
-    results: "Тест нәтижелері", overall: "Жалпы деңгей", sectionScore: "Бөлім бойынша баллдар",
-    correctOf: "дұрыс", submitted: "жіберілді", notDone: "орындалмады", backToList: "Тестер тізіміне", empty: "Таңдалған сүзгілерге сай тест жоқ.",
+    title: "Сынақ TÖMER", sub: "Емтихан форматы: 4 бөлім, әрқайсысы 25 ұпайдан. Ресми форматтағы төл материалдар.",
+    sections: { dinleme: "Dinleme · Тыңдалым", okuma: "Okuma · Оқылым", yazma: "Yazma · Жазылым", konusma: "Konuşma · Сөйлесім" },
+    start: "Бастау", redo: "Қайта өту", scoreOf: "/ 25", total: "Қорытынды", totalHint: "4 бөлім түгел бағаланғанда /100 қорытынды шығады.",
+    listenHint: "Жазба екі рет ойналады — нағыз емтихандағыдай.", playsLeft: (n: number) => `қалған тыңдау: ${n}`,
+    q: "Сұрақ", ofQ: "/", next: "Келесі", finishSection: "Бөлімді аяқтау",
+    sectionDone: "Бөлім аяқталды", correctAnswers: "Дұрыс жауап", back: "Бөлімдерге",
+    yazmaWords: "сөз", yazmaSubmit: "Тексеруге жіберу", yazmaChecking: "AI емтихан алушы тексеруде…",
+    yazmaTask: "Тапсырма", yazmaScored: "Баға", yazmaNeedBoth: "Бөлім бағасы — екі тапсырманың орташасы.",
+    yazmaErr: "Тексеру сәтсіз — мәтінің сақтаулы, қайта жіберіп көр.",
+    konusmaBody: "Сөйлесім AI ұстазбен жанды сабақта өтеді: TÖMER үлгісіндегі 3 бөлім. Өлшемдер бойынша баға сабақтан кейін келеді.",
+    konusmaGo: "Сөйлесім емтиханын бастау",
+    sourceOriginal: "TÖMER форматындағы төл материалдар",
   },
 };
 
-export default function MockPage() {
-  const { locale } = useI18n();
-  const c = pick(locale, T);
-  const [level, setLevel] = useState<Level | "all">("all");
-  const [onlyUnfinished, setOnlyUnfinished] = useState(false);
-  const [active, setActive] = useState<MockExam | null>(null);
-  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+const SECTION_EMOJI: Record<TomerSection, string> = { dinleme: "🎧", okuma: "📖", yazma: "✍️", konusma: "🎤" };
+const SECTION_ORDER: TomerSection[] = ["dinleme", "okuma", "yazma", "konusma"];
 
-  const list = useMemo(
-    () =>
-      MOCK_EXAMS.filter((m) => {
-        const byLevel = level === "all" || m.level === level;
-        const byStatus = !onlyUnfinished || !doneIds.has(m.id);
-        return byLevel && byStatus;
-      }),
-    [level, onlyUnfinished, doneIds],
-  );
+/* ------------------------- persistence (mock_results) ------------------------- */
 
-  if (active)
-    return (
-      <ExamRunner
-        exam={active}
-        c={c}
-        onExit={() => setActive(null)}
-        onFinish={() => setDoneIds((s) => new Set(s).add(active.id))}
-      />
-    );
+type SectionScores = Partial<Record<TomerSection, number>>;
 
+async function loadScores(examId: string): Promise<SectionScores> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("mock_results")
+      .select("section_scores, created_at")
+      .eq("exam_id", examId)
+      .order("created_at", { ascending: true });
+    if (error || !data) return {};
+    // one row per finished section attempt; the latest attempt wins
+    const agg: SectionScores = {};
+    for (const row of data) {
+      const s = (row.section_scores ?? {}) as SectionScores;
+      for (const k of SECTION_ORDER) if (typeof s[k] === "number") agg[k] = s[k];
+    }
+    return agg;
+  } catch {
+    return {};
+  }
+}
+
+async function saveSectionScore(examId: string, section: TomerSection, score: number, allScores: SectionScores): Promise<void> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const merged = { ...allScores, [section]: score };
+    const complete = SECTION_ORDER.every((k) => typeof merged[k] === "number");
+    const { error } = await supabase.from("mock_results").insert({
+      user_id: user.id,
+      exam_id: examId,
+      section_scores: { [section]: score },
+      total: complete ? SECTION_ORDER.reduce((s, k) => s + (merged[k] ?? 0), 0) : null,
+    });
+    if (error) console.error("[mock] save failed:", error.message);
+  } catch {
+    /* score shown in UI either way; next attempt can re-save */
+  }
+  // credit today's mock task on the dashboard (voice-done pattern, audit #10)
+  try {
+    window.localStorage.setItem("lingopro:mock-done", todayISO());
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ------------------------------ audio (2 plays) ------------------------------ */
+
+function MockAudio({ unitId, src, c }: { unitId: string; src: string; c: (typeof T)["ru"] }) {
+  const MAX_PLAYS = 2;
+  const key = `lingopro:mockplays:${unitId}`;
+  const [playsUsed, setPlaysUsed] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    try {
+      setPlaysUsed(Number(window.sessionStorage.getItem(key) ?? 0));
+    } catch {
+      /* ignore */
+    }
+  }, [key]);
+
+  function play() {
+    if (playing || playsUsed >= MAX_PLAYS) return;
+    const el = audioRef.current ?? new Audio(src);
+    audioRef.current = el;
+    el.currentTime = 0;
+    void el.play();
+    setPlaying(true);
+    const used = playsUsed + 1;
+    setPlaysUsed(used);
+    try {
+      window.sessionStorage.setItem(key, String(used));
+    } catch {
+      /* ignore */
+    }
+    el.onended = () => setPlaying(false);
+  }
+
+  const left = Math.max(0, MAX_PLAYS - playsUsed);
   return (
-    <div>
-      <SectionBack />
-      <SectionHint id="mock" />
-      <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
-      <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
-      <div className="mt-2 text-sm text-[var(--color-muted)]">
-        <span className="font-semibold text-[var(--color-brand)]">{doneIds.size}</span> / {MOCK_EXAMS.length} {c.done}
+    <div className="rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={play}
+          disabled={playing || left === 0}
+          className="btn-primary rounded-full px-5 py-2.5 text-sm font-semibold disabled:opacity-40"
+        >
+          {playing ? "🔊 …" : "▶ Dinle"}
+        </button>
+        <span className="text-xs text-[var(--color-muted)]">{c.playsLeft(left)}</span>
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <FilterBtn active={level === "all"} onClick={() => setLevel("all")}>{c.allLevels}</FilterBtn>
-        {LEVELS.map((l) => (
-          <FilterBtn key={l} active={level === l} onClick={() => setLevel(l)}>{l}</FilterBtn>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <FilterBtn active={!onlyUnfinished} onClick={() => setOnlyUnfinished(false)}>{c.all}</FilterBtn>
-        <FilterBtn active={onlyUnfinished} onClick={() => setOnlyUnfinished(true)}>{c.unfinished}</FilterBtn>
-      </div>
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {list.map((m) => (
-          <motion.div key={m.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <div className="glass card-glow flex h-full flex-col rounded-2xl p-5">
-              <div className="flex items-center justify-between">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand)]/10 text-xl">🧪</span>
-                <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-brand-2)]">{m.level}</span>
-              </div>
-              <div className="mt-3 text-sm font-semibold text-[var(--color-foreground)]">{m.title}</div>
-              <div className="mt-1 text-xs text-[var(--color-muted)]">
-                {m.grammar.length + m.reading.questions.length}+{m.listening.questions.length} soru · ~{m.timeMinutes} {c.min}
-              </div>
-              <button
-                type="button"
-                onClick={() => setActive(m)}
-                className={`mt-4 rounded-full px-4 py-2 text-sm font-semibold ${doneIds.has(m.id) ? "bg-[#16a34a]/12 text-[#16a34a]" : "btn-primary"}`}
-              >
-                {doneIds.has(m.id) ? `✅ ${c.start}` : `▶ ${c.start}`}
-              </button>
-            </div>
-          </motion.div>
-        ))}
-        {list.length === 0 && (
-          <div className="rounded-2xl border border-black/[0.07] bg-white/60 px-5 py-8 text-center text-sm text-[var(--color-muted)] sm:col-span-2 lg:col-span-3">
-            <p>{c.empty}</p>
-            <button type="button" onClick={() => { setLevel("all"); setOnlyUnfinished(false); }} className="btn-primary mt-4 rounded-full px-5 py-2.5 text-sm">
-              {c.all}
-            </button>
-          </div>
-        )}
-      </div>
+      <p className="mt-2 text-xs text-[var(--color-muted)]">{c.listenHint}</p>
     </div>
   );
 }
 
-type SectionId = "okuma" | "dinleme" | "yazma" | "konusma";
+/* ------------------------------ MCQ section run ------------------------------ */
 
-function ExamRunner({ exam, c, onExit, onFinish }: { exam: MockExam; c: (typeof T)["ru"]; onExit: () => void; onFinish: () => void }) {
-  const okumaQs: Question[] = useMemo(() => [...exam.reading.questions, ...exam.grammar], [exam]);
-  const dinlemeQs = exam.listening.questions;
-  const shuffled = useMemo(() => shuffleQuestionMap([...okumaQs, ...dinlemeQs]), [okumaQs, dinlemeQs]);
-  const tts = useTTS();
-
-  const sections: { id: SectionId; label: string; count: number }[] = [
-    { id: "okuma", label: c.okuma, count: okumaQs.length },
-    { id: "dinleme", label: c.dinleme, count: dinlemeQs.length },
-    { id: "yazma", label: c.yazma, count: 1 },
-    { id: "konusma", label: c.konusma, count: exam.speaking.parts.length },
-  ];
-
-  const [section, setSection] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [writing, setWriting] = useState("");
-  const [speaking, setSpeaking] = useState<string[]>(() => exam.speaking.parts.map(() => ""));
-  const [finished, setFinished] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(exam.timeMinutes * 60);
-
-  useEffect(() => {
-    if (finished) return;
-    if (secondsLeft <= 0) {
-      setFinished(true);
-      onFinish();
-      return;
-    }
-    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(id);
-  }, [secondsLeft, finished, onFinish]);
-
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
-  const ss = String(secondsLeft % 60).padStart(2, "0");
-
-  function nextSection() {
-    if (section + 1 >= sections.length) {
-      setFinished(true);
-      onFinish();
-    } else {
-      setSection((s) => s + 1);
-    }
+function shuffledOrder(n: number): number[] {
+  const idx = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
   }
+  return idx;
+}
 
-  if (finished) {
-    const okumaCorrect = okumaQs.filter((q) => answers[q.id] === shuffled[q.id].answer).length;
-    const dinlemeCorrect = dinlemeQs.filter((q) => answers[q.id] === shuffled[q.id].answer).length;
-    const writingWords = writing.trim().split(/\s+/).filter(Boolean).length;
-    const speakingDone = speaking.filter((s) => s.trim().length > 0).length;
-    return (
-      <div className="mx-auto max-w-lg">
-        <div className="glass rounded-3xl p-6 text-center">
-          <div className="text-3xl">🎉</div>
-          <h2 className="mt-2 text-lg font-bold">{c.results}</h2>
-          <div className="mt-1 text-sm text-[var(--color-muted)]">{exam.title}</div>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-sm">
-            <span className="text-[var(--color-muted)]">{c.overall}:</span>
-            <span className="font-bold text-[var(--color-brand)]">{exam.level}</span>
-          </div>
+function McqRunner({
+  units,
+  section,
+  c,
+  onDone,
+}: {
+  units: TomerUnit[];
+  section: TomerSection;
+  c: (typeof T)["ru"];
+  onDone: (correct: number, total: number) => void;
+}) {
+  const flat = useMemo(() => units.flatMap((u) => u.questions.map((q) => ({ unit: u, q }))), [units]);
+  // presentation order of options, fixed per question for this run
+  const orders = useMemo(() => flat.map(({ q }) => shuffledOrder(q.options.length)), [flat]);
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null); // index in shuffled space
+  const correctRef = useRef(0);
 
-          <div className="mt-5 text-left">
-            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.sectionScore}</div>
-            <div className="mt-2 flex flex-col gap-2">
-              <ScoreRow label={c.okuma} value={`${okumaCorrect}/${okumaQs.length} ${c.correctOf}`} />
-              <ScoreRow label={c.dinleme} value={`${dinlemeCorrect}/${dinlemeQs.length} ${c.correctOf}`} />
-              <ScoreRow label={c.yazma} value={writingWords > 0 ? `${writingWords} ${c.words} · ${c.submitted}` : c.notDone} />
-              <ScoreRow label={c.konusma} value={`${speakingDone}/${exam.speaking.parts.length} ${c.submitted}`} />
-            </div>
-          </div>
+  const { unit, q } = flat[i];
+  const order = orders[i];
+  const isNewUnit = i === 0 || flat[i - 1].unit.id !== unit.id;
 
-          <button type="button" onClick={onExit} className="btn-primary mt-6 rounded-full px-6 py-3 text-sm">{c.backToList}</button>
-        </div>
-      </div>
-    );
+  function next() {
+    if (picked == null) return;
+    if (order[picked] === q.answer) correctRef.current += 1;
+    setPicked(null);
+    if (i + 1 >= flat.length) onDone(correctRef.current, flat.length);
+    else setI(i + 1);
   }
-
-  const cur = sections[section];
 
   return (
-    <div>
-      {/* top bar */}
-      <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-black/[0.07] bg-[var(--color-bg)]/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <button type="button" onClick={onExit} className="text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)]">← {c.exit}</button>
-        <span className="text-sm font-semibold text-[var(--color-foreground)]">{exam.title}</span>
-        <span className={`rounded-full px-3 py-1 text-sm font-bold tabular-nums ${secondsLeft < 300 ? "bg-[#dc2626]/12 text-[#dc2626]" : "bg-black/[0.05] text-[var(--color-foreground)]"}`}>⏱ {mm}:{ss}</span>
-      </div>
-
-      {/* section tabs */}
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {sections.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSection(i)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${section === i ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}
-          >
-            {s.label} <span className={section === i ? "text-white/70" : "opacity-60"}>{s.count}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-5">
-        {cur.id === "okuma" && (
-          <div className="flex flex-col gap-4">
-            <div className="glass rounded-2xl p-5">
-              <div className="text-sm font-bold text-[var(--color-foreground)]">{exam.reading.title}</div>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-foreground)]">{exam.reading.text}</p>
+    <div className="mt-5 flex flex-col gap-4">
+      {/* unit context: text for okuma, audio for dinleme — shown at unit start and kept visible */}
+      <div className="glass rounded-3xl p-6">
+        <div className="text-sm font-semibold text-[var(--color-foreground)]">{unit.title}</div>
+        {section === "okuma" ? (
+          <div className="mt-3 max-h-72 overflow-y-auto whitespace-pre-line rounded-2xl bg-black/[0.02] p-4 text-sm leading-relaxed text-[var(--color-foreground)]">
+            {unit.body}
+          </div>
+        ) : (
+          unit.audioSrc && (
+            <div className="mt-3">
+              {isNewUnit || true ? <MockAudio unitId={unit.id} src={unit.audioSrc} c={c} /> : null}
             </div>
-            {okumaQs.map((q) => <MCQ key={q.id} q={q} options={shuffled[q.id].options} answers={answers} setAnswers={setAnswers} />)}
-          </div>
-        )}
-
-        {cur.id === "dinleme" && (
-          <div className="flex flex-col gap-4">
-            <div className="glass rounded-2xl p-5">
-              <div className="text-sm font-bold text-[var(--color-foreground)]">🎧 {exam.listening.title}</div>
-              {tts.isSupported && (
-                <button
-                  type="button"
-                  onClick={() => (tts.isSpeaking ? tts.stop() : tts.speak(exam.listening.text))}
-                  className="mt-2 rounded-lg bg-[var(--color-brand)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90"
-                >
-                  {tts.isSpeaking ? "⏸" : "▶"} {exam.listening.title}
-                </button>
-              )}
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs font-medium text-[var(--color-brand)]">{c.transcript}</summary>
-                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-foreground)]">{exam.listening.text}</p>
-              </details>
-            </div>
-            {dinlemeQs.map((q) => <MCQ key={q.id} q={q} options={shuffled[q.id].options} answers={answers} setAnswers={setAnswers} />)}
-          </div>
-        )}
-
-        {cur.id === "yazma" && (
-          <div className="glass rounded-2xl p-5">
-            <div className="text-sm font-bold text-[var(--color-foreground)]">{exam.writing.title}</div>
-            <p className="mt-2 text-sm text-[var(--color-foreground)]">{exam.writing.prompt}</p>
-            <textarea
-              value={writing}
-              onChange={(e) => setWriting(e.target.value)}
-              rows={10}
-              placeholder={c.writeHere}
-              className="mt-3 w-full resize-y rounded-2xl border border-black/[0.1] bg-white p-4 text-sm leading-relaxed outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/15"
-            />
-            <div className="mt-2 text-xs text-[var(--color-muted)]">
-              {writing.trim().split(/\s+/).filter(Boolean).length} / {exam.writing.minWords} {c.words} ({c.minWords})
-            </div>
-          </div>
-        )}
-
-        {cur.id === "konusma" && (
-          <div className="flex flex-col gap-4">
-            {exam.speaking.parts.map((p, i) => (
-              <div key={i} className="glass rounded-2xl p-5">
-                <div className="text-sm font-semibold text-[var(--color-foreground)]">Bölüm {i + 1} · {p.timeMinutes} dk</div>
-                <p className="mt-1 text-sm text-[var(--color-foreground)]">{p.instruction}</p>
-                <p className="mt-0.5 text-xs text-[var(--color-muted)]">{p.instructionRu}</p>
-                <textarea
-                  value={speaking[i]}
-                  onChange={(e) => setSpeaking((arr) => arr.map((v, j) => (j === i ? e.target.value : v)))}
-                  rows={4}
-                  placeholder={c.writeHere}
-                  className="mt-3 w-full resize-y rounded-2xl border border-black/[0.1] bg-white p-3 text-sm leading-relaxed outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/15"
-                />
-              </div>
-            ))}
-          </div>
+          )
         )}
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <button type="button" onClick={nextSection} className="btn-primary rounded-full px-6 py-3 text-sm">
-          {section + 1 >= sections.length ? c.finishExam : c.finishSection}
+      <div className="glass rounded-3xl p-6">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+          {c.q} {i + 1} {c.ofQ} {flat.length}
+        </div>
+        <div className="mt-2 text-base font-medium leading-relaxed text-[var(--color-foreground)]">{q.prompt}</div>
+        <div className="mt-4 flex flex-col gap-2">
+          {order.map((optIdx, pos) => (
+            <button
+              key={pos}
+              type="button"
+              onClick={() => setPicked(pos)}
+              className={`rounded-2xl border px-4 py-3 text-left text-sm transition-all ${
+                picked === pos
+                  ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.07]"
+                  : "border-black/[0.08] bg-white hover:border-black/[0.2]"
+              }`}
+            >
+              <span className="mr-2 font-semibold text-[var(--color-muted)]">{String.fromCharCode(65 + pos)})</span>
+              {q.options[optIdx]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={next}
+          disabled={picked == null}
+          className="btn-primary mt-5 rounded-full px-6 py-3 text-sm font-semibold disabled:opacity-40"
+        >
+          {i + 1 >= flat.length ? c.finishSection : c.next} →
         </button>
       </div>
     </div>
   );
 }
 
-function MCQ({ q, options, answers, setAnswers }: { q: Question; options: string[]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>> }) {
-  const sel = answers[q.id];
+/* ------------------------------ Yazma section ------------------------------ */
+
+function YazmaRunner({
+  units,
+  c,
+  locale,
+  onDone,
+}: {
+  units: TomerUnit[];
+  c: (typeof T)["ru"];
+  locale: string;
+  onDone: (score25: number) => void;
+}) {
+  const [texts, setTexts] = useState<string[]>(() => units.map(() => ""));
+  const [scores, setScores] = useState<(number | null)[]>(() => units.map(() => null));
+  const [busy, setBusy] = useState<number | null>(null);
+  const [err, setErr] = useState<number | null>(null);
+  const doneRef = useRef(false);
+
+  const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+
+  async function submit(idx: number) {
+    const text = texts[idx].trim();
+    if (!text || busy != null) return;
+    setBusy(idx);
+    setErr(null);
+    try {
+      const res = await fetch("/api/ai/writing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, taskPrompt: units[idx].body, feedbackLang: locale }),
+      });
+      const d = await res.json().catch(() => ({}));
+      const s = d?.review?.score_total_25;
+      if (res.ok && typeof s === "number") {
+        setScores((prev) => {
+          const nextScores = prev.map((v, i) => (i === idx ? s : v));
+          if (nextScores.every((v) => v != null) && !doneRef.current) {
+            doneRef.current = true;
+            onDone(Math.round(nextScores.reduce((a, b) => a + (b ?? 0), 0) / nextScores.length));
+          }
+          return nextScores;
+        });
+      } else {
+        setErr(idx);
+      }
+    } catch {
+      setErr(idx);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <div className="glass rounded-2xl p-5">
-      <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
-      <div className="mt-3 grid gap-2">
-        {options.map((opt, oi) => (
-          <button
-            key={oi}
-            type="button"
-            onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
-            className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all ${sel === oi ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.08]" : "border-black/[0.08] bg-black/[0.02] text-[var(--color-foreground)] hover:border-black/[0.16]"}`}
-          >
-            {opt}
+    <div className="mt-5 flex flex-col gap-5">
+      <p className="text-xs text-[var(--color-muted)]">{c.yazmaNeedBoth}</p>
+      {units.map((u, idx) => (
+        <div key={u.id} className="glass rounded-3xl p-6">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+            {c.yazmaTask} {idx + 1} · {u.constraints ? `${u.constraints.minWords}–${u.constraints.maxWords} ${c.yazmaWords}` : ""}
+          </div>
+          <div className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-foreground)]">{u.body}</div>
+          {scores[idx] == null ? (
+            <>
+              <textarea
+                value={texts[idx]}
+                onChange={(e) => setTexts((p) => p.map((v, i) => (i === idx ? e.target.value : v)))}
+                rows={8}
+                className="mt-4 w-full rounded-2xl border border-black/[0.1] bg-white p-4 text-sm leading-relaxed outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/15"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void submit(idx)}
+                  disabled={busy != null || words(texts[idx]) === 0}
+                  className="btn-primary rounded-full px-5 py-2.5 text-sm font-semibold disabled:opacity-40"
+                >
+                  {busy === idx ? c.yazmaChecking : c.yazmaSubmit}
+                </button>
+                <span className="text-xs text-[var(--color-muted)]">{words(texts[idx])} {c.yazmaWords}</span>
+              </div>
+              {err === idx && <p className="mt-2 text-xs font-medium text-[#b91c1c]">{c.yazmaErr}</p>}
+            </>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-[#16a34a]/[0.08] px-4 py-3 text-sm font-semibold text-[#15803d]">
+              ✓ {c.yazmaScored}: {scores[idx]} / 25
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------------------------- page ---------------------------------- */
+
+type View = { kind: "exam" } | { kind: "section"; section: TomerSection } | { kind: "result"; section: TomerSection; score: number; correct?: number; total?: number };
+
+export default function MockPage() {
+  const { locale } = useI18n();
+  const c = pick(locale, T);
+  const exam: TomerExam = TOMER_EXAMS[0];
+
+  const [view, setView] = useState<View>({ kind: "exam" });
+  const [scores, setScores] = useState<SectionScores>({});
+
+  useEffect(() => {
+    void loadScores(exam.id).then(setScores);
+  }, [exam.id]);
+
+  function finishSection(section: TomerSection, score: number, correct?: number, total?: number) {
+    void saveSectionScore(exam.id, section, score, scores);
+    setScores((s) => ({ ...s, [section]: score }));
+    setView({ kind: "result", section, score, correct, total });
+  }
+
+  const totalReady = SECTION_ORDER.every((k) => typeof scores[k] === "number");
+  const total = SECTION_ORDER.reduce((s, k) => s + (scores[k] ?? 0), 0);
+
+  if (view.kind === "section") {
+    const units = sectionUnits(exam, view.section);
+    return (
+      <div>
+        <button type="button" onClick={() => setView({ kind: "exam" })} className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-foreground)]">
+          ← {c.back}
+        </button>
+        <h2 className="text-xl font-bold tracking-tight">{SECTION_EMOJI[view.section]} {c.sections[view.section]}</h2>
+        {view.section === "yazma" ? (
+          <YazmaRunner units={units} c={c} locale={locale} onDone={(s) => finishSection("yazma", s)} />
+        ) : (
+          <McqRunner
+            units={units}
+            section={view.section}
+            c={c}
+            onDone={(correct, totalQ) => finishSection(view.section, scoreOutOf25(correct, totalQ), correct, totalQ)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (view.kind === "result") {
+    return (
+      <div>
+        <SectionBack />
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass mt-4 rounded-3xl p-7 text-center">
+          <div className="text-3xl">{SECTION_EMOJI[view.section]}</div>
+          <h2 className="mt-2 text-xl font-bold tracking-tight">{c.sectionDone}</h2>
+          <div className="mt-3 text-4xl font-extrabold text-[var(--color-brand)]">{view.score} <span className="text-lg font-semibold text-[var(--color-muted)]">{c.scoreOf}</span></div>
+          {view.correct != null && view.total != null && (
+            <p className="mt-2 text-sm text-[var(--color-muted)]">{c.correctAnswers}: {view.correct} / {view.total}</p>
+          )}
+          <button type="button" onClick={() => setView({ kind: "exam" })} className="btn-primary mt-5 rounded-full px-6 py-3 text-sm font-semibold">
+            {c.back}
           </button>
-        ))}
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionBack />
+      <SectionHint id="mock" />
+      <h2 className="text-xl font-bold tracking-tight">{c.title} · {exam.level}</h2>
+      <p className="mt-1 max-w-xl text-sm text-[var(--color-muted)]">{c.sub}</p>
+
+      {/* honest total */}
+      <div className="glass mt-5 rounded-3xl p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="text-sm font-semibold text-[var(--color-foreground)]">{exam.title}</span>
+          {totalReady ? (
+            <span className="text-lg font-extrabold text-[var(--color-brand)]">{c.total}: {total} / 100</span>
+          ) : (
+            <span className="text-xs text-[var(--color-muted)]">{c.totalHint}</span>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {SECTION_ORDER.map((s) => {
+            const units = sectionUnits(exam, s);
+            const nQ = units.reduce((n, u) => n + u.questions.length, 0);
+            const done = typeof scores[s] === "number";
+            return (
+              <div key={s} className="flex flex-col rounded-2xl border border-black/[0.07] bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-[var(--color-foreground)]">{SECTION_EMOJI[s]} {c.sections[s]}</span>
+                  {done && <span className="rounded-full bg-[#16a34a]/10 px-2.5 py-1 text-xs font-bold text-[#15803d]">{scores[s]} / 25</span>}
+                </div>
+                <div className="mt-1 text-xs text-[var(--color-muted)]">
+                  {s === "yazma" ? `${units.length} görev` : s === "konusma" ? "3 bölüm · canlı" : `${units.length} ${s === "okuma" ? "metin" : "kayıt"} · ${nQ} soru`}
+                </div>
+                {s === "konusma" ? (
+                  <>
+                    <p className="mt-2 text-xs leading-relaxed text-[var(--color-muted)]">{c.konusmaBody}</p>
+                    <Link href="/dashboard/speaking/live?mode=full" className="btn-primary mt-3 w-fit rounded-full px-4 py-2 text-xs font-semibold">
+                      🎤 {c.konusmaGo}
+                    </Link>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setView({ kind: "section", section: s })}
+                    className={`mt-3 w-fit rounded-full px-4 py-2 text-xs font-semibold ${done ? "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]" : "btn-primary"}`}
+                  >
+                    {done ? c.redo : `▶ ${c.start}`}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-4 text-[11px] text-[var(--color-muted)]">{c.sourceOriginal}</p>
       </div>
     </div>
-  );
-}
-
-function ScoreRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl bg-black/[0.03] px-4 py-2.5 text-sm">
-      <span className="text-[var(--color-foreground)]">{label}</span>
-      <span className="font-semibold text-[var(--color-brand)]">{value}</span>
-    </div>
-  );
-}
-
-function FilterBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${active ? "bg-[var(--color-brand)]/12 text-[var(--color-brand)]" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}>
-      {children}
-    </button>
   );
 }

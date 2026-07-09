@@ -1,0 +1,16 @@
+{
+  "id": "konusma-b2-001",
+  "source": "original",
+  "license": null,
+  "skill": "konusma",
+  "level": "B2",
+  "title": "Konuşma Sınavı (canlı, 3 bölüm)",
+  "body": "Konuşma bölümü AI öğretmenle canlı derste yapılır ve TÖMER Konuşma ölçütleriyle değerlendirilir:\nBölüm 1 — karşılıklı konuşma: tanışma, günlük hayat (~2 dakika).\nBölüm 2 — sözlü anlatım: verilen konuda kesintisiz konuşma (~3 dakika).\nBölüm 3 — görüş bildirme: tartışmalı bir konuda görüş ve gerekçe (~3 dakika).",
+  "audioSrc": null,
+  "questions": [],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

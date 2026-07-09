@@ -1,0 +1,21 @@
+{
+  "id": "yazma-b2-002",
+  "source": "original",
+  "license": null,
+  "skill": "yazma",
+  "level": "B2",
+  "title": "Resmî Dilekçe: Parkın Bakımsızlığı",
+  "body": "Oturduğunuz mahalledeki parkın bakımsızlığından şikâyetçisiniz. Belediyeye durumu anlatan, sorunları somut örneklerle açıklayan ve çözüm talep eden resmî bir dilekçe yazınız (en az 120, en çok 160 kelime).\n\nDilekçenizde kime hitap ettiğinizi belirtin, sorunu örneklerle anlatın, talebinizi açıkça ifade edin ve resmî dil kullanın.",
+  "audioSrc": null,
+  "questions": [],
+  "constraints": {
+    "minWords": 120,
+    "maxWords": 160,
+    "genre": "dilekçe"
+  },
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "id": "dinleme-b2-002",
+  "source": "original",
+  "license": null,
+  "skill": "dinleme",
+  "level": "B2",
+  "title": "Bilgilendirme Konuşması: Öğrenci Değişim Programı",
+  "body": "AHU: Değerli öğrenciler, hoş geldiniz. Ben Uluslararası İlişkiler Ofisi'nden Ahu Demir. Bugün size önümüzdeki yıl için değişim programımızı tanıtacağım. Başvurular bu yıl her zamankinden erken, on beş Kasım'da kapanıyor; bu tarihi lütfen bir yere not edin. Programa başvurmak için genel not ortalamanızın dört üzerinden en az iki buçuk olması ve geçerli bir yabancı dil belgesi sunmanız gerekiyor. Sık yapılan bir hatayı şimdiden söyleyeyim: birçok öğrenci dil sınavına girmeyi son haftaya bırakıyor, oysa sonuçların açıklanması üç haftayı bulabiliyor. Seçim sürecinde yalnızca notlarınıza bakmıyoruz; niyet mektubunuz en az ortalamanız kadar önemli. Gittiğiniz üniversitede aldığınız dersler, bölümünüz tarafından onaylandığı sürece buradaki programınıza sayılacak; yani dönem kaybı yaşamayacaksınız. Konaklama masrafları size ait; ancak seçilen öğrencilerin çoğu aylık hibe desteğinden yararlanıyor. Sorularınız için ofisimize uğrayabilir ya da internet sayfamızdaki soru formunu doldurabilirsiniz. Hepinize başarılar diliyorum.",
+  "audioSrc": "/audio/tomer/dinleme-b2-002.mp3",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "detail",
+      "prompt": "Konuşmaya göre başvurular ne zaman sona ermektedir?",
+      "options": [
+        "On beş Kasım'da",
+        "Aralık ayının ortasında",
+        "Yıl sonunda",
+        "Üç hafta sonra"
+      ],
+      "answer": 0,
+      "rationale": "«on beş Kasım'da kapanıyor»; D — ловушка на прозвучавшее «üç hafta» (срок результатов экзамена), B/C — типовые дедлайны."
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Konuşmacıya göre öğrencilerin sık yaptığı hata nedir?",
+      "options": [
+        "Dil sınavına girmeyi son haftaya bırakmaları",
+        "Not ortalamalarını yanlış hesaplamaları",
+        "Niyet mektubu yazmayı unutmaları",
+        "Başvuru formunu eksik doldurmaları"
+      ],
+      "answer": 0,
+      "rationale": "«birçok öğrenci dil sınavına girmeyi son haftaya bırakıyor»; C — обыгрывает прозвучавший niyet mektubu, B/D — типовые бюрократические ошибки."
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Konuşmadan niyet mektubuyla ilgili aşağıdaki sonuçlardan hangisi çıkarılabilir?",
+      "options": [
+        "Seçimde not ortalaması kadar belirleyicidir",
+        "Yalnızca ortalaması düşük öğrencilerden istenir",
+        "Yabancı dilde yazılması zorunludur",
+        "Programın sonunda teslim edilmesi yeterlidir"
+      ],
+      "answer": 0,
+      "rationale": "«niyet mektubunuz en az ortalamanız kadar önemli» — вывод о весе; B/C/D не звучали, но бюрократически правдоподобны."
+    },
+    {
+      "id": "q4",
+      "type": "detail",
+      "prompt": "Derslerin buradaki programa sayılması neye bağlıdır?",
+      "options": [
+        "Bölümün derslere onay vermesine",
+        "Öğrencinin dilekçe yazmasına",
+        "Hibe miktarının yeterli olmasına",
+        "Konaklamanın kampüste olmasına"
+      ],
+      "answer": 0,
+      "rationale": "«bölümünüz tarafından onaylandığı sürece … sayılacak»; C/D — из прозвучавших тем (hibe, konaklama), но к зачёту не относятся."
+    },
+    {
+      "id": "q5",
+      "type": "not_true",
+      "prompt": "Aşağıdakilerden hangisi konuşmada GEÇMEMEKTEDİR?",
+      "options": [
+        "Ulaşım biletlerinin ofis tarafından karşılanacağı",
+        "Konaklama masraflarının öğrenciye ait olduğu",
+        "Öğrencilerin çoğunun hibe desteği aldığı",
+        "Soruların internet üzerinden iletilebileceği"
+      ],
+      "answer": 0,
+      "rationale": "B/C/D прозвучали; A — правдоподобная льгота программ обмена, о которой не говорилось ни слова."
+    }
+  ],
+  "meta": {
+    "author": "ai-draft",
+    "reviewedBy": null,
+    "createdAt": "2026-07-09"
+  }
+}
