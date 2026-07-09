@@ -18,7 +18,8 @@ export type AiTask =
   | "writing_review"
   | "diagnostic_analysis"
   | "voice_review"
-  | "route_plan";
+  | "route_plan"
+  | "motivator_note"; // daily one-liner from Ahu on the dashboard
 
 export type AiProvider = "anthropic" | "deepseek";
 export type FeedbackLang = "ru" | "en" | "tr" | "kk";
@@ -36,12 +37,14 @@ const TASK_MODELS: Record<AiTask, ModelChoice> = {
   route_plan: SONNET,
   writing_review: DEEPSEEK_PRO,
   diagnostic_analysis: DEEPSEEK_PRO,
+  motivator_note: DEEPSEEK_PRO, // 1 short line/day — the cheap path
 };
 
 // Language quality beats price here: writing is capped at 3/day anyway.
 const LANG_OVERRIDES: Partial<Record<AiTask, Partial<Record<FeedbackLang, ModelChoice>>>> = {
   writing_review: { kk: SONNET },
   diagnostic_analysis: { kk: SONNET },
+  motivator_note: { kk: SONNET },
 };
 
 /** When the primary provider fails or returns garbage, retry once here. */

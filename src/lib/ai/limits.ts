@@ -13,10 +13,13 @@ export const AI_LIMITS = {
   diagnostic: { daily: 2, monthly: 10 },
   /** Study-route generation — event-driven only (settings change / big mock gap). */
   route: { daily: 3, monthly: 10 },
+  /** Daily Ahu note on the dashboard — client caches per day, 2 covers a
+   * mid-day language switch. */
+  motivator: { daily: 2, monthly: 40 },
   voice: { dailyBaseMinutes: 10 },
 } as const;
 
-export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic" | "route";
+export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic" | "route" | "motivator";
 
 /**
  * Unit-cost estimates for budget accounting (worst-case, USD).
@@ -28,6 +31,7 @@ export const AI_COST_ESTIMATE_USD: Record<QuotaFeature, number> & { voiceMinute:
   speaking: 0.006,
   diagnostic: 0.03, // same task class as writing
   route: 0.05, // Sonnet + full registry in the prompt (cached)
+  motivator: 0.002, // DeepSeek one-liner (KK → Sonnet, still tiny)
   voiceMinute: 0.13,
 };
 

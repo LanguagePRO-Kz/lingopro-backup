@@ -10,6 +10,11 @@ import { TaskModal } from "@/components/TaskModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StartChecklist } from "@/components/StartChecklist";
 import { PlanCheckpoint } from "@/components/PlanCheckpoint";
+import { LiveFacts } from "@/components/LiveFacts";
+import { Milestones } from "@/components/Milestones";
+import { WeeklyDigest } from "@/components/WeeklyDigest";
+import { AhuNote } from "@/components/AhuNote";
+import { fetchExamPlan } from "@/lib/exam-plan";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
 import {
   loadDashboardData,
@@ -25,9 +30,6 @@ import {
   weekCalendar,
   totalTasksDone,
   wordsLearned,
-  lastActivity,
-  getMotivation,
-  phraseOfDay,
   type DayRow,
   type DailyTask,
 } from "@/lib/daily-plan";
@@ -89,10 +91,19 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  // real goal for the progress card — "→ C1" was hardcoded for everyone
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lingopro:name");
     if (stored) setName(stored);
+    let active = true;
+    void fetchExamPlan().then((p) => {
+      if (p && active) setTargetLevel(p.targetLevel);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -246,6 +257,9 @@ export default function DashboardHome() {
 
   return (
     <div className="relative">
+      {/* milestone toasts: only REAL events (topic closed / streak / mock PB) */}
+      <Milestones history={history} />
+
       {/* confetti */}
       <AnimatePresence>
         {celebrate && (
@@ -273,8 +287,14 @@ export default function DashboardHome() {
 
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{c.hi}, {name}! 👋</h1>
 
+      {/* ===== LIVE FACTS (motivator: real numbers only) ===== */}
+      <LiveFacts streak={streak} levelRaw={levelRaw} />
+
       {/* ===== GETTING STARTED (first visits only; real progress) ===== */}
       <StartChecklist level={levelRaw} firstTaskDone={totalTasksDone(history) > 0} />
+
+      {/* ===== WEEKLY DIGEST (last week's real numbers, honest zero) ===== */}
+      <WeeklyDigest history={history} />
 
       {/* ===== PLAN ===== */}
       <div id="plan" className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">
@@ -402,26 +422,8 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* ===== AI motivator ===== */}
-      {(() => {
-        const m = getMotivation(locale, streak, lastActivity(history));
-        const p = phraseOfDay(locale);
-        return (
-          <div className="mt-6 flex items-start gap-4 rounded-3xl border border-black/[0.06] bg-gradient-to-br from-[var(--color-brand)]/[0.06] to-[var(--color-brand-2)]/[0.06] p-5 sm:p-6">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg text-white">
-              🤖
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-[var(--color-foreground)]">{m.title}</div>
-              <p className="mt-0.5 text-sm text-[var(--color-muted)]">{m.text[locale]}</p>
-              <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs">
-                <span className="font-semibold text-[var(--color-brand)]">{p.tr}</span>
-                <span className="text-[var(--color-muted)]"> — {p.translation}</span>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ===== Ahu's daily note: AI from real facts, honest template fallback ===== */}
+      <AhuNote streak={streak} history={history} />
 
       {/* ===== MY PROGRESS ===== */}
       <h2 className="mt-8 text-lg font-semibold text-[var(--color-foreground)]">{c.myProgress}</h2>
@@ -429,7 +431,7 @@ export default function DashboardHome() {
         <div className="glass rounded-3xl p-6">
           <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.levelCard}</div>
           <div className="mt-2 flex items-baseline gap-2 text-2xl font-bold text-[var(--color-foreground)]">
-            {levelRaw} <span className="text-[var(--color-muted)]">→</span> <span className="text-gradient">C1</span>
+            {levelRaw} <span className="text-[var(--color-muted)]">→</span> <span className="text-gradient">{targetLevel}</span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/[0.06]">
             <div className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]" style={{ width: `${Math.max(6, lvlPct)}%` }} />
