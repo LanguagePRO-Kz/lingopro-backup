@@ -27,10 +27,15 @@ UI (EarlyAccessModal)                        сервер
 Ключевые файлы: `src/lib/payments/*` (адаптер), `src/app/api/payments/*`
 (роуты), `supabase/migrations/0007_payments.sql` (журнал платежей).
 
-## Шаг 0 — миграция (один раз, до включения любого провайдера)
+## Шаг 0 — миграции (один раз, до включения любого провайдера)
 
-Применить `supabase/migrations/0007_payments.sql` в SQL Editor. Без неё
-checkout вернёт `migration_0007_missing`.
+Применить в SQL Editor: `0007_payments.sql` (журнал платежей) и
+`0009_voice_packs.sql` (пакеты минут vp30/vp60/vp120 в журнале). Без них
+checkout честно вернёт `migration_missing`.
+
+Пакеты минут: оплата тем же адаптером; по webhook'у сервер начисляет минуты
+в `voice_minute_credits` (срок — до конца календарного месяца покупки),
+`check_voice_allowance` подхватывает их автоматически.
 
 ## Kaspi (Казахстан, тенге)
 
@@ -78,6 +83,14 @@ Dodo — Merchant of Record: налоги/VAT считает и платит с�
    | 3 месяца −30% | $59.99 | `DODO_PRODUCT_3M_DISC=` |
    | 6 месяцев −30% | $89.99 | `DODO_PRODUCT_6M_DISC=` |
 
+   Плюс **3 продукта пакетов голосовых минут** (допы; USD — плейсхолдеры
+   до цифр основателя, KZT-цены Kaspi берёт из запроса):
+   | Продукт | Цена сейчас | env |
+   |---|---|---|
+   | 30 минут | $9.99 | `DODO_PRODUCT_VP30=` |
+   | 60 минут | $17.99 | `DODO_PRODUCT_VP60=` |
+   | 120 минут | $30.99 | `DODO_PRODUCT_VP120=` |
+
 **Включение:** `DODO_MODE=test` (API ходит на test.dodopayments.com) →
 тестовая карта → `DODO_MODE=live` + live-ключ.
 
@@ -107,6 +120,9 @@ DODO_PRODUCT_6M=
 DODO_PRODUCT_1M_DISC=
 DODO_PRODUCT_3M_DISC=
 DODO_PRODUCT_6M_DISC=
+DODO_PRODUCT_VP30=
+DODO_PRODUCT_VP60=
+DODO_PRODUCT_VP120=
 ```
 
 На Vercel те же переменные добавить в Project → Settings → Environment

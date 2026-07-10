@@ -95,7 +95,26 @@ export async function applyWebhookEvent(
     return { status: 500, body: { ok: false, reason: "db_error" } };
   }
 
-  // выдача доступа — тот же флаг, что ставит redeem_promo (гейт дашборда)
+  /* --------- пакет минут → начисление в voice_minute_credits --------- */
+  const packMinutes = VP_MINUTES[row.package_id];
+  if (packMinutes) {
+    // «живут до конца месяца» — конец календарного месяца покупки (UTC)
+    const now = new Date();
+    const expires = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+    const { error: creditErr } = await admin.from("voice_minute_credits").insert({
+      user_id: row.user_id,
+      minutes: packMinutes,
+      source: "purchase",
+      expires_at: expires,
+    });
+    if (creditErr) {
+      console.error("[payments] voice credit grant failed", creditErr.message);
+      return { status: 500, body: { ok: false, reason: "grant_failed" } };
+    }
+    return { status: 200, body: { ok: true, paid: true, minutes: packMinutes } };
+  }
+
+  /* ------------- пакет доступа → тот же флаг, что redeem_promo ------------- */
   const { error: grantErr } = await admin.from("profiles").update({ plan: row.package_id }).eq("id", row.user_id);
   if (grantErr) {
     console.error("[payments] grant failed", grantErr.message);
@@ -104,3 +123,5 @@ export async function applyWebhookEvent(
 
   return { status: 200, body: { ok: true, paid: true } };
 }
+
+const VP_MINUTES: Record<string, number> = { vp30: 30, vp60: 60, vp120: 120 };

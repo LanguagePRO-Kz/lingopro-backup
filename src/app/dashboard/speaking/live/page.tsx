@@ -7,6 +7,7 @@ import { VOICE_OPTIONS } from "@/lib/ai/voices";
 import { topicById } from "@/lib/ai/topics";
 import type { VoiceReport } from "@/lib/ai/prompts/voice-review";
 import { attachKonusmaScore } from "@/lib/diagnostic/result";
+import { VoicePackModal } from "@/components/VoicePackModal";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { awardXp, XP } from "@/lib/xp";
@@ -44,7 +45,7 @@ const T = {
     topicsWorked: "Проработанные темы", nextSteps: "Что дальше", reportNone: "Разговор был слишком коротким для разбора.",
     again: "Ещё урок",
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
-    errNoMinutes: "На сегодня минуты закончились. База обновится в полночь; пакеты минут скоро появятся.",
+    errNoMinutes: "На сегодня минуты закончились. База обновится в полночь — или докупи пакет минут.", buyMinutes: "Докупить минуты",
     errUnavailable: "Голосовой урок временно недоступен. Попробуй позже.", errGeneric: "Не получилось подключиться. Попробуй ещё раз.",
     errBusy: (n: number) => `Преподаватель сейчас занят — все места на уроке. Освободится в течение ~${n} мин, мы проверяем автоматически.`, busyFree: "Преподаватель освободился — можно начинать!",
     hint: "Говори свободно — ошибки это нормально, преподаватель поправит.",
@@ -66,7 +67,7 @@ const T = {
     topicsWorked: "Topics worked on", nextSteps: "Next steps", reportNone: "The conversation was too short for a review.",
     again: "Another lesson",
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
-    errNoMinutes: "You're out of minutes for today. The base quota resets at midnight; minute packs are coming soon.",
+    errNoMinutes: "You're out of minutes for today. The base quota resets at midnight — or top up with a minute pack.", buyMinutes: "Buy minutes",
     errUnavailable: "The voice lesson is temporarily unavailable. Please try later.", errGeneric: "Couldn't connect. Please try again.",
     errBusy: (n: number) => `The teacher is busy right now — all lesson slots are taken. A slot frees up within ~${n} min; we re-check automatically.`, busyFree: "The teacher is free — you can start!",
     hint: "Speak freely — mistakes are fine, the teacher will correct you.",
@@ -88,7 +89,7 @@ const T = {
     topicsWorked: "Çalışılan konular", nextSteps: "Sonraki adımlar", reportNone: "Konuşma değerlendirme için çok kısaydı.",
     again: "Yeni ders",
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
-    errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir; dakika paketleri yakında.",
+    errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir — ya da dakika paketi al.", buyMinutes: "Dakika al",
     errUnavailable: "Sesli ders geçici olarak kullanılamıyor. Daha sonra dene.", errGeneric: "Bağlanılamadı. Tekrar dene.",
     errBusy: (n: number) => `Öğretmen şu an meşgul — tüm ders yerleri dolu. ~${n} dk içinde boşalır; otomatik kontrol ediyoruz.`, busyFree: "Öğretmen boşaldı — başlayabilirsin!",
     hint: "Rahat konuş — hata yapmak normal, öğretmen düzeltir.",
@@ -110,7 +111,7 @@ const T = {
     topicsWorked: "Өтілген тақырыптар", nextSteps: "Келесі қадамдар", reportNone: "Әңгіме талдау үшін тым қысқа болды.",
     again: "Тағы бір сабақ",
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
-    errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады; минут пакеттері жақында.",
+    errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады — немесе минут пакетін ал.", buyMinutes: "Минут алу",
     errUnavailable: "Дауысты сабақ уақытша қолжетімсіз. Кейінірек көр.", errGeneric: "Қосылу сәтсіз. Қайта көр.",
     errBusy: (n: number) => `Ұстаз қазір бос емес — сабақтағы орындар толы. ~${n} мин ішінде босайды; автоматты тексереміз.`, busyFree: "Ұстаз босады — бастауға болады!",
     hint: "Еркін сөйле — қателесу қалыпты, ұстаз түзетеді.",
@@ -181,6 +182,7 @@ function LiveLesson() {
   const [err, setErr] = useState<"errAuth" | "errMic" | "errNoMinutes" | "errUnavailable" | "errGeneric" | "errBusy" | null>(null);
   const [busyEta, setBusyEta] = useState(2);
   const [busyFreed, setBusyFreed] = useState(false);
+  const [packModal, setPackModal] = useState(false);
 
   // «занято» → поллим доступность каждые 25 с; освободилось → зелёное «можно начинать»
   useEffect(() => {
@@ -483,11 +485,21 @@ function LiveLesson() {
       <p className="mt-1 max-w-xl text-sm text-[var(--color-muted)]">{c.subtitle}</p>
 
       {allowance && (
-        <div className="mt-3 text-xs text-[var(--color-muted)]">
-          {c.minutes}: <span className="font-semibold text-[var(--color-brand)]">{allowance.baseLeft}</span>
-          {allowance.creditsLeft > 0 && <> + {allowance.creditsLeft} {c.purchased}</>}
+        <div className="mt-3 flex items-center gap-2 text-xs text-[var(--color-muted)]">
+          <span>
+            {c.minutes}: <span className="font-semibold text-[var(--color-brand)]">{allowance.baseLeft}</span>
+            {allowance.creditsLeft > 0 && <> + {allowance.creditsLeft} {c.purchased}</>}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPackModal(true)}
+            className="rounded-full border border-[var(--color-brand)]/30 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[0.06]"
+          >
+            + {c.buyMinutes}
+          </button>
         </div>
       )}
+      {packModal && <VoicePackModal onClose={() => setPackModal(false)} />}
 
       {phase === "idle" && (
         <div className="glass mt-5 rounded-3xl p-6">
@@ -555,9 +567,14 @@ function LiveLesson() {
                     {pick(locale, { ru: "Войти", en: "Sign in", tr: "Giriş yap", kk: "Кіру" })}
                   </a>
                 ) : err === "errNoMinutes" ? (
-                  <a href="/dashboard" className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
-                    {pick(locale, { ru: "К плану дня", en: "To today's plan", tr: "Günün planına", kk: "Күн жоспарына" })}
-                  </a>
+                  <>
+                    <button type="button" onClick={() => setPackModal(true)} className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                      🎙️ {c.buyMinutes}
+                    </button>
+                    <a href="/dashboard" className="rounded-full border border-[#92400e]/40 px-4 py-1.5 text-xs font-semibold text-[#92400e]">
+                      {pick(locale, { ru: "К плану дня", en: "To today's plan", tr: "Günün planına", kk: "Күн жоспарына" })}
+                    </a>
+                  </>
                 ) : err === "errBusy" ? null : (
                   <button type="button" onClick={start} className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
                     {pick(locale, { ru: "Попробовать снова", en: "Try again", tr: "Tekrar dene", kk: "Қайта көру" })}
@@ -572,9 +589,18 @@ function LiveLesson() {
             </div>
           )}
 
-          <button type="button" onClick={start} className="btn-primary mt-5 rounded-full px-6 py-3 text-sm font-semibold">
-            🎙️ {c.start}
-          </button>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={start} className="btn-primary rounded-full px-6 py-3 text-sm font-semibold">
+              🎙️ {c.start}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPackModal(true)}
+              className="btn-ghost rounded-full px-5 py-3 text-sm font-medium"
+            >
+              + {c.buyMinutes}
+            </button>
+          </div>
           <p className="mt-3 text-xs text-[var(--color-muted)]">{c.hint}</p>
           <a href="/dashboard/speaking/push" className="mt-2 inline-block text-xs text-[var(--color-muted)] underline-offset-2 hover:underline">
             {pick(locale, { ru: { t: "Текстовый режим (push-to-talk)" }, en: { t: "Text mode (push-to-talk)" }, tr: { t: "Metin modu (push-to-talk)" }, kk: { t: "Мәтін режимі (push-to-talk)" } }).t}

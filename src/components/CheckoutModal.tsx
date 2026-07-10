@@ -369,7 +369,7 @@ export function CheckoutModal({
 
 /* ------------------------- карточка способа оплаты ------------------------- */
 
-function MethodCard({
+export function MethodCard({
   active,
   onSelect,
   icon,
@@ -413,7 +413,7 @@ function MethodCard({
  * официальные ассеты. Когда основатель положит их в public/payment/
  * (kaspi.svg, visa.svg, mastercard.svg) — заменить эти SVG на <Image>.
  */
-function MethodIcon({ kind }: { kind: "kaspi" | "card" }) {
+export function MethodIcon({ kind }: { kind: "kaspi" | "card" }) {
   if (kind === "kaspi") {
     // нейтральная иконка «оплата в приложении» (смартфон + чек)
     return (

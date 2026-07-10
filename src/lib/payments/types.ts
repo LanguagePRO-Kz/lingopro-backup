@@ -9,6 +9,10 @@
  */
 
 import type { PackageId } from "@/lib/billing";
+import type { VoicePackId } from "@/lib/pricing";
+
+/** Покупаемое: пакет доступа (1/3/6 мес) или пакет голосовых минут. */
+export type PurchasableId = PackageId | VoicePackId;
 
 export type PaymentProviderId = "kaspi" | "dodo";
 
@@ -19,7 +23,7 @@ export type PayCurrency = "kzt" | "usd";
 
 export type CheckoutInput = {
   userId: string;
-  packageId: PackageId;
+  packageId: PurchasableId;
   currency: PayCurrency;
   /** Сумма в МИНОРНЫХ единицах (тиын/центы) — без float-ошибок. */
   amountMinor: number;

@@ -61,6 +61,30 @@ export function planRow(cur: Currency, id: PackageId): PlanRow {
   return PRICING[cur].plans.find((p) => p.id === id)!;
 }
 
+/* ------------------------- пакеты голосовых минут ------------------------- */
+
+export type VoicePackId = "vp30" | "vp60" | "vp120";
+
+export const VOICE_PACK_IDS: VoicePackId[] = ["vp30", "vp60", "vp120"];
+
+/**
+ * Допы: докупаемые минуты голосовых уроков (живут до конца календарного
+ * месяца покупки — см. grant.ts). KZT — цены основателя (P0);
+ * USD — плейсхолдер по курсу ≈512 ₸/$ до финальной сетки.
+ */
+export const VOICE_PACKS: Record<Currency, Record<VoicePackId, { minutes: number; price: number }>> = {
+  kzt: {
+    vp30: { minutes: 30, price: 4990 },
+    vp60: { minutes: 60, price: 8990 },
+    vp120: { minutes: 120, price: 15990 },
+  },
+  usd: {
+    vp30: { minutes: 30, price: 9.99 },
+    vp60: { minutes: 60, price: 17.99 },
+    vp120: { minutes: 120, price: 30.99 },
+  },
+};
+
 const MONTHS: Record<PackageId, number> = { "1m": 1, "3m": 3, "6m": 6 };
 
 /**

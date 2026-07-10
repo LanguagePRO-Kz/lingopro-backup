@@ -9,13 +9,17 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
 import { savePlan } from "@/lib/billing";
 import type { PackageId } from "@/lib/billing";
+
+const PKG_IDS = ["1m", "3m", "6m"];
 
 const T = {
   ru: {
@@ -66,16 +70,40 @@ function ReturnInner() {
   const [state, setState] = useState<"waiting" | "done" | "slow">("waiting");
   const [attempt, setAttempt] = useState(0);
 
+  const pid = useSearchParams().get("pid");
+
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
+
+    // успех = наш журнал payments (RLS: читаем свои строки) — работает и для
+    // пакетов доступа, и для пакетов минут; статус ставит только webhook
     async function poll() {
-      const profile = await fetchProfile();
       if (cancelled) return;
-      if (profile?.plan) {
-        savePlan(profile.plan as PackageId); // локальный кэш гейта
+      let paid = false;
+      let itemId: string | null = null;
+
+      if (pid) {
+        const { data } = await createClient()
+          .from("payments")
+          .select("status, package_id")
+          .eq("id", pid)
+          .maybeSingle();
+        paid = data?.status === "paid";
+        itemId = (data?.package_id as string | null) ?? null;
+      } else {
+        // без pid (потеряли параметр) — старый путь: ждём флаг доступа
+        const profile = await fetchProfile();
+        paid = !!profile?.plan;
+        itemId = (profile?.plan as string | null) ?? null;
+      }
+      if (cancelled) return;
+
+      if (paid) {
+        if (itemId && PKG_IDS.includes(itemId)) savePlan(itemId as PackageId); // локальный кэш гейта
         setState("done");
-        setTimeout(() => (window.location.href = "/dashboard"), 1500);
+        const dest = itemId?.startsWith("vp") ? "/dashboard/speaking/live" : "/dashboard";
+        setTimeout(() => (window.location.href = dest), 1500);
         return;
       }
       tries += 1;
@@ -89,7 +117,7 @@ function ReturnInner() {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, pid]);
 
   return (
     <PageShell>

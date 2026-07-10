@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { providerForMarket, type PayCurrency } from "@/lib/payments";
 import { DAYS, type PackageId } from "@/lib/billing";
-import { planRow } from "@/lib/pricing";
+import { planRow, VOICE_PACKS, VOICE_PACK_IDS, type VoicePackId } from "@/lib/pricing";
 
 const PKG_IDS: PackageId[] = ["1m", "3m", "6m"];
 
@@ -45,8 +45,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
   }
   const packageId = PKG_IDS.find((p) => p === body.packageId);
+  const voicePackId = VOICE_PACK_IDS.find((p) => p === body.packageId);
   const currency: PayCurrency | null = body.currency === "kzt" || body.currency === "usd" ? body.currency : null;
-  if (!packageId || !currency) return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
+  if ((!packageId && !voicePackId) || !currency) {
+    return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
+  }
 
   const provider = providerForMarket(currency);
   if (provider.mode() === "off") {
@@ -58,30 +61,36 @@ export async function POST(req: Request) {
   if (!admin) return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 503 });
 
   /* --------------------- скидка (считает сервер) --------------------- */
+  // пакеты минут — расходник, скидки не применяются
   let discount = 0;
-  const { data: prof } = await admin
-    .from("profiles")
-    .select("quiz_result, diagnostic_completed_at")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (prof?.quiz_result || prof?.diagnostic_completed_at) discount = 30; // скидка за диагностику
+  if (packageId) {
+    const { data: prof } = await admin
+      .from("profiles")
+      .select("quiz_result, diagnostic_completed_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (prof?.quiz_result || prof?.diagnostic_completed_at) discount = 30; // скидка за диагностику
 
-  // сохранённый частичный промокод (redeem_promo < 100%) — если выгоднее
-  try {
-    const { data: reds } = await admin
-      .from("promo_redemptions")
-      .select("promo_codes(discount_percent)")
-      .eq("user_id", user.id);
-    for (const r of reds ?? []) {
-      const pc = (r as { promo_codes?: { discount_percent?: number } | { discount_percent?: number }[] }).promo_codes;
-      const d = Array.isArray(pc) ? pc[0]?.discount_percent : pc?.discount_percent;
-      if (typeof d === "number" && d > discount && d < 100) discount = d;
+    // сохранённый частичный промокод (redeem_promo < 100%) — если выгоднее
+    try {
+      const { data: reds } = await admin
+        .from("promo_redemptions")
+        .select("promo_codes(discount_percent)")
+        .eq("user_id", user.id);
+      for (const r of reds ?? []) {
+        const pc = (r as { promo_codes?: { discount_percent?: number } | { discount_percent?: number }[] }).promo_codes;
+        const d = Array.isArray(pc) ? pc[0]?.discount_percent : pc?.discount_percent;
+        if (typeof d === "number" && d > discount && d < 100) discount = d;
+      }
+    } catch {
+      /* нет таблицы/строк — остаёмся на скидке за диагностику */
     }
-  } catch {
-    /* нет таблицы/строк — остаёмся на скидке за диагностику */
   }
 
-  const amountMinor = priceMinor(currency, packageId, discount);
+  const itemId: PackageId | VoicePackId = packageId ?? (voicePackId as VoicePackId);
+  const amountMinor = packageId
+    ? priceMinor(currency, packageId, discount)
+    : Math.round(VOICE_PACKS[currency][voicePackId as VoicePackId].price * 100);
 
   /* ------------------ платёж (pending) до провайдера ------------------ */
   const { data: created, error: insErr } = await admin
@@ -89,7 +98,7 @@ export async function POST(req: Request) {
     .insert({
       user_id: user.id,
       provider: provider.id,
-      package_id: packageId,
+      package_id: itemId,
       currency,
       amount_minor: amountMinor,
       discount_percent: discount,
@@ -98,20 +107,24 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (insErr || !created) {
-    // до применения миграции 0007 таблицы нет — говорим об этом прямо
+    // нет таблицы (0007) или constraint не знает пакеты минут (0009) —
+    // говорим об этом прямо, покупка честно недоступна до миграции
     console.error("[payments] insert failed:", insErr?.message);
-    return NextResponse.json({ ok: false, reason: "migration_0007_missing" }, { status: 503 });
+    return NextResponse.json({ ok: false, reason: "migration_missing" }, { status: 503 });
   }
 
   const origin = new URL(req.url).origin;
+  const description = packageId
+    ? `LingoPRO · пакет ${packageId} · ${DAYS[packageId]} дней доступа`
+    : `LingoPRO · пакет минут · ${VOICE_PACKS[currency][voicePackId as VoicePackId].minutes} мин голосовых уроков`;
   const session = await provider.createCheckout({
     userId: user.id,
-    packageId,
+    packageId: itemId,
     currency,
     amountMinor,
     discountPercent: discount,
     paymentId: created.id,
-    description: `LingoPRO · пакет ${packageId} · ${DAYS[packageId]} дней доступа`,
+    description,
     returnUrl: `${origin}/payment/return?pid=${created.id}`,
     customerEmail: user.email ?? null,
   });

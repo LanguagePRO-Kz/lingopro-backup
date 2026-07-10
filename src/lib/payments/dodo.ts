@@ -20,9 +20,8 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { PackageId } from "@/lib/billing";
 import { dodoMode } from "./config";
-import type { CheckoutInput, CheckoutSession, PaymentProvider, WebhookEvent } from "./types";
+import type { CheckoutInput, CheckoutSession, PaymentProvider, PurchasableId, WebhookEvent } from "./types";
 
 function env(name: string): string | undefined {
   const v = process.env[name];
@@ -33,11 +32,19 @@ function baseUrl(): string {
   return dodoMode() === "live" ? "https://live.dodopayments.com" : "https://test.dodopayments.com";
 }
 
-function productIdFor(pkg: PackageId, discounted: boolean): string | undefined {
-  const base = { "1m": "DODO_PRODUCT_1M", "3m": "DODO_PRODUCT_3M", "6m": "DODO_PRODUCT_6M" }[pkg];
+function productIdFor(pkg: PurchasableId, discounted: boolean): string | undefined {
+  const base = {
+    "1m": "DODO_PRODUCT_1M",
+    "3m": "DODO_PRODUCT_3M",
+    "6m": "DODO_PRODUCT_6M",
+    // пакеты голосовых минут — расходники, скидочных вариантов нет
+    vp30: "DODO_PRODUCT_VP30",
+    vp60: "DODO_PRODUCT_VP60",
+    vp120: "DODO_PRODUCT_VP120",
+  }[pkg];
   // скидка = отдельный продукт; молча подменять на полный прайс НЕЛЬЗЯ —
   // сумма разойдётся с ожидаемой и webhook отклонит оплату (amount_mismatch)
-  return env(discounted ? `${base}_DISC` : base);
+  return env(discounted && !pkg.startsWith("vp") ? `${base}_DISC` : base);
 }
 
 async function createCheckout(input: CheckoutInput): Promise<CheckoutSession> {
