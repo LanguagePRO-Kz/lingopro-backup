@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
@@ -8,14 +8,21 @@ import { pick } from "@/lib/localized";
 import { savePlan, type PackageId } from "@/lib/billing";
 import { saveProfilePlan } from "@/lib/profile";
 import { redeemPromo, type PromoReason } from "@/lib/promo";
-import { currencyFor } from "@/lib/pricing";
+import { currencyFor, fmtMoney, planRow, type Currency } from "@/lib/pricing";
 
 /**
  * Чекаут пакета — единый для всех пакетов (1/3/6 мес) и языков (RU/EN/TR/KK).
  *
- * Основной путь — ОПЛАТА (Kaspi для KZT-рынка, карта через Dodo для USD —
- * провайдера выбирает сервер по валюте). Промокод — вторичное поле под
- * разделителем; публично механику кодов не рекламируем.
+ * Основной путь — ОПЛАТА: на выбор ДВА способа (Kaspi в тенге и карта
+ * Visa/Mastercard через Dodo в долларах), дефолт — по рынку интерфейса
+ * (RU/KK → Kaspi, EN/TR → карта). Цена и валюта честно переключаются вместе
+ * со способом; провайдер при оплате определяется выбранным способом.
+ * Промокод — вторичное поле под разделителем.
+ *
+ * Логотипы: до получения официальных brand-ассетов (Kaspi/Visa/Mastercard)
+ * используем нейтральные иконки + текстовые подписи — чужие бренды не
+ * перерисовываем. Официальные SVG положить в public/payment/ и заменить
+ * иконки в MethodIcon ниже.
  *
  * Пока провайдер выключен (KASPI_MODE/DODO_MODE=off) кнопка оплаты честно
  * отвечает «временно недоступна» — при вставке ключей тот же клик открывает
@@ -28,9 +35,9 @@ const T = {
     discountNote: "Скидка 30% за диагностику применена",
     method: "Способ оплаты",
     methodKaspi: "Kaspi",
-    methodKaspiNote: "Оплата в приложении Kaspi.kz",
+    methodKaspiNote: "Приложение Kaspi.kz · счёт в тенге",
     methodCard: "Банковская карта",
-    methodCardNote: "Visa · Mastercard · безопасная оплата",
+    methodCardNote: "Visa · Mastercard · счёт в долларах",
     pay: (p: string) => `Оплатить ${p}`,
     paying: "Открываем оплату…",
     payErr: "Не удалось открыть оплату — попробуй ещё раз.",
@@ -56,9 +63,9 @@ const T = {
     discountNote: "30% diagnostic discount applied",
     method: "Payment method",
     methodKaspi: "Kaspi",
-    methodKaspiNote: "Pay in the Kaspi.kz app",
+    methodKaspiNote: "Kaspi.kz app · billed in KZT",
     methodCard: "Bank card",
-    methodCardNote: "Visa · Mastercard · secure checkout",
+    methodCardNote: "Visa · Mastercard · billed in USD",
     pay: (p: string) => `Pay ${p}`,
     paying: "Opening checkout…",
     payErr: "Couldn't open checkout — please try again.",
@@ -84,9 +91,9 @@ const T = {
     discountNote: "Teşhis için %30 indirim uygulandı",
     method: "Ödeme yöntemi",
     methodKaspi: "Kaspi",
-    methodKaspiNote: "Kaspi.kz uygulamasında öde",
+    methodKaspiNote: "Kaspi.kz uygulaması · KZT olarak",
     methodCard: "Banka kartı",
-    methodCardNote: "Visa · Mastercard · güvenli ödeme",
+    methodCardNote: "Visa · Mastercard · USD olarak",
     pay: (p: string) => `${p} öde`,
     paying: "Ödeme açılıyor…",
     payErr: "Ödeme açılamadı — lütfen tekrar dene.",
@@ -112,9 +119,9 @@ const T = {
     discountNote: "Диагностика үшін 30% жеңілдік қолданылды",
     method: "Төлем тәсілі",
     methodKaspi: "Kaspi",
-    methodKaspiNote: "Kaspi.kz қосымшасында төле",
+    methodKaspiNote: "Kaspi.kz қосымшасы · теңгемен",
     methodCard: "Банк картасы",
-    methodCardNote: "Visa · Mastercard · қауіпсіз төлем",
+    methodCardNote: "Visa · Mastercard · доллармен",
     pay: (p: string) => `${p} төлеу`,
     paying: "Төлем ашылуда…",
     payErr: "Төлемді ашу мүмкін болмады — қайталап көр.",
@@ -145,25 +152,36 @@ type PromoStatus =
   | { kind: "saved"; discount: number }
   | { kind: "error"; msg: string };
 
+type MethodId = "kaspi" | "card";
+
+/** Валюта каждого способа: Kaspi всегда в тенге, карта (Dodo) — в долларах. */
+const METHOD_CURRENCY: Record<MethodId, Currency> = { kaspi: "kzt", card: "usd" };
+
 export function CheckoutModal({
   pkgId,
   planName,
-  priceLabel,
-  baseLabel,
+  hasDiscount,
   onClose,
 }: {
   pkgId: PackageId;
   planName: string;
-  /** Итоговая цена («29 990 ₸» / «$59.99»). */
-  priceLabel: string;
-  /** Цена без скидки — рисуется зачёркнутой, когда скидка применена. */
-  baseLabel?: string;
+  /** Скидка 30% за пройденную диагностику применена. */
+  hasDiscount: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const { locale } = useI18n();
   const c = pick(locale, T);
-  const currency = currencyFor(locale); // KZT → Kaspi, USD → карта (Dodo)
+
+  /* --------------------------- способ оплаты --------------------------- */
+  // оба способа доступны всем; дефолт — по рынку интерфейса:
+  // RU/KK → Kaspi (₸), EN/TR → карта (USD)
+  const [method, setMethod] = useState<MethodId>(currencyFor(locale) === "kzt" ? "kaspi" : "card");
+  const currency = METHOD_CURRENCY[method];
+  // цена и валюта честно следуют за выбранным способом
+  const row = planRow(currency, pkgId);
+  const priceLabel = fmtMoney(currency, hasDiscount ? row.disc : row.price);
+  const baseLabel = hasDiscount ? fmtMoney(currency, row.price) : undefined;
 
   /* ------------------------------ оплата ------------------------------ */
   const [payState, setPayState] = useState<"idle" | "busy" | "off" | "error">("idle");
@@ -268,27 +286,26 @@ export function CheckoutModal({
           </p>
         )}
 
-        {/* способ оплаты — по рынку: KZT → Kaspi, USD → карта (Dodo) */}
-        <div className="mt-5 rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4">
+        {/* способ оплаты — на выбор: Kaspi (₸) и карта (USD), оба для всех */}
+        <div className="mt-5">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.method}</div>
-          <div className="mt-2.5 flex items-center gap-3">
-            {currency === "kzt" ? (
-              <>
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ef2e24] text-lg font-black text-white">K</span>
-                <span className="flex flex-col">
-                  <span className="text-sm font-semibold text-[var(--color-foreground)]">{c.methodKaspi}</span>
-                  <span className="text-xs text-[var(--color-muted)]">{c.methodKaspiNote}</span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a1f71] to-[#3b4db8] text-lg text-white">💳</span>
-                <span className="flex flex-col">
-                  <span className="text-sm font-semibold text-[var(--color-foreground)]">{c.methodCard}</span>
-                  <span className="text-xs text-[var(--color-muted)]">{c.methodCardNote}</span>
-                </span>
-              </>
-            )}
+          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+            <MethodCard
+              active={method === "kaspi"}
+              onSelect={() => setMethod("kaspi")}
+              icon={<MethodIcon kind="kaspi" />}
+              title={c.methodKaspi}
+              note={c.methodKaspiNote}
+              chip="₸"
+            />
+            <MethodCard
+              active={method === "card"}
+              onSelect={() => setMethod("card")}
+              icon={<MethodIcon kind="card" />}
+              title={c.methodCard}
+              note={c.methodCardNote}
+              chip="$"
+            />
           </div>
         </div>
 
@@ -347,5 +364,76 @@ export function CheckoutModal({
         {promo.kind === "saved" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoSaved(promo.discount)}</div>}
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ------------------------- карточка способа оплаты ------------------------- */
+
+function MethodCard({
+  active,
+  onSelect,
+  icon,
+  title,
+  note,
+  chip,
+}: {
+  active: boolean;
+  onSelect: () => void;
+  icon: ReactNode;
+  title: string;
+  note: string;
+  chip: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={`relative flex flex-col items-start gap-2 rounded-2xl border p-3.5 text-left transition-all ${
+        active
+          ? "border-[var(--color-brand)] bg-[var(--color-brand)]/[0.06] ring-2 ring-[var(--color-brand)]/25"
+          : "border-black/[0.08] bg-black/[0.02] hover:border-black/[0.16]"
+      }`}
+    >
+      <span className="absolute right-3 top-3 rounded-full bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-muted)]">
+        {chip}
+      </span>
+      {icon}
+      <span className="flex flex-col">
+        <span className="text-sm font-semibold text-[var(--color-foreground)]">{title}</span>
+        <span className="mt-0.5 text-[11px] leading-snug text-[var(--color-muted)]">{note}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Нейтральные иконки способов оплаты. Чужие логотипы (Kaspi/Visa/Mastercard)
+ * НЕ перерисовываем — по бренд-гайдлайнам можно использовать только
+ * официальные ассеты. Когда основатель положит их в public/payment/
+ * (kaspi.svg, visa.svg, mastercard.svg) — заменить эти SVG на <Image>.
+ */
+function MethodIcon({ kind }: { kind: "kaspi" | "card" }) {
+  if (kind === "kaspi") {
+    // нейтральная иконка «оплата в приложении» (смартфон + чек)
+    return (
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/[0.05]">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="7" y="3" width="10" height="18" rx="2.2" stroke="#0f172a" strokeWidth="1.7" />
+          <path d="M10.2 12.2l1.6 1.6 3-3.4" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10.5 18h3" stroke="#0f172a" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </span>
+    );
+  }
+  // нейтральная иконка банковской карты
+  return (
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/[0.05]">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="2.5" y="5" width="19" height="14" rx="2.4" stroke="#0f172a" strokeWidth="1.7" />
+        <path d="M2.5 9.5h19" stroke="#0f172a" strokeWidth="1.7" />
+        <path d="M6 15h4" stroke="#0f172a" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    </span>
   );
 }

@@ -11,7 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { pick, pluralize } from "@/lib/localized";
 import { loadResult, saveResult, PLANS, LEVEL_ORDER, levelIndex, type QuizResult } from "@/lib/quiz";
 import { type PackageId } from "@/lib/billing";
-import { PRICING, currencyFor, fmtMoney, planRow, savingsPct, type Currency } from "@/lib/pricing";
+import { PRICING, currencyFor, fmtMoney, savingsPct, type Currency } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
 import { CheckoutModal } from "@/components/CheckoutModal";
@@ -352,8 +352,7 @@ export default function PricingPage() {
           <CheckoutModal
             pkgId={modalPkg}
             planName={c.names[modalPkg]}
-            priceLabel={fmtMoney(cur, hasDiscount ? planRow(cur, modalPkg).disc : planRow(cur, modalPkg).price)}
-            baseLabel={hasDiscount ? fmtMoney(cur, planRow(cur, modalPkg).price) : undefined}
+            hasDiscount={hasDiscount}
             onClose={() => setModalPkg(null)}
           />
         )}
