@@ -93,8 +93,13 @@ export async function POST(req: Request) {
   const topicsClosed = rows.filter((r) => r.strength >= 60 && span.has(r.topic)).length;
   const weakest = rows.find((r) => r.strength < 60);
 
+  // новичок: до сегодняшнего дня строк прогресса не существовало вовсе —
+  // «вчера пропуск» для него ложь (нечего было пропускать)
+  const firstDays = (days ?? []).every((r) => (r.date as string) >= today);
+
   const facts: MotivatorFacts = {
     yesterday: yRow ? { done: yRow.completed_count ?? 0, total: yRow.total_count ?? 0 } : null,
+    firstDays,
     streak,
     daysToExam,
     weakTopicTr: weakest ? (topicById(weakest.topic)?.label.tr ?? null) : null,

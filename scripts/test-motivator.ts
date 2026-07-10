@@ -32,6 +32,7 @@ async function main() {
   const scenarios = {
     zero: {
       yesterday: { done: 0, total: 5 },
+      firstDays: false,
       streak: 0,
       daysToExam: 113,
       weakTopicTr: "İsim tamlaması (izafet)",
@@ -41,12 +42,23 @@ async function main() {
     },
     solid: {
       yesterday: { done: 5, total: 5 },
+      firstDays: false,
       streak: 4,
       daysToExam: 87,
       weakTopicTr: "Dolaylı anlatım",
       topicsClosed: 7,
       level: "B1",
       targetLevel: "C1",
+    },
+    fresh: {
+      yesterday: null,
+      firstDays: true,
+      streak: 0,
+      daysToExam: 100,
+      weakTopicTr: null,
+      topicsClosed: 0,
+      level: "A1",
+      targetLevel: "B2",
     },
   } as const;
 
@@ -69,6 +81,7 @@ async function main() {
       if (text.length > 400) problems.push(`слишком длинно (${text.length})`);
       if (/[*#|`]|^- /m.test(text)) problems.push("markdown в ответе");
       if (name === "zero" && /молодец|harika|great job|жарайсың|керемет/i.test(text)) problems.push("похвала при нуле активности");
+      if (name === "fresh" && /пропус|kaçır|missed|skip|жіберіп|atlad/i.test(text)) problems.push("«пропуск» новичку — ложь");
 
       const status = problems.length ? "✗" : "✓";
       if (problems.length) failures += 1;

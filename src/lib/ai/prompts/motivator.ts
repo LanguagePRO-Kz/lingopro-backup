@@ -37,6 +37,8 @@ Kurallar (İHLAL EDİLEMEZ):
 export type MotivatorFacts = {
   /** yesterday's plan: done/total, null = no plan row existed */
   yesterday: { done: number; total: number } | null;
+  /** true = до сегодняшнего дня истории НЕ было (новичок) — «пропуск» здесь ложь */
+  firstDays: boolean;
   /** current streak in days (0 = broken/none) */
   streak: number;
   /** days until the exam (exact date only) */
@@ -54,9 +56,11 @@ export function buildMotivatorUserMessage(f: MotivatorFacts): string {
   const lines = [
     `Seviye: ${f.level}, hedef: ${f.targetLevel}.`,
     f.daysToExam != null ? `Sınava ${f.daysToExam} gün var.` : "Sınav tarihi belirlenmedi.",
-    f.yesterday
-      ? `Dün: planın ${f.yesterday.done}/${f.yesterday.total} görevi yapıldı.`
-      : "Dün için plan verisi yok (öğrenci girmedi).",
+    f.firstDays
+      ? "Öğrenci platforma DAHA YENİ başladı — geçmiş günler henüz yok. 'Kaçırdın/dersi atladın' DEME; hoş geldin de ve ilk adımı öner."
+      : f.yesterday
+        ? `Dün: planın ${f.yesterday.done}/${f.yesterday.total} görevi yapıldı.`
+        : "Dün için plan verisi yok (öğrenci o gün girmedi).",
     `Seri: ${f.streak} gün.`,
     `Kapatılan konu sayısı: ${f.topicsClosed}.`,
     f.weakTopicTr ? `En zayıf konu: ${f.weakTopicTr}.` : "Zayıf konu verisi yok.",
