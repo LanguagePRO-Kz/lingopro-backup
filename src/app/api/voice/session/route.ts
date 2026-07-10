@@ -4,8 +4,50 @@ import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
+
+/* ------------------- слоты одновременных уроков (очередь) -------------------
+ * ElevenLabs ограничивает число одновременных разговоров на аккаунт.
+ * Слоты трекаются в voice_slots (миграция 0008): клейм на старте с TTL
+ * (самолечится при упавшей вкладке), освобождение при завершении урока.
+ * Все слоты заняты → честный ответ 429 { error: "busy", etaMinutes } —
+ * клиент показывает «преподаватель занят, освободится через ~N мин», не ошибку.
+ */
+const SLOT_TTL_MS = 16 * 60_000; // максимум урока (15 мин) + запас
+
+function maxConcurrent(): number {
+  const n = Number(process.env.VOICE_MAX_CONCURRENT ?? 4);
+  return Number.isFinite(n) && n >= 0 ? n : 4;
+}
+
+type SlotState = { busy: boolean; etaMinutes: number; active: number };
+
+/** Текущее состояние слотов (+ подчистка протухших). excludeUser — свой клейм не считаем. */
+async function slotState(excludeUser?: string): Promise<SlotState | null> {
+  const admin = createAdminClient();
+  if (!admin) return null; // нет service-ключа — не гейтим (деградация в старое поведение)
+  const nowIso = new Date().toISOString();
+  await admin.from("voice_slots").delete().lt("expires_at", nowIso);
+  const { data, error } = await admin.from("voice_slots").select("user_id, expires_at").gt("expires_at", nowIso);
+  if (error) return null; // таблицы ещё нет (миграция 0008) — не гейтим
+  const active = (data ?? []).filter((s) => s.user_id !== excludeUser);
+  const max = maxConcurrent();
+  if (active.length < max) return { busy: false, etaMinutes: 0, active: active.length };
+  const soonest = active.map((s) => Date.parse(s.expires_at as string)).sort()[0];
+  const etaMinutes = soonest ? Math.min(16, Math.max(1, Math.ceil((soonest - Date.now()) / 60_000))) : 2;
+  return { busy: true, etaMinutes, active: active.length };
+}
+
+/** GET — опрос доступности: клиент в busy-состоянии поллит и оживляет кнопку. */
+export async function GET(req: Request) {
+  if (!checkRateLimit(`voice-poll:${clientKey(req)}`, 30, 60_000)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
+  const state = await slotState();
+  return NextResponse.json(state ?? { busy: false, etaMinutes: 0, active: 0 });
+}
 
 type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full";
 
@@ -82,6 +124,24 @@ export async function POST(req: Request) {
     );
   }
 
+  // все слоты одновременных уроков заняты → честное «занято» с оценкой ожидания
+  const slots = await slotState(user.id);
+  if (slots?.busy) {
+    return NextResponse.json({ error: "busy", etaMinutes: slots.etaMinutes, active: slots.active }, { status: 429 });
+  }
+  // клейм слота ДО запроса токена (гонка за последний слот); TTL самолечится
+  const adminForSlot = createAdminClient();
+  if (adminForSlot) {
+    await adminForSlot.from("voice_slots").upsert({
+      user_id: user.id,
+      claimed_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + SLOT_TTL_MS).toISOString(),
+    });
+  }
+  const releaseSlot = async () => {
+    if (adminForSlot) await adminForSlot.from("voice_slots").delete().eq("user_id", user.id);
+  };
+
   // student's voice choice: explicit pick > stored preference > default (Ahu)
   const voice = voiceById(
     body.voiceId && VOICE_OPTIONS.some((v) => v.id === body.voiceId)
@@ -92,14 +152,25 @@ export async function POST(req: Request) {
     void supabase.from("profiles").update({ preferred_voice: voice.id }).eq("id", user.id);
   }
 
-  const conversationToken = await fetch(
+  const tokenRes = await fetch(
     `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${agentId}`,
     { headers: { "xi-api-key": apiKey } },
-  )
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => d?.token ?? null)
+  ).catch(() => null);
+  if (!tokenRes || !tokenRes.ok) {
+    await releaseSlot();
+    // ElevenLabs сам упёрся в лимит одновременных разговоров → тоже «занято»,
+    // а не безликая ошибка (наш счётчик мог недосчитать чужие сессии)
+    if (tokenRes?.status === 429) {
+      return NextResponse.json({ error: "busy", etaMinutes: 2 }, { status: 429 });
+    }
+    return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
+  }
+  const conversationToken = await tokenRes
+    .json()
+    .then((d: { token?: string }) => d?.token ?? null)
     .catch(() => null);
   if (!conversationToken) {
+    await releaseSlot();
     return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
   }
 

@@ -46,6 +46,7 @@ const T = {
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errNoMinutes: "На сегодня минуты закончились. База обновится в полночь; пакеты минут скоро появятся.",
     errUnavailable: "Голосовой урок временно недоступен. Попробуй позже.", errGeneric: "Не получилось подключиться. Попробуй ещё раз.",
+    errBusy: (n: number) => `Преподаватель сейчас занят — все места на уроке. Освободится в течение ~${n} мин, мы проверяем автоматически.`, busyFree: "Преподаватель освободился — можно начинать!",
     hint: "Говори свободно — ошибки это нормально, преподаватель поправит.",
   },
   en: {
@@ -67,6 +68,7 @@ const T = {
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
     errNoMinutes: "You're out of minutes for today. The base quota resets at midnight; minute packs are coming soon.",
     errUnavailable: "The voice lesson is temporarily unavailable. Please try later.", errGeneric: "Couldn't connect. Please try again.",
+    errBusy: (n: number) => `The teacher is busy right now — all lesson slots are taken. A slot frees up within ~${n} min; we re-check automatically.`, busyFree: "The teacher is free — you can start!",
     hint: "Speak freely — mistakes are fine, the teacher will correct you.",
   },
   tr: {
@@ -88,6 +90,7 @@ const T = {
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir; dakika paketleri yakında.",
     errUnavailable: "Sesli ders geçici olarak kullanılamıyor. Daha sonra dene.", errGeneric: "Bağlanılamadı. Tekrar dene.",
+    errBusy: (n: number) => `Öğretmen şu an meşgul — tüm ders yerleri dolu. ~${n} dk içinde boşalır; otomatik kontrol ediyoruz.`, busyFree: "Öğretmen boşaldı — başlayabilirsin!",
     hint: "Rahat konuş — hata yapmak normal, öğretmen düzeltir.",
   },
   kk: {
@@ -109,6 +112,7 @@ const T = {
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады; минут пакеттері жақында.",
     errUnavailable: "Дауысты сабақ уақытша қолжетімсіз. Кейінірек көр.", errGeneric: "Қосылу сәтсіз. Қайта көр.",
+    errBusy: (n: number) => `Ұстаз қазір бос емес — сабақтағы орындар толы. ~${n} мин ішінде босайды; автоматты тексереміз.`, busyFree: "Ұстаз босады — бастауға болады!",
     hint: "Еркін сөйле — қателесу қалыпты, ұстаз түзетеді.",
   },
 };
@@ -174,7 +178,28 @@ function LiveLesson() {
     const focus = (params.get("focus") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     if (focus.length) focusOverrideRef.current = focus.slice(0, 3); // server re-validates against the registry
   }, []);
-  const [err, setErr] = useState<"errAuth" | "errMic" | "errNoMinutes" | "errUnavailable" | "errGeneric" | null>(null);
+  const [err, setErr] = useState<"errAuth" | "errMic" | "errNoMinutes" | "errUnavailable" | "errGeneric" | "errBusy" | null>(null);
+  const [busyEta, setBusyEta] = useState(2);
+  const [busyFreed, setBusyFreed] = useState(false);
+
+  // «занято» → поллим доступность каждые 25 с; освободилось → зелёное «можно начинать»
+  useEffect(() => {
+    if (err !== "errBusy") return;
+    const id = setInterval(async () => {
+      try {
+        const d = await fetch("/api/voice/session").then((r) => r.json());
+        if (d && d.busy === false) {
+          setErr(null);
+          setBusyFreed(true);
+        } else if (d?.etaMinutes) {
+          setBusyEta(d.etaMinutes);
+        }
+      } catch {
+        /* сеть мигнула — следующий тик */
+      }
+    }, 25_000);
+    return () => clearInterval(id);
+  }, [err]);
   const [lines, setLines] = useState<Line[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [allowance, setAllowance] = useState<{ baseLeft: number; creditsLeft: number } | null>(null);
@@ -421,6 +446,10 @@ function LiveLesson() {
         else if (d.error === "no_minutes") {
           setErr("errNoMinutes");
           setAllowance({ baseLeft: d.baseLeft ?? 0, creditsLeft: d.creditsLeft ?? 0 });
+        } else if (d.error === "busy") {
+          setErr("errBusy");
+          setBusyEta(d.etaMinutes ?? 2);
+          setBusyFreed(false);
         } else setErr("errUnavailable");
         setPhase("idle");
         return;
@@ -517,7 +546,8 @@ function LiveLesson() {
 
           {err && (
             <div className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">
-              <p>{c[err]}</p>
+              {/* «занято» — не ошибка: честный статус с ETA и автопроверкой */}
+              <p>{err === "errBusy" ? c.errBusy(busyEta) : c[err]}</p>
               {/* every error offers a way forward (P0-5) */}
               <div className="mt-2 flex flex-wrap gap-2">
                 {err === "errAuth" ? (
@@ -528,12 +558,17 @@ function LiveLesson() {
                   <a href="/dashboard" className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
                     {pick(locale, { ru: "К плану дня", en: "To today's plan", tr: "Günün planına", kk: "Күн жоспарына" })}
                   </a>
-                ) : (
+                ) : err === "errBusy" ? null : (
                   <button type="button" onClick={start} className="rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
                     {pick(locale, { ru: "Попробовать снова", en: "Try again", tr: "Tekrar dene", kk: "Қайта көру" })}
                   </button>
                 )}
               </div>
+            </div>
+          )}
+          {busyFreed && !err && (
+            <div className="mt-4 rounded-xl bg-[#16a34a]/10 px-4 py-3 text-sm font-medium text-[#166534]">
+              ✅ {c.busyFree}
             </div>
           )}
 

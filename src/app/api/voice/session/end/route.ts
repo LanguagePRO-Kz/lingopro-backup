@@ -46,6 +46,13 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
 
+  // урок завершён — освобождаем слот одновременных уроков сразу (очередь
+  // голосовых, миграция 0008); TTL подстрахует, если этот вызов не случится
+  {
+    const slotAdmin = createAdminClient();
+    if (slotAdmin) void slotAdmin.from("voice_slots").delete().eq("user_id", user.id);
+  }
+
   // ElevenLabs finalizes the call record a few seconds AFTER the WebRTC
   // disconnect — an immediate fetch 404s or returns no duration/transcript,
   // which used to leave the student with a bare "lesson finished" and no

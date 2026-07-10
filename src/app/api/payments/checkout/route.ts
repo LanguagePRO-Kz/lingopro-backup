@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { providerForMarket, type PayCurrency } from "@/lib/payments";
@@ -27,6 +28,10 @@ function priceMinor(cur: PayCurrency, pkg: PackageId, discountPercent: number): 
 }
 
 export async function POST(req: Request) {
+  // спам-гвард: pending-строки журнала не должны плодиться бесконтрольно
+  if (!checkRateLimit(`checkout:${clientKey(req)}`, 6, 60_000)) {
+    return NextResponse.json({ ok: false, reason: "rate_limited" }, { status: 429 });
+  }
   const supabase = await createClient();
   const {
     data: { user },
