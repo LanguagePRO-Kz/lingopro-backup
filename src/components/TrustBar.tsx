@@ -15,7 +15,7 @@ const CONTENT: Record<Locale, Content> = {
     metrics: [
       { value: "A1 → C1", label: "полный диапазон уровней TÖMER" },
       { value: "~15 мин", label: "на AI-диагностику уровня" },
-      { value: "30·60·90", label: "дней персонального плана" },
+      { value: "24/7", label: "AI-преподаватель на связи" },
       { value: "5 навыков", label: "оцениваются с самого старта" },
     ],
   },
@@ -24,7 +24,7 @@ const CONTENT: Record<Locale, Content> = {
     metrics: [
       { value: "A1 → C1", label: "TÖMER деңгейлерінің толық ауқымы" },
       { value: "~15 мин", label: "AI деңгей диагностикасына" },
-      { value: "30·60·90", label: "жеке жоспар күндері" },
+      { value: "24/7", label: "AI-мұғалім байланыста" },
       { value: "5 дағды", label: "ең басынан бағаланады" },
     ],
   },
@@ -33,7 +33,7 @@ const CONTENT: Record<Locale, Content> = {
     metrics: [
       { value: "A1 → C1", label: "full range of TÖMER levels" },
       { value: "~15 min", label: "for the AI level diagnostic" },
-      { value: "30·60·90", label: "days of a personal plan" },
+      { value: "24/7", label: "AI tutor available" },
       { value: "5 skills", label: "assessed from the very start" },
     ],
   },
@@ -42,7 +42,7 @@ const CONTENT: Record<Locale, Content> = {
     metrics: [
       { value: "A1 → C1", label: "TÖMER seviyelerinin tamamı" },
       { value: "~15 dk", label: "AI seviye tanısı için" },
-      { value: "30·60·90", label: "kişisel plan günü" },
+      { value: "7/24", label: "AI öğretmen erişilebilir" },
       { value: "5 beceri", label: "en baştan değerlendirilir" },
     ],
   },

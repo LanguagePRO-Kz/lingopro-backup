@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
+import { useI18n } from "@/lib/i18n";
 
 const variants: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -42,8 +43,14 @@ export function StaggerGroup({
   children: ReactNode;
   className?: string;
 }) {
+  const { locale } = useI18n();
   return (
+    // key={locale}: дети, у которых key — ПЕРЕВОДНАЯ строка, при смене языка
+    // пересоздаются и рождаются в variant "hidden", а одноразовый whileInView
+    // родителя уже отработал → «пропавшие карточки до перезагрузки страницы».
+    // Ремоунт группы по локали заново запускает in-view анимацию целиком.
     <motion.div
+      key={locale}
       className={className}
       initial="hidden"
       whileInView="show"

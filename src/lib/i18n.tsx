@@ -39,11 +39,11 @@ const ru = {
     titleHi: "TÖMER",
     titleTail: "с персональным AI-преподавателем",
     subtitle:
-      "Пройди диагностику уровня, получи индивидуальный план на 30, 60 или 90 дней и готовься к экзамену по программе, которая ежедневно адаптируется под твой прогресс.",
+      "Пройди диагностику уровня, получи честный план под твою цель и дату экзамена — программа ежедневно адаптируется под твой прогресс.",
     primary: "Пройти бесплатную диагностику",
     secondary: "Посмотреть, как это работает",
     stats: [
-      { value: "30/60/90", label: "дней индивидуального плана" },
+      { value: "Честный план", label: "под твою цель и дату экзамена" },
       { value: "AI 24/7", label: "преподаватель всегда на связи" },
       { value: "TÖMER", label: "турецкий язык — уже доступно" },
     ],
@@ -229,7 +229,7 @@ const ru = {
         price: "1 490 ₽",
         desc: "Полноценная подготовка с адаптивным планом.",
         features: [
-          "Персональный план 30/60/90 дней",
+          "Персональный план под твою цель",
           "AI-преподаватель 24/7",
           "Разговорная практика и анализ произношения",
           "Проверка письменных заданий",
@@ -384,11 +384,11 @@ const kk: Dict = {
     titleHi: "TÖMER",
     titleTail: "жеке AI-оқытушымен",
     subtitle:
-      "Деңгей диагностикасынан өт, 30, 60 немесе 90 күндік жеке жоспар ал және прогресіңе күн сайын бейімделетін бағдарламамен дайындал.",
+      "Деңгей диагностикасынан өт, мақсатың мен емтихан күніне сай адал жоспар ал — бағдарлама прогресіңе күн сайын бейімделеді.",
     primary: "Тегін диагностикадан өту",
     secondary: "Қалай жұмыс істейтінін көру",
     stats: [
-      { value: "30/60/90", label: "күндік жеке жоспар" },
+      { value: "Адал жоспар", label: "мақсатың мен күніңе сай" },
       { value: "AI 24/7", label: "оқытушы әрқашан желіде" },
       { value: "TÖMER", label: "түрік тілі — қазірдің өзінде" },
     ],
@@ -573,7 +573,7 @@ const kk: Dict = {
         price: "7 900 ₸",
         desc: "Бейімделетін жоспармен толыққанды дайындық.",
         features: [
-          "30/60/90 күндік жеке жоспар",
+          "Мақсатыңа сай жеке жоспар",
           "Шексіз AI-оқытушы",
           "Сөйлеу практикасы және айтылым талдауы",
           "Жазба тапсырмаларын тексеру",
@@ -724,11 +724,11 @@ const en: Dict = {
     titleHi: "TÖMER",
     titleTail: "with a personal AI tutor",
     subtitle:
-      "Take a level diagnostic, get a custom 30, 60 or 90-day plan, and study with a program that adapts to your progress every single day.",
+      "Take a level diagnostic, get an honest plan built around your goal and exam date — the program adapts to your progress every single day.",
     primary: "Take the free diagnostic",
     secondary: "See how it works",
     stats: [
-      { value: "30/60/90", label: "days of a custom plan" },
+      { value: "Honest plan", label: "built for your goal and date" },
       { value: "AI 24/7", label: "tutor always available" },
       { value: "TÖMER", label: "Turkish — available now" },
     ],
@@ -913,7 +913,7 @@ const en: Dict = {
         price: "$15",
         desc: "Full preparation with an adaptive plan.",
         features: [
-          "Personal 30/60/90-day plan",
+          "Personal plan built for your goal",
           "AI tutor 24/7",
           "Speaking practice & pronunciation analysis",
           "Writing task review",
@@ -1064,11 +1064,11 @@ const tr: Dict = {
     titleHi: "TÖMER",
     titleTail: "kişisel AI öğretmenle",
     subtitle:
-      "Seviye diagnostiğini geç, 30, 60 veya 90 günlük kişisel bir plan al ve her gün ilerlemene uyum sağlayan bir programla çalış.",
+      "Seviye diagnostiğini geç, hedefine ve sınav tarihine göre dürüst bir plan al — program ilerlemene her gün uyum sağlar.",
     primary: "Ücretsiz diagnostiği başlat",
     secondary: "Nasıl çalıştığını gör",
     stats: [
-      { value: "30/60/90", label: "günlük kişisel plan" },
+      { value: "Dürüst plan", label: "hedefine ve tarihine göre" },
       { value: "AI 24/7", label: "öğretmen her zaman yanında" },
       { value: "TÖMER", label: "Türkçe — şimdi mevcut" },
     ],
@@ -1253,7 +1253,7 @@ const tr: Dict = {
         price: "499 ₺",
         desc: "Uyarlanabilir planla tam hazırlık.",
         features: [
-          "Kişisel 30/60/90 günlük plan",
+          "Hedefine göre kişisel plan",
           "7/24 AI öğretmen",
           "Konuşma pratiği ve telaffuz analizi",
           "Yazılı görev kontrolü",
