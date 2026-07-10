@@ -6,6 +6,7 @@ import { TrustBar } from "@/components/TrustBar";
 import { HowItWorks } from "@/components/HowItWorks";
 import { PlatformInside } from "@/components/PlatformInside";
 import { Certificates } from "@/components/Certificates";
+import { WhyLingoPro } from "@/components/WhyLingoPro";
 import { Guarantee } from "@/components/Guarantee";
 import { Pricing } from "@/components/Pricing";
 import { FAQ } from "@/components/FAQ";
@@ -31,6 +32,7 @@ export default function Home() {
         <HowItWorks />
         <PlatformInside />
         <Certificates />
+        <WhyLingoPro />
         <Pricing />
         <Guarantee />
         <UGCCreator />
