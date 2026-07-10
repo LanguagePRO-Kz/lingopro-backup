@@ -3,8 +3,8 @@
  * flag that gates dashboard access. Real prices live in `@/lib/pricing`
  * (multi-currency). Promo codes are server-side only — see `@/lib/promo`
  * and the `redeem_promo()` RPC; there is deliberately NO client-side code list.
- * No real payment is wired yet: access is granted by a genuine promo redemption
- * (early access) until Kaspi payments launch.
+ * Access is granted by the payment webhook (lib/payments/grant.ts) or by a
+ * genuine 100% promo redemption — never silently by the client.
  */
 
 export type PackageId = "1m" | "3m" | "6m";

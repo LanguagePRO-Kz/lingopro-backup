@@ -14,7 +14,7 @@ import { type PackageId } from "@/lib/billing";
 import { PRICING, currencyFor, fmtMoney, planRow, savingsPct, type Currency } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
-import { EarlyAccessModal } from "@/components/EarlyAccessModal";
+import { CheckoutModal } from "@/components/CheckoutModal";
 
 const T = {
   ru: {
@@ -32,7 +32,6 @@ const T = {
     toGoal: "До цели C1 —",
     levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
     choosePlan: "Выберите план подготовки",
-    earlyNote: "Оплата откроется при запуске платформы.",
     discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
     names: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } as Record<string, string>,
     save: (n: number) => `Экономия ${n}%`,
@@ -63,7 +62,6 @@ const T = {
     toGoal: "To the C1 goal —",
     levels: (n: number) => (n === 1 ? "level" : "levels"),
     choosePlan: "Choose a prep plan",
-    earlyNote: "Card payments open at launch.",
     discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
     names: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } as Record<string, string>,
     save: (n: number) => `Save ${n}%`,
@@ -94,7 +92,6 @@ const T = {
     toGoal: "C1 hedefine —",
     levels: () => "seviye",
     choosePlan: "Bir hazırlık planı seç",
-    earlyNote: "Kart ödemeleri lansmanda açılacak.",
     discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
     names: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } as Record<string, string>,
     save: (n: number) => `%${n} tasarruf`,
@@ -125,7 +122,6 @@ const T = {
     toGoal: "C1 мақсатына дейін —",
     levels: () => "деңгей",
     choosePlan: "Дайындық жоспарын таңда",
-    earlyNote: "Карта төлемдері платформа іске қосылғанда ашылады.",
     discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
     names: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } as Record<string, string>,
     save: (n: number) => `${n}% үнемдеу`,
@@ -178,9 +174,9 @@ export default function PricingPage() {
       });
   }, []);
 
-  // pick a plan → honest early access. Not authed yet? register first. Otherwise
-  // open the early-access modal: real payment opens at launch, and the only way
-  // in now is a genuine access code (redeem_promo) — no silent free grant.
+  // pick a plan → checkout. Not authed yet? register first. Otherwise open
+  // the checkout modal: payment first (Kaspi/Dodo by market), promo code as
+  // the secondary field — access is never granted silently.
   async function selectPlan(plan: PackageId) {
     if (busy) return;
     setBusy(true);
@@ -332,9 +328,6 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* honest early-access framing — no silent free grant */}
-        <p className="mt-4 text-center text-xs text-[var(--color-muted)]">{c.earlyNote}</p>
-
         {/* included features */}
         <div className="glass mt-8 rounded-3xl p-7">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.includedTitle}</h3>
@@ -353,13 +346,14 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* early-access modal — code-gated entry (redeem_promo), no fake payment */}
+      {/* чекаут: оплата — основной путь, промокод — вторичное поле */}
       <AnimatePresence>
         {modalPkg && (
-          <EarlyAccessModal
+          <CheckoutModal
             pkgId={modalPkg}
             planName={c.names[modalPkg]}
-            launchPrice={fmtMoney(cur, hasDiscount ? planRow(cur, modalPkg).disc : planRow(cur, modalPkg).price)}
+            priceLabel={fmtMoney(cur, hasDiscount ? planRow(cur, modalPkg).disc : planRow(cur, modalPkg).price)}
+            baseLabel={hasDiscount ? fmtMoney(cur, planRow(cur, modalPkg).price) : undefined}
             onClose={() => setModalPkg(null)}
           />
         )}
