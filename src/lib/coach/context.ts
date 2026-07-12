@@ -25,7 +25,9 @@ const agoTr = (n: number | null): string =>
 
 /* --------------------- строка состояния + директива ---------------------- */
 
-function stateLine(st: CoachState): string {
+/** Однострочное TR-описание состояния; экспорт — голосовой роут кладёт его
+ * в dynamic-переменную {{focus_reason}} ElevenLabs-агента. */
+export function stateLineTr(st: CoachState): string {
   switch (st.id) {
     case "NEWBIE":
       return "YENİ ÖĞRENCİ — geçmiş günler yok, bugün ilk adım.";
@@ -99,8 +101,8 @@ export function buildAhuContext(
   );
 
   // — состояние + директива (всегда)
-  keep(`DURUM: ${stateLine(d.state)}`);
-  for (const st of d.states.slice(1, 3)) opt(`AYRICA: ${stateLine(st)}`, 3);
+  keep(`DURUM: ${stateLineTr(d.state)}`);
+  for (const st of d.states.slice(1, 3)) opt(`AYRICA: ${stateLineTr(st)}`, 3);
   keep(`DAVRANIŞ: ${stateDirective(d.state)}`);
 
   // — план и активность

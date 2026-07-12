@@ -9,6 +9,7 @@ import {
   type VoiceReport,
 } from "@/lib/ai/prompts/voice-review";
 import { topicById } from "@/lib/ai/topics";
+import { recordVoiceSummary } from "@/lib/coach/voice-summary";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -220,6 +221,11 @@ export async function POST(req: Request) {
       transcript: { conversation_id: conversationId, items: conv.transcript ?? [] },
       report,
     });
+    // единый агент: карточка-итог урока в ленту Ahu (best-effort, после
+    // биллинга — сбой не ломает завершение; DESIGN-COACH §6)
+    if (report?.valid) {
+      await recordVoiceSummary(admin, { userId: user.id, conversationId, minutes, report });
+    }
   }
 
   return NextResponse.json({

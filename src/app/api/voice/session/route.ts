@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
+import { buildSnapshot, decide } from "@/lib/coach";
+import { stateLineTr } from "@/lib/coach/context";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -184,18 +186,36 @@ export async function POST(req: Request) {
 
   // Lesson focus (core value). A plan-engine deep link may pin the focus
   // (DESIGN-PLAN-ENGINE §4 p.2) — validated against the registry; otherwise
-  // weak topics first, topped up with topics of the student's own level so
-  // every lesson has a concrete teaching target.
+  // the coach core decides (weak ∩ current route week; DESIGN-COACH §6),
+  // with the old weak-topics list as a hard fallback, topped up with topics
+  // of the student's own level so every lesson has a concrete target.
   const requested: Topic[] = (Array.isArray(body.focusTopics) ? body.focusTopics : [])
     .map((id) => topicById(normalizeTopicId(id)))
     .filter((t): t is Topic => !!t && t.id !== "other")
     .slice(0, 3);
-  const focus: Topic[] = requested.length
-    ? requested
-    : (weak ?? [])
-        .map((w) => topicById(w.topic as string))
+  let coachFocus: Topic[] = [];
+  let focusReason = "";
+  if (requested.length === 0) {
+    // best-effort: сбой ядра не имеет права сорвать урок (биллинг/слоты уже пройдены)
+    try {
+      const decision = decide(await buildSnapshot(supabase, user.id, { kkNative: body.feedbackLang === "kk" }));
+      coachFocus = decision.focusTopics
+        .map((id) => topicById(id))
         .filter((t): t is Topic => !!t && t.id !== "other")
         .slice(0, 3);
+      focusReason = stateLineTr(decision.state);
+    } catch (e) {
+      console.error("[voice] coach focus failed, weak-topics fallback:", e instanceof Error ? e.message : e);
+    }
+  }
+  const focus: Topic[] = requested.length
+    ? requested
+    : coachFocus.length
+      ? coachFocus
+      : (weak ?? [])
+          .map((w) => topicById(w.topic as string))
+          .filter((t): t is Topic => !!t && t.id !== "other")
+          .slice(0, 3);
   if (focus.length < 3) {
     const levelKey = ["A1", "A2", "B1", "B2", "C1"].includes(level) ? level : "A2";
     for (const t of TOPICS) {
@@ -224,6 +244,9 @@ export async function POST(req: Request) {
       target_level: (profile?.target_level as string | null) ?? "C1",
       weak_topics: weakTr,
       lesson_focus: lessonFocusTr,
+      // почему эти темы — одна TR-строка от ядра агента ({{focus_reason}} в
+      // промпте ElevenLabs; пустая строка безопасна, слот просто молчит)
+      focus_reason: focusReason,
       lesson_focus_ids: focus.map((t) => t.id).join(","), // read back at settlement for the report
       feedback_lang: FEEDBACK_LANG_TR[feedbackLangCode],
       feedback_lang_code: feedbackLangCode,
