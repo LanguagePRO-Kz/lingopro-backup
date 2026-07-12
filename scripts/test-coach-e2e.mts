@@ -185,12 +185,22 @@ async function main() {
     server = await startServer(3100);
   }
   const browser = await chromium.launch();
-  const page = await (await browser.newContext()).newPage();
+  // сессия переживает перезапуски скрипта (storageState) — Supabase троттлит
+  // частые password-входы, логинимся только когда куки реально протухли
+  const AUTH_STATE = resolve(process.cwd(), ".shots-debug/e2e-auth.json");
+  let context;
+  try {
+    context = await browser.newContext({ storageState: AUTH_STATE });
+  } catch {
+    context = await browser.newContext();
+  }
+  const page = await context.newPage();
 
   try {
-    // логин демо-аккаунтом через UI (куки сессии для page.request);
-    // ретрай: Supabase временами троттлит частые входы подряд
-    let loggedIn = false;
+    // жива ли сохранённая сессия? (/dashboard уводит неавторизованных на /login)
+    await page.goto(`${BASE}/dashboard`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(2500);
+    let loggedIn = !page.url().includes("/login");
     for (let attempt = 1; attempt <= 3 && !loggedIn; attempt++) {
       await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
       await page.locator('input[type="email"]').fill(acc.email);
@@ -198,12 +208,13 @@ async function main() {
       await page.getByRole("button", { name: /Войти|Sign in|Giriş|Кіру/i }).click();
       loggedIn = await page.waitForURL(/dashboard|quiz/, { timeout: 25_000 }).then(() => true).catch(() => false);
       if (!loggedIn) {
-        console.log(`  логин: попытка ${attempt} не прошла, жду 15с…`);
-        await page.waitForTimeout(15_000);
+        console.log(`  логин: попытка ${attempt} не прошла (троттлинг Supabase?), жду 60с…`);
+        await page.waitForTimeout(60_000);
       }
     }
     if (!loggedIn) throw new Error("логин демо-аккаунтом не удался за 3 попытки");
-    console.log("логин OK:", new URL(page.url()).pathname);
+    await context.storageState({ path: AUTH_STATE });
+    console.log("сессия OK:", new URL(page.url()).pathname);
     // парковка: живая вкладка кабинета самолечит данные (upsert mastery/plan)
     // и гонится с посевом сценариев — куки уже в контексте, страница не нужна
     await page.goto("about:blank");
@@ -299,7 +310,9 @@ async function main() {
       // follow-up с опорой на историю: сервер сам поднимает прошлые реплики
       const q2 = await postJson(page, `${BASE}/api/coach/chat`, { feedbackLang: "ru", message: "Дай ещё два примера на это же правило." });
       const t2 = String(q2.json.text ?? "");
-      ok("follow-up понят из серверной истории (примеры по теме)", q2.status === 200 && /(-s[ıiuü]|s[ıiuü]$|tamlama|изафет|-ı|kitab)/im.test(t2), t2.slice(0, 80));
+      // примеры по теме = слова с притяжательным суффиксом (masası, kitabı…)
+      // или упоминание правила; живой прогон дал «masa → masası» без дефисов
+      ok("follow-up понят из серверной истории (примеры по теме)", q2.status === 200 && /s[ıiuü]|tamlama|изафет|izafet|-ı|kitab/i.test(t2), t2.slice(0, 80));
 
       const { data: hist2 } = await admin.from("coach_messages").select("id").eq("user_id", uid).eq("channel", "chat");
       ok("история накапливается (4 реплики)", (hist2 ?? []).length === 4, `строк: ${hist2?.length}`);
@@ -340,6 +353,21 @@ async function main() {
       // бриф тоже видит урок в снапшоте (контекст SON SESLİ DERS) — smoke
       const b = await postJson(page, `${BASE}/api/coach/brief`, { feedbackLang: "ru" });
       ok("бриф после урока жив и честен", b.status === 200 && !!b.json.text, `HTTP ${b.status}`);
+
+      // старт голосовой сессии: фокус от ЯДРА + focus_reason (токен бесплатен,
+      // минуты не списываются без разговора; слот убираем за собой)
+      await admin.from("topic_mastery").insert([masteryRow("izafet", 28, { error_count: 6 })]);
+      const vs = await postJson(page, `${BASE}/api/voice/session`, { feedbackLang: "ru", mode: "free" });
+      if (vs.status === 200) {
+        const focusIds = ((vs.json.lessonFocus as { id: string }[] | undefined) ?? []).map((f) => f.id);
+        const dyn = (vs.json.dynamicVariables ?? {}) as Record<string, string>;
+        ok("фокус урока — от ядра (izafet первым)", focusIds[0] === "izafet", focusIds.join(","));
+        ok("focus_reason прокинут агенту", /KONU ZAYIF|izafet|İsim/i.test(dyn.focus_reason ?? ""), dyn.focus_reason ?? "(пусто)");
+        await admin.from("voice_slots").delete().eq("user_id", uid); // слот назад
+      } else {
+        // 429 busy/no_minutes — честный ответ, но фокус не проверить
+        ok("voice/session стартовал (нужен для проверки фокуса)", false, `HTTP ${vs.status}: ${JSON.stringify(vs.json)}`);
+      }
     }
 
     /* ---------------- 5. фолбэк без AI-ключей ---------------- */

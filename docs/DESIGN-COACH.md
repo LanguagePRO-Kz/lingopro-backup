@@ -1,7 +1,10 @@
 # DESIGN-COACH — единый автономный агент Ahu
 
-**Статус на 2026-07-12 (ветка `feat/ahu-coach`):** слой 1 (ядро) и слой 2
-(личность) ГОТОВЫ и проверены; каналы и UI — TODO по этому чертежу.
+**Статус на 2026-07-13 (ветка `feat/ahu-coach`):** ядро, личность И КАНАЛЫ
+(§4-6) ГОТОВЫ и проверены живым e2e (`scripts/test-coach-e2e.mts`) против
+реальной БД и реального AI. Осталось: **UI (§7)**, **удаление старого (§9,
+только после UI)**, деплой, плюс два хвоста из §10a. Миграция 0010 применена
+основателем и прозвонена (12/12: RLS, дедуп, check'и).
 Прод (`main`) не тронут: всё в ветке, старые тьютор/мотиватор работают как раньше.
 
 Идея: три разрозненных AI-сущности (тьютор-чат «LingoPRO AI», мотиватор
@@ -27,14 +30,29 @@
 | `src/lib/coach/index.ts` | публичный баррель | — |
 | `scripts/test-coach.ts` | ~100 юнит-проверок честности (`npm run test:coach`) | зелёные |
 | `scripts/test-coach-live.ts` | живые прогоны persona+context через callAI (`npx tsx scripts/test-coach-live.ts [lang]`) | 12/12 |
-| `supabase/migrations/0010_coach.sql` | память агента `coach_messages` + RLS + дедуп | ждёт применения основателем |
+| `supabase/migrations/0010_coach.sql` | память агента `coach_messages` + RLS + дедуп | ПРИМЕНЕНА; прозвон 12/12 |
 | `src/lib/ai/mastery.ts` | добавлен экспорт `STRENGTH_GAIN` (нужен детекту BREAKTHROUGH) | — |
+| **`src/app/api/coach/brief/route.ts`** | канал 1 §4 — проактивный бриф | e2e: 4 сценария ×4 языка, гонки, потолок |
+| **`src/app/api/coach/chat/route.ts`** | канал 2 §5 — чат с серверной историей | e2e: реальная ошибка процитирована, история в БД |
+| **`src/lib/coach/voice-summary.ts`** | `recordVoiceSummary(admin, {userId, conversationId, minutes, report})` | e2e: вставка + идемпотентность |
+| **`src/app/api/voice/session/route.ts`** | фокус от `decide()` + `focus_reason` в dynamic vars (биллинг/слоты не тронуты) | e2e: живой старт сессии, izafet первым |
+| **`src/app/api/voice/session/end/route.ts`** | вызов `recordVoiceSummary` после биллинга (best-effort) | код-ревью + tsc (полный круг через report — e2e voice-блок) |
+| **`scripts/test-coach-e2e.mts`** | живой e2e: briefs/race/chat/voice/fallback | см. §10a |
 
-Уроки живых прогонов, уже вшитые в persona/context (НЕ ослаблять):
+Уроки живых прогонов, уже вшитые в код (НЕ ослаблять):
 - языковое требование продублировано ПОСЛЕДНЕЙ строкой промпта («SON KONTROL») — DeepSeek иначе отвечает по-турецки при feedbackLang=ru;
+- …и этого МАЛО: дрейф вероятностный, поэтому brief-роут проверяет ответ
+  через `matchesFeedbackLang(text, lang)` (persona.ts) и делает один жёсткий
+  ретрай, иначе честный шаблон. Для чата (Sonnet) дрейф не наблюдался — при
+  жалобах включить тот же страж;
 - запрет начинать с имени/приветствия — явно «ни своим (Ahu), ни именем студента»;
 - сила темы в контексте всегда «güç N/100», иначе модель превращает «60+» в «60 вопросов»;
-- проактивный шаг — только СУЩЕСТВУЮЩАЯ вещь (задание плана / урок / пробный / настройки), модель иначе выдумывает «тест уровня».
+- нагрузка >400% подаётся кратностью («gereken çalışma ~9 KATI»), иначе в
+  тексте студенту всплывает «backlog is 938%»;
+- проактивный шаг — только СУЩЕСТВУЮЩАЯ вещь (задание плана / урок / пробный / настройки), модель иначе выдумывает «тест уровня»;
+- приоритет BEHIND(deadline) > BREAKTHROUGH — осознанный: реальная угроза
+  дедлайну важнее праздника; модель сама красиво совмещает («порог пройден,
+  но с такой скоростью не успеваешь»).
 
 ## 2. Контракт ядра (сигнатуры — импортировать из `@/lib/coach`)
 
@@ -75,7 +93,7 @@ ${buildAhuContext(snapshot, decision, channel)}`;
 строки Ahu вставляет сервер через `createAdminClient()` (паттерн voice_slots).
 Дедуп проактивных: уникальный индекс `(user_id, meta->>'day_key') where channel='proactive'`.
 
-## 4. TODO-канал 1: `POST /api/coach/brief` (заменяет /api/ai/motivator)
+## 4. ГОТОВО — канал 1: `POST /api/coach/brief` (заменяет /api/ai/motivator)
 
 Файл: `src/app/api/coach/brief/route.ts`. Body: `{ feedbackLang }`.
 
@@ -109,7 +127,7 @@ ${buildAhuContext(snapshot, decision, channel)}`;
 `replanHint: true` → клиент (дашборд) может дёрнуть существующий
 `POST /api/ai/route` (регенерация маршрута) — как уже делает при `routeStale`.
 
-## 5. TODO-канал 2: `POST /api/coach/chat` (заменяет /api/ai/tutor)
+## 5. ГОТОВО — канал 2: `POST /api/coach/chat` (заменяет /api/ai/tutor)
 
 Файл: `src/app/api/coach/chat/route.ts`. Body: `{ feedbackLang, message: string }`
 (≤2000 символов; истории клиент БОЛЬШЕ НЕ шлёт — сервер владеет ею).
@@ -134,7 +152,7 @@ ${buildAhuContext(snapshot, decision, channel)}`;
 `from("coach_messages").select("channel, role, content, meta, created_at")
  .in("channel", ["chat","voice_summary"]).order("created_at").limit(50)`.
 
-## 6. TODO-канал 3: голос (два точечных врезания, роуты НЕ переименовывать)
+## 6. ГОТОВО — канал 3: голос (два точечных врезания, роуты НЕ переименовывать)
 
 **`src/app/api/voice/session/route.ts`** — выбор фокуса (строки ~185-205):
 deep-link `body.focusTopics` по-прежнему главнее; если его нет — вместо
@@ -161,7 +179,36 @@ await admin.from("coach_messages").insert({
 Замыкание круга: следующий `buildSnapshot` увидит урок в `voice_sessions`
 (секция SON SESLİ DERS контекста) — чат и бриф автоматически «помнят» урок.
 
-## 7. TODO-UI
+## 7. TODO-UI — ЕДИНСТВЕННЫЙ крупный кусок, точные контракты каналов
+
+Ответ `POST /api/coach/brief` (body `{ feedbackLang: "ru"|"en"|"tr"|"kk" }`):
+```ts
+{ text: string,
+  source: "ai" | "cached" | "template",
+  state: "NEWBIE"|"EXAM_SOON"|"STREAK_BROKEN"|"TOPIC_FAILED"|"BEHIND"|"BREAKTHROUGH"|"PLATEAU"|"ON_TRACK",
+  action: "none"|"suggest_task"|"suggest_voice"|"suggest_mock"|"warn_pace"|"celebrate",
+  actionTopic: string | null,      // id темы для deep-link
+  focusTopics: string[],           // ≤3 id тем
+  replanHint: boolean }            // true → можно дёрнуть POST /api/ai/route
+// ошибки: 401 auth_required, 429 rate_limited, 400 bad_request
+// ВАЖНО: при source="cached" текст — сохранённый, а state/action — СВЕЖИЕ
+// (кнопка-действие всегда актуальна, даже если заметка утренняя)
+
+Ответ `POST /api/coach/chat` (body `{ feedbackLang, message: string ≤2000 }`):
+{ text: string, meta: { provider, model, usedToday, usedMonth } }
+// ошибки: 401, 429 {error: daily_limit|monthly_limit|rate_limited|user_budget|global_budget},
+//         503 ai_unavailable, 400 empty_message — коды те же, что у старого
+//         тьютора: маппинг ошибок на странице переиспользуется как есть
+```
+История для страницы чата — прямой select (RLS read-own):
+```ts
+supabase.from("coach_messages")
+  .select("channel, role, content, meta, created_at")
+  .in("channel", ["chat", "voice_summary"])
+  .order("created_at").limit(50)
+// role: "student" → пузырь студента; "ahu" → пузырь Ahu;
+// channel="voice_summary" → карточка урока (meta: {minutes, criteria_total, topics})
+```
 
 **`src/components/AhuCoach.tsx`** — замена `AhuNote` (та же точка монтирования,
 `src/app/dashboard/page.tsx:317`, пропсы `{streak, history}` оставить для
@@ -229,6 +276,43 @@ dynamic-переменные: `{{student_name}} {{level}} {{target_level}}
 5. Голос: урок → voice_summary-карточка в чате → следующий бриф упоминает урок.
 6. AI-ключи выключить локально → брифы = честные шаблоны, чат = честная ошибка.
 7. Playwright-прогон дашборда/чата/live (паттерн .shots-debug/final-run.js).
+
+## 10a. Живой e2e (`scripts/test-coach-e2e.mts`) — статус и как гонять
+
+```
+E2E_BASE=http://localhost:3000 npx tsx scripts/test-coach-e2e.mts [briefs|race|chat|voice|fallback]
+```
+- `E2E_BASE` — уже поднятый дев-сервер (без переменной скрипт сам поднимает
+  :3100, но в папке НЕ должен работать другой `next dev` — Next 16 не даёт
+  второй инстанс).
+- Сеет/чистит данные ТОЛЬКО демо-аккаунта (.demo-account.json), сессия
+  кешируется в `.shots-debug/e2e-auth.json` (Supabase троттлит частые
+  password-входы). Rate-limit обходится уникальным тестовым `x-forwarded-for`
+  на запрос — прод-лимиты не ослаблялись.
+
+Прогнано и зелено (2026-07-13, живой AI):
+- **briefs**: 4 сценария (newbie/streak_broken/behind/breakthrough) ×4 языка —
+  честность, язык ответа, повтор = cached, одна строка дня в БД;
+- **race**: 5 параллельных → 1 строка, sources `ai,ai,template×3` (потолок
+  2 AI/день удержан под гонкой), 3-й язык дня → не-AI;
+- **chat**: ответ цитирует РЕАЛЬНУЮ ошибку из error_events («kitapı→kitabı»),
+  вопрос+ответ в coach_messages (история переживает перезагрузку по
+  построению — грузится из БД), follow-up понят из серверной истории;
+- **voice**: recordVoiceSummary вставка+идемпотентность; чат ЗНАЕТ о реальном
+  уроке из voice_sessions (тема, 14/20, «вчера») и не выдумывает; живой старт
+  /api/voice/session — фокус от ядра (izafet первым), focus_reason в dynamic vars.
+
+**Хвосты (следующей модели):**
+1. **fallback-блок не гонялся с пустыми ключами**: требует сервера без
+   AI-ключей, а дев-сервер основателя занимал папку. Квотный template-путь
+   (тот же `template()`) живьём доказан в race-блоке. Когда сервер свободен:
+   `npx tsx scripts/test-coach-e2e.mts fallback` (сам поднимет оба сервера).
+2. **Полный круг голоса с НАСТОЯЩИМ разговором** (речь → transcript →
+   report → voice_summary) — на этапе UI/деплоя: нужен человек у микрофона;
+   все звенья по отдельности живьём проверены.
+3. **KK-качество брифа**: в одном прогоне встречалось «Дүнбі» (вместо
+   «Кеше») — у основателя идёт i18n-ревью носителем; собрать примеры с
+   `source:"ai"` kk и показать ревьюеру.
 
 ## 11. Бюджет (не раздуть)
 
