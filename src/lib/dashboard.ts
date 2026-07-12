@@ -12,7 +12,8 @@ export type NavItem = { id: string; emoji: string; href: string; label: Loc; isN
 
 export const NAV: NavItem[] = [
   { id: "home", emoji: "📊", href: "/dashboard", label: { ru: "Главная", en: "Home", tr: "Ana sayfa", kk: "Басты бет" } },
-  { id: "tutor", emoji: "📝", href: "/dashboard/tutor", isNew: true, label: { ru: "AI-преподаватель", en: "AI tutor", tr: "AI öğretmen", kk: "AI-мұғалім" } },
+  // одна личность агента на всю платформу: и чат, и голосовой урок — это Ahu
+  { id: "tutor", emoji: "💬", href: "/dashboard/tutor", isNew: true, label: { ru: "Чат с Ahu", en: "Chat with Ahu", tr: "Ahu ile sohbet", kk: "Ahu-мен чат" } },
   { id: "writing", emoji: "✍️", href: "/dashboard/writing", label: { ru: "Письмо", en: "Writing", tr: "Yazma", kk: "Жазу" } },
   { id: "reading", emoji: "📖", href: "/dashboard/reading", label: { ru: "Чтение", en: "Reading", tr: "Okuma", kk: "Оқу" } },
   { id: "listening", emoji: "🎧", href: "/dashboard/listening", label: { ru: "Аудирование", en: "Listening", tr: "Dinleme", kk: "Тыңдалым" } },
@@ -20,7 +21,7 @@ export const NAV: NavItem[] = [
   { id: "mock", emoji: "🧪", href: "/dashboard/mock", label: { ru: "Пробные тесты", en: "Mock tests", tr: "Deneme testleri", kk: "Сынақ тесттер" } },
   { id: "stats", emoji: "📈", href: "/dashboard/stats", label: { ru: "Статистика", en: "Statistics", tr: "İstatistik", kk: "Статистика" } },
   { id: "vocabulary", emoji: "📕", href: "/dashboard/vocabulary", label: { ru: "Словарь", en: "Vocabulary", tr: "Sözlük", kk: "Сөздік" } },
-  { id: "speaking", emoji: "🎙", href: "/dashboard/speaking", isNew: true, label: { ru: "AI Öğretmen", en: "AI Öğretmen", tr: "AI Öğretmen", kk: "AI Öğretmen" } },
+  { id: "speaking", emoji: "🎙", href: "/dashboard/speaking", isNew: true, label: { ru: "Урок с Ahu", en: "Lesson with Ahu", tr: "Ahu ile ders", kk: "Ahu-мен сабақ" } },
   { id: "leaderboard", emoji: "🏆", href: "/dashboard/leaderboard", label: { ru: "Рейтинг", en: "Leaderboard", tr: "Sıralama", kk: "Рейтинг" } },
   { id: "settings", emoji: "⚙️", href: "/dashboard/settings", label: { ru: "Настройки", en: "Settings", tr: "Ayarlar", kk: "Баптаулар" } },
 ];

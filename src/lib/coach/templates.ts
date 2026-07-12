@@ -16,6 +16,39 @@ import { activityOf } from "./states";
 const label = (id: string | undefined, locale: Locale): string =>
   id ? (topicById(id)?.label[locale] ?? id) : "";
 
+/**
+ * «Почему эта тема» — строка под фокус-чипами голосового урока (live-страница).
+ * Только реальные причины из решения ядра; null = фокус не от ядра.
+ */
+export function focusReasonText(s: StudentSnapshot, d: CoachDecision, locale: Locale): string | null {
+  if (d.focusTopics.length === 0) return null;
+  const st = d.state;
+  const t = (ru: string, en: string, tr: string, kk: string) => ({ ru, en, tr, kk })[locale];
+  if ((st.id === "TOPIC_FAILED" || st.id === "PLATEAU") && d.focusTopics[0] === st.topic) {
+    const l = label(st.topic, locale);
+    return t(
+      `«${l}» — сейчас твоя самая слабая тема (${st.strength}/100), урок нацелен на неё.`,
+      `“${l}” is your weakest topic right now (${st.strength}/100) — this lesson targets it.`,
+      `«${l}» şu an en zayıf konun (${st.strength}/100) — ders ona odaklı.`,
+      `«${l}» — қазіргі ең әлсіз тақырыбың (${st.strength}/100), сабақ соған бағытталған.`,
+    );
+  }
+  const inWeek = s.routeWeek?.topics.some((id) => d.focusTopics.includes(id));
+  return inWeek
+    ? t(
+        "Слабые темы текущей недели твоего маршрута.",
+        "Weak topics from this week of your route.",
+        "Rotandaki bu haftanın zayıf konuları.",
+        "Маршрутыңдағы осы аптаның әлсіз тақырыптары.",
+      )
+    : t(
+        "Твои самые слабые темы по данным платформы.",
+        "Your weakest topics based on your real data.",
+        "Platform verilerine göre en zayıf konuların.",
+        "Платформа деректері бойынша ең әлсіз тақырыптарың.",
+      );
+}
+
 /** Текст дня от Ahu без AI — по главному состоянию решения. */
 export function coachFallbackText(s: StudentSnapshot, d: CoachDecision, locale: Locale): string {
   const act = activityOf(s);

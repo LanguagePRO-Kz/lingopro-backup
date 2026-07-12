@@ -13,7 +13,7 @@ import { PlanCheckpoint } from "@/components/PlanCheckpoint";
 import { LiveFacts } from "@/components/LiveFacts";
 import { Milestones } from "@/components/Milestones";
 import { WeeklyDigest } from "@/components/WeeklyDigest";
-import { AhuNote } from "@/components/AhuNote";
+import { AhuCoach } from "@/components/AhuCoach";
 import { fetchExamPlan } from "@/lib/exam-plan";
 import { createClient } from "@/lib/supabase/client";
 import { awardXp, awardSkillTest, XP } from "@/lib/xp";
@@ -314,7 +314,7 @@ export default function DashboardHome() {
 
       {/* ===== Ahu's daily note: slim strip, the teacher opens the day —
            the PLAN below stays the hero of the page ===== */}
-      <AhuNote streak={streak} history={history} />
+      <AhuCoach />
 
       {/* ===== PLAN ===== */}
       <div id="plan" className="mt-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(16,24,40,0.15)] sm:p-7">

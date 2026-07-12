@@ -4,6 +4,7 @@ import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
 import { buildSnapshot, decide } from "@/lib/coach";
 import { stateLineTr } from "@/lib/coach/context";
+import { focusReasonText } from "@/lib/coach/templates";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -195,15 +196,20 @@ export async function POST(req: Request) {
     .slice(0, 3);
   let coachFocus: Topic[] = [];
   let focusReason = "";
+  let focusReasonLocalized: string | null = null;
   if (requested.length === 0) {
     // best-effort: сбой ядра не имеет права сорвать урок (биллинг/слоты уже пройдены)
     try {
-      const decision = decide(await buildSnapshot(supabase, user.id, { kkNative: body.feedbackLang === "kk" }));
+      const snapshot = await buildSnapshot(supabase, user.id, { kkNative: body.feedbackLang === "kk" });
+      const decision = decide(snapshot);
       coachFocus = decision.focusTopics
         .map((id) => topicById(id))
         .filter((t): t is Topic => !!t && t.id !== "other")
         .slice(0, 3);
       focusReason = stateLineTr(decision.state);
+      const loc = (["ru", "en", "tr", "kk"].includes(body.feedbackLang ?? "") ? body.feedbackLang : "en") as
+        | "ru" | "en" | "tr" | "kk";
+      focusReasonLocalized = focusReasonText(snapshot, decision, loc);
     } catch (e) {
       console.error("[voice] coach focus failed, weak-topics fallback:", e instanceof Error ? e.message : e);
     }
@@ -237,6 +243,8 @@ export async function POST(req: Request) {
     maxSeconds,
     allowance: { baseLeft, creditsLeft },
     lessonFocus: focus.map((t) => ({ id: t.id, label: t.label })),
+    // «почему эта тема» на языке интерфейса (null = фокус не от ядра)
+    lessonFocusReason: focusReasonLocalized,
     dynamicVariables: {
       user_id: user.id, // ownership check at settlement
       student_name: (profile?.full_name as string | null) ?? (profile?.handle as string | null) ?? "öğrenci",

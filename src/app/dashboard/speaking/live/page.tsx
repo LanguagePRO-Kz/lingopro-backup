@@ -206,6 +206,8 @@ function LiveLesson() {
   const [elapsed, setElapsed] = useState(0);
   const [allowance, setAllowance] = useState<{ baseLeft: number; creditsLeft: number } | null>(null);
   const [lessonFocus, setLessonFocus] = useState<{ id: string; label: Record<Locale, string> }[]>([]);
+  // «почему эта тема» — решение ядра агента на языке интерфейса (null = фокус не от ядра)
+  const [focusReason, setFocusReason] = useState<string | null>(null);
   const [settle, setSettle] = useState<{ minutes: number | null; seconds: number; fromBase: number; fromCredits: number; report: VoiceReport | null } | null>(null);
   const [reportPending, setReportPending] = useState(false);
   const [settleFailed, setSettleFailed] = useState(false);
@@ -434,6 +436,7 @@ function LiveLesson() {
       maxSeconds: number;
       allowance: { baseLeft: number; creditsLeft: number };
       lessonFocus: { id: string; label: Record<Locale, string> }[];
+      lessonFocusReason?: string | null;
       dynamicVariables: Record<string, string>;
     };
     try {
@@ -465,6 +468,7 @@ function LiveLesson() {
 
     setAllowance(data.allowance);
     setLessonFocus(data.lessonFocus ?? []);
+    setFocusReason(data.lessonFocusReason ?? null);
     maxSecondsRef.current = data.maxSeconds;
     setMaxSeconds(data.maxSeconds);
     conversation.startSession({
@@ -611,13 +615,18 @@ function LiveLesson() {
       {(phase === "starting" || inCall) && (
         <div className="glass mt-5 rounded-3xl p-6">
           {lessonFocus.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.focus}:</span>
-              {lessonFocus.map((f) => (
-                <span key={f.id} className="rounded-full bg-[var(--color-brand)]/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-[var(--color-brand)]">
-                  {f.label[locale]}
-                </span>
-              ))}
+            <div className="mb-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.focus}:</span>
+                {lessonFocus.map((f) => (
+                  <span key={f.id} className="rounded-full bg-[var(--color-brand)]/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-[var(--color-brand)]">
+                    {f.label[locale]}
+                  </span>
+                ))}
+              </div>
+              {focusReason && (
+                <p className="mt-1.5 text-[11px] leading-snug text-[var(--color-muted)]">💡 {focusReason}</p>
+              )}
             </div>
           )}
 

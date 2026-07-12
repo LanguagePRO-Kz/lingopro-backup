@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { createClient } from "@/lib/supabase/client";
 import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
 
-type Msg = { role: "ai" | "user"; text: string };
+// "lesson" — карточка голосового урока из coach_messages (voice_summary)
+type Msg = { role: "ai" | "user" | "lesson"; text: string; minutes?: number };
 
 /* ----------------------------- Web Speech API ----------------------------- */
 type SRResult = { 0: { transcript: string }; isFinal: boolean };
@@ -30,43 +32,51 @@ function getSR(): SRCtor | null {
 const T = {
   ru: {
     online: "Онлайн",
-    greet2: "Привет! Я твой персональный учитель турецкого. Спроси про грамматику, слово, план подготовки — или пришли предложение на проверку.",
+    subtitle: "твой преподаватель",
+    lesson: (n?: number) => `🎙 Голосовой урок${n ? ` · ${n} мин` : ""}`,
+    greet2: "Привет! Я Ahu — твой преподаватель турецкого. Спроси про грамматику, слово, план подготовки — или пришли предложение на проверку. Я помню твой план, ошибки и наши уроки.",
     placeholder: "Напиши сообщение…",
     quick: ["Объясни грамматику", "Проверь предложение", "Подготовка к TÖMER", "Разговорная практика", "Переведи текст"],
     errGeneric: "Не получилось получить ответ — проверь соединение и попробуй ещё раз.",
-    errDaily: "Дневной лимит вопросов тьютору исчерпан. Завтра лимит обновится.",
-    errMonthly: "Месячный лимит вопросов тьютору исчерпан.",
-    errUnavailable: "AI-тьютор временно недоступен. Попробуй чуть позже.",
+    errDaily: "Дневной лимит вопросов исчерпан. Завтра лимит обновится.",
+    errMonthly: "Месячный лимит вопросов исчерпан.",
+    errUnavailable: "Ahu временно недоступна. Попробуй чуть позже.",
   },
   en: {
     online: "Online",
-    greet2: "Hi! I'm your personal Turkish teacher. Ask about grammar, a word, your prep plan — or send a sentence to check.",
+    subtitle: "your teacher",
+    lesson: (n?: number) => `🎙 Voice lesson${n ? ` · ${n} min` : ""}`,
+    greet2: "Hi! I'm Ahu — your Turkish teacher. Ask about grammar, a word, your prep plan — or send a sentence to check. I remember your plan, your mistakes and our lessons.",
     placeholder: "Type a message…",
     quick: ["Explain grammar", "Check a sentence", "TÖMER prep", "Speaking practice", "Translate text"],
     errGeneric: "Couldn't get a reply — check your connection and try again.",
-    errDaily: "Today's tutor limit is used up. It resets tomorrow.",
-    errMonthly: "This month's tutor limit is used up.",
-    errUnavailable: "The AI tutor is temporarily unavailable. Try again shortly.",
+    errDaily: "Today's question limit is used up. It resets tomorrow.",
+    errMonthly: "This month's question limit is used up.",
+    errUnavailable: "Ahu is temporarily unavailable. Try again shortly.",
   },
   tr: {
     online: "Çevrimiçi",
-    greet2: "Dil bilgisi, kelime, hazırlık planı sor — ya da kontrol için bir cümle gönder.",
+    subtitle: "öğretmenin",
+    lesson: (n?: number) => `🎙 Sesli ders${n ? ` · ${n} dk` : ""}`,
+    greet2: "Merhaba! Ben Ahu — Türkçe öğretmenin. Dil bilgisi, kelime, hazırlık planı sor — ya da kontrol için bir cümle gönder. Planını, hatalarını ve derslerimizi hatırlıyorum.",
     placeholder: "Bir mesaj yaz…",
     quick: ["Dil bilgisi açıkla", "Cümle kontrol et", "TÖMER hazırlık", "Konuşma pratiği", "Metin çevir"],
     errGeneric: "Cevap alınamadı — bağlantını kontrol edip tekrar dene.",
     errDaily: "Bugünkü soru limitin doldu. Yarın yenilenir.",
     errMonthly: "Bu ayki soru limitin doldu.",
-    errUnavailable: "AI öğretmen geçici olarak kullanılamıyor. Az sonra tekrar dene.",
+    errUnavailable: "Ahu geçici olarak ulaşılamıyor. Az sonra tekrar dene.",
   },
   kk: {
     online: "Желіде",
-    greet2: "Сәлем! Мен сенің жеке түрік тілі мұғаліміңмін. Грамматика, сөз, дайындық жоспары туралы сұра — немесе тексеруге сөйлем жібер.",
+    subtitle: "сенің ұстазың",
+    lesson: (n?: number) => `🎙 Дауыстық сабақ${n ? ` · ${n} мин` : ""}`,
+    greet2: "Сәлем! Мен Ahu — сенің түрік тілі ұстазыңмын. Грамматика, сөз, дайындық жоспары туралы сұра — немесе тексеруге сөйлем жібер. Жоспарыңды, қателеріңді және сабақтарымызды есімде сақтаймын.",
     placeholder: "Хабарлама жаз…",
     quick: ["Грамматиканы түсіндір", "Сөйлемді тексер", "TÖMER дайындық", "Сөйлеу практикасы", "Мәтінді аудар"],
     errGeneric: "Жауап алынбады — байланысты тексеріп, қайта көр.",
     errDaily: "Бүгінгі сұрақ лимиті таусылды. Ертең жаңарады.",
     errMonthly: "Осы айдағы сұрақ лимиті таусылды.",
-    errUnavailable: "AI ұстаз уақытша қолжетімсіз. Сәлден соң қайта көр.",
+    errUnavailable: "Ahu уақытша қолжетімсіз. Сәлден соң қайта көр.",
   },
 };
 
@@ -86,6 +96,61 @@ export default function TutorPage() {
   });
 
   useEffect(() => () => recRef.current?.stop(), []);
+
+  // Историей владеет СЕРВЕР (coach_messages, RLS read-own): переживает
+  // перезагрузку и смену устройства. Голосовые уроки — карточками в ленте.
+  // После загрузки подхватываем handoff-вопрос из блока Ahu на дашборде.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user || !active) return;
+        const { data } = await supabase
+          .from("coach_messages")
+          .select("channel, role, content, meta")
+          .eq("user_id", user.id)
+          .in("channel", ["chat", "voice_summary"])
+          .order("created_at", { ascending: true })
+          .limit(50);
+        if (!active) return;
+        const restored: Msg[] = [];
+        for (const r of (data ?? []) as { channel: string; role: string; content: string; meta: { minutes?: number } | null }[]) {
+          if (r.channel === "voice_summary") {
+            restored.push({ role: "lesson", text: r.content, minutes: r.meta?.minutes });
+          } else if (r.role === "student") {
+            restored.push({ role: "user", text: r.content });
+          } else {
+            // ответ Ahu хранится целиком — на экране те же пузыри, что при отправке
+            for (const part of r.content.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean).slice(0, 4)) {
+              restored.push({ role: "ai", text: part });
+            }
+          }
+        }
+        if (restored.length) setMessages([{ role: "ai", text: c.greet2 }, ...restored]);
+      } catch {
+        /* история недоступна — чат работает с чистого листа */
+      } finally {
+        // handoff с дашборда: вопрос из блока «Ahu — твой преподаватель»
+        try {
+          const h = window.sessionStorage.getItem("lingopro:ahu:handoff");
+          if (h && active) {
+            window.sessionStorage.removeItem("lingopro:ahu:handoff");
+            void ask(h);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggleVoice() {
     if (recording) {
@@ -131,28 +196,18 @@ export default function TutorPage() {
       .replace(/`([^`\n]+)`/g, "$1");
   }
 
-  /** Real chat: send the visible history to /api/ai/tutor (quota `tutor`). */
+  /** Единый агент: серверу нужен только НОВЫЙ вопрос — историю (последние 12
+   * реплик) и контекст студента /api/coach/chat поднимает сам из БД. */
   async function ask(userText: string) {
     const text = userText.trim();
     if (!text || thinking) return;
-    const nextMessages: Msg[] = [...messages, { role: "user", text }];
-    setMessages(nextMessages);
+    setMessages((m) => [...m, { role: "user", text }]);
     setThinking(true);
     try {
-      // the greeting is UI chrome — the model only needs the dialogue.
-      // Consecutive teacher bubbles (one reply split for the messenger feel)
-      // merge back into a single assistant turn: the API expects alternation.
-      const history: { role: "assistant" | "user"; content: string }[] = [];
-      for (const m of nextMessages.slice(1)) {
-        const role = m.role === "ai" ? ("assistant" as const) : ("user" as const);
-        const last = history[history.length - 1];
-        if (last && last.role === role) last.content += "\n\n" + m.text;
-        else history.push({ role, content: m.text });
-      }
-      const res = await fetch("/api/ai/tutor", {
+      const res = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedbackLang: locale, messages: history }),
+        body: JSON.stringify({ feedbackLang: locale, message: text }),
       });
       if (res.ok) {
         const data = (await res.json()) as { text?: string };
@@ -196,13 +251,13 @@ export default function TutorPage() {
     <div className="flex h-[calc(100vh-9.5rem)] flex-col">
       <SectionBack />
       <SectionHint id="tutor" />
-      {/* header */}
+      {/* header — одна личность на всю платформу: Ahu */}
       <div className="flex items-center gap-3 border-b border-black/[0.06] pb-4">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg">🤖</span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-lg">👩🏻‍🏫</span>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--color-foreground)]">LingoPRO AI</span>
-            <span className="rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)] px-1.5 py-0.5 text-[9px] font-bold text-white">NEW</span>
+            <span className="text-sm font-semibold text-[var(--color-foreground)]">Ahu</span>
+            <span className="text-xs text-[var(--color-muted)]">· {c.subtitle}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
             <span className="h-2 w-2 rounded-full bg-[#16a34a]" /> {c.online} 🟢
@@ -213,18 +268,31 @@ export default function TutorPage() {
       {/* messages */}
       <div className="flex-1 overflow-y-auto py-5">
         <div className="flex flex-col gap-3">
-          {messages.map((m, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                m.role === "ai" ? "self-start bg-black/[0.04] text-[var(--color-foreground)]" : "self-end bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-white"
-              }`}
-            >
-              {m.text}
-            </motion.div>
-          ))}
+          {messages.map((m, i) =>
+            m.role === "lesson" ? (
+              // карточка голосового урока (voice_summary) — часть общей памяти Ahu
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-[85%] self-start rounded-2xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.05] px-4 py-2.5"
+              >
+                <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand)]">{c.lesson(m.minutes)}</div>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--color-foreground)]">{m.text}</p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  m.role === "ai" ? "self-start bg-black/[0.04] text-[var(--color-foreground)]" : "self-end bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-white"
+                }`}
+              >
+                {m.text}
+              </motion.div>
+            ),
+          )}
           {thinking && (
             <div className="flex items-center gap-1.5 self-start rounded-2xl bg-black/[0.04] px-4 py-3">
               {[0, 1, 2].map((i) => (

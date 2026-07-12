@@ -237,60 +237,8 @@ export function lastActivity(history: DayRow[]): string | null {
   return active.length ? active[active.length - 1] : null;
 }
 
-/* ------------------------------ Motivator -------------------------------- */
-export function getMotivation(
-  locale: Locale,
-  streak: number,
-  last: string | null,
-): { title: string; text: Record<Locale, string> } {
-  if (!last) {
-    return { title: "Merhaba! 👋", text: {
-      ru: "Добро пожаловать! Начни свой первый день подготовки.",
-      en: "Welcome! Start your first day of preparation.",
-      tr: "Hoş geldin! İlk hazırlık gününe başla.",
-      kk: "Қош келдің! Дайындықтың алғашқы күнін баста.",
-    } };
-  }
-  const daysSince = Math.floor((Date.parse(todayISO()) - Date.parse(last)) / 86_400_000);
-  if (daysSince > 2) {
-    return { title: "Seni özledim! 🙌", text: {
-      ru: "Ты пропустил пару дней — это нормально. Вернись сегодня и восстанови серию!",
-      en: "You missed a couple of days — that's okay. Come back today and rebuild your streak!",
-      tr: "Birkaç gün ara verdin — sorun değil. Bugün dön ve serini yeniden başlat!",
-      kk: "Бірнеше күн жіберіп алдың — бұл қалыпты. Бүгін орал да серияңды қайта баста!",
-    } };
-  }
-  if (streak === 0) {
-    return { title: "Haydi başlayalım! 💪", text: {
-      ru: "Выполни план на сегодня и начни свою серию!",
-      en: "Finish today's plan and start your streak!",
-      tr: "Bugünün planını tamamla ve serini başlat!",
-      kk: "Бүгінгі жоспарды орында да серияңды баста!",
-    } };
-  }
-  if (streak < 7) {
-    return { title: "Harika! 🔥", text: {
-      ru: `${streak} дней подряд — так держать! Не останавливайся.`,
-      en: `${streak} days in a row — keep it up!`,
-      tr: `${streak} gün üst üste — böyle devam et!`,
-      kk: `${streak} күн қатарынан — осылай жалғастыр!`,
-    } };
-  }
-  if (streak < 30) {
-    return { title: "Muhteşem! 🏆", text: {
-      ru: `${streak} дней подряд — ты настоящий чемпион!`,
-      en: `${streak} days in a row — you're a true champion!`,
-      tr: `${streak} gün üst üste — gerçek bir şampiyonsun!`,
-      kk: `${streak} күн қатарынан — сен нағыз чемпионсың!`,
-    } };
-  }
-  return { title: "Efsane! 👑", text: {
-    ru: `${streak} дней подряд — это невероятно! Ты на пути к C1!`,
-    en: `${streak} days in a row — incredible! You're on your way to C1!`,
-    tr: `${streak} gün üst üste — inanılmaz! C1 yolundasın!`,
-    kk: `${streak} күн қатарынан — керемет! C1-ге бара жатырсың!`,
-  } };
-}
+// Мотиватор-шаблонник переехал в единого агента: src/lib/coach/templates.ts
+// (честные тексты по состояниям ядра); блок AhuCoach получает их с сервера.
 
 const PHRASES: { tr: string; tx: Record<Locale, string> }[] = [
   { tr: "Sabır acıdır, meyvesi tatlıdır.", tx: { ru: "Терпение горько, но плод его сладок.", en: "Patience is bitter, but its fruit is sweet.", tr: "Sabır acıdır, meyvesi tatlıdır.", kk: "Сабыр ащы, жемісі тәтті." } },
