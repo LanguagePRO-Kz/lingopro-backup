@@ -23,6 +23,15 @@ const agoDays = (ts: string | null | undefined, today: string): number | null =>
 const agoTr = (n: number | null): string =>
   n == null ? "" : n === 0 ? "bugün" : n === 1 ? "dün" : `${n} gün önce`;
 
+/** Нагрузка человеческим языком: 921% честно, но нечитаемо («backlog 938%»
+ * в живом прогоне) — выше 4х говорим кратностью. */
+const loadTr = (loadPct: number | null): string =>
+  loadPct == null
+    ? "yük bilinmiyor"
+    : loadPct > 400
+      ? `gereken çalışma mevcut sürenin ~${Math.round(loadPct / 100)} KATI`
+      : `yük %${loadPct}`;
+
 /* --------------------- строка состояния + директива ---------------------- */
 
 /** Однострочное TR-описание состояния; экспорт — голосовой роут кладёт его
@@ -39,7 +48,7 @@ export function stateLineTr(st: CoachState): string {
       return `KONU ZAYIF — «${trLabel(st.topic)}» güç ${st.strength}/100${st.recentErrors ? `, son 7 günde ${st.recentErrors} hata` : ""}.`;
     case "BEHIND":
       return st.reason === "deadline"
-        ? `GERİDE — bu tempoyla sınav tarihine yetişmiyor (yük ${st.loadPct ?? "?"}%).`
+        ? `GERİDE — bu tempoyla sınav tarihine yetişmiyor (${loadTr(st.loadPct)}).`
         : `GERİDE — son 7 günde planın sadece %${st.weekDonePct} yapıldı.`;
     case "BREAKTHROUGH":
       return st.kind === "topic_closed"
@@ -114,7 +123,7 @@ export function buildAhuContext(
   if (act.streak > 0) planBits.push(`seri ${act.streak} gün`);
   if (s.feasibility && s.feasibility.verdict !== "unknown") {
     const v = { ok: "yetişiyor", tight: "sıkışık", notEnough: "yetişmiyor" }[s.feasibility.verdict];
-    planBits.push(`gidişat: ${v}${s.feasibility.loadPct != null ? ` (%${s.feasibility.loadPct} yük)` : ""}`);
+    planBits.push(`gidişat: ${v}${s.feasibility.loadPct != null ? ` (${loadTr(s.feasibility.loadPct)})` : ""}`);
   }
   keep(`PLAN: ${planBits.join(", ")}.`);
   if (act.yesterdayPlan) opt(`DÜN: ${act.yesterdayPlan.done}/${act.yesterdayPlan.total} görev.`, 2);

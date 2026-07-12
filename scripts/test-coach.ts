@@ -11,7 +11,7 @@ import { detectStates, isoShift, daysBetween } from "../src/lib/coach/states";
 import { decide, shouldHintReplan } from "../src/lib/coach/decide";
 import { buildAhuContext, MAX_CONTEXT_CHARS } from "../src/lib/coach/context";
 import { coachFallbackText } from "../src/lib/coach/templates";
-import { buildAhuSystem } from "../src/lib/coach/persona";
+import { buildAhuSystem, matchesFeedbackLang } from "../src/lib/coach/persona";
 import type { StudentSnapshot } from "../src/lib/coach/types";
 import type { Locale } from "../src/lib/i18n";
 
@@ -342,6 +342,17 @@ console.log("— шаблоны: все состояния ×4 языка —");
       check(`шаблон ${expected} (${loc}) непустой и без markdown`, text.length > 10 && !/[*#_`]/.test(text), text.slice(0, 60));
     }
   }
+}
+
+/* --------------------------- язык ответа (guard) --------------------------- */
+console.log("— matchesFeedbackLang: страж языка ответа —");
+{
+  check("турецкий текст при ru → false", !matchesFeedbackLang("Şart kipi bugün kapandı, tebrikler.", "ru"));
+  check("русский текст при ru → true", matchesFeedbackLang("Тема закрыта — 62 из 100, отличный шаг.", "ru"));
+  check("казахский при kk → true", matchesFeedbackLang("Тақырып жабылды — күш 62/100, жақсы қадам.", "kk"));
+  check("русский при en → false (кириллица)", !matchesFeedbackLang("Тема закрыта.", "en"));
+  check("англ. с турецкой цитатой при en → true", matchesFeedbackLang('"Şart kipi" closed at 62/100 — solid.', "en"));
+  check("пустой текст → false", !matchesFeedbackLang("", "ru"));
 }
 
 /* -------------------------------- persona --------------------------------- */

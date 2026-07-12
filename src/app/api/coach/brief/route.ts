@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import { consumeQuota } from "@/lib/ai/quota";
 import { buildAhuContext, buildAhuSystem, buildSnapshot, coachFallbackText, decide } from "@/lib/coach";
+import { matchesFeedbackLang } from "@/lib/coach/persona";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -101,15 +102,25 @@ export async function POST(req: Request) {
 --- ÖĞRENCİNİN GERÇEK VERİLERİ ---
 ${buildAhuContext(snapshot, decision, "proactive")}`;
 
-  const result = await callAI({
-    task: "motivator_note",
-    feedbackLang: lang,
-    system,
-    messages: [{ role: "user", content: "Bugünkü notunu yaz." }],
-    // deepseek-v4-pro рассуждает до ответа — меньший бюджет съедается целиком
-    maxTokens: 700,
-  });
-  const text = result?.text?.trim();
+  const LANG_TR: Record<FeedbackLang, string> = { ru: "RUSÇA", en: "İNGİLİZCE", tr: "TÜRKÇE", kk: "KAZAKÇA" };
+  const ask = (content: string) =>
+    callAI({
+      task: "motivator_note",
+      feedbackLang: lang,
+      system,
+      messages: [{ role: "user", content }],
+      // deepseek-v4-pro рассуждает до ответа — меньший бюджет съедается целиком
+      maxTokens: 700,
+    });
+  let result = await ask("Bugünkü notunu yaz.");
+  let text = result?.text?.trim();
+  // живые прогоны: DeepSeek изредка отвечает целиком по-турецки при ru/kk —
+  // один жёсткий ретрай, дальше честный шаблон (не турецкий текст студенту)
+  if (text && !matchesFeedbackLang(text, lang)) {
+    result = await ask(`Bugünkü notunu yaz. ÇOK ÖNEMLİ: notun TAMAMI ${LANG_TR[lang]} dilinde olmalı (Türkçe sadece örnek/alıntı olarak kalabilir).`);
+    text = result?.text?.trim();
+    if (text && !matchesFeedbackLang(text, lang)) text = undefined;
+  }
   if (!text) return template();
 
   const meta: ProactiveMeta & Record<string, unknown> = {

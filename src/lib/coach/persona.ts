@@ -39,6 +39,18 @@ const channelFormat = (channel: Exclude<CoachChannel, "voice">, langName: string
 - Öğrenci Türkçe pratik isterse Türkçeye geç, seviyesinde kal, hatalarını nazikçe düzelt.
 - SON KONTROL: açıklamaların ${langName} dilinde mi? Türkçe sadece örnek ve alıntılarda kalmalı.`;
 
+/**
+ * Ответ действительно на языке интерфейса? Скрипт-эвристика: ru/kk требуют
+ * ≥30% кириллицы, en/tr — ноль кириллицы (en от tr дёшево не отличить, и не
+ * надо). Живые прогоны ловили DeepSeek на полностью турецких ответах при
+ * feedbackLang=ru — роуты обязаны перепроверять и ретраить.
+ */
+export function matchesFeedbackLang(text: string, lang: FeedbackLang): boolean {
+  if (!text) return false;
+  const cyr = (text.match(/[а-яёәіңғүұқөһ]/gi) ?? []).length;
+  return lang === "ru" || lang === "kk" ? cyr >= text.length * 0.3 : cyr === 0;
+}
+
 export function buildAhuSystem(input: {
   channel: Exclude<CoachChannel, "voice">;
   lang: FeedbackLang;
