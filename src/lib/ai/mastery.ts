@@ -18,7 +18,8 @@ export type ErrorEvidence = {
 };
 
 const STRENGTH_HIT = { major: 12, minor: 6 } as const;
-const STRENGTH_GAIN = 8; // per session where the topic was worked error-free
+/** Exported: the coach core detects "topic crossed 60 today" by this step. */
+export const STRENGTH_GAIN = 8; // per session where the topic was worked error-free
 
 /**
  * Topics practiced without errors get stronger — this is how a topic
