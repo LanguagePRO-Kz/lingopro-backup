@@ -128,6 +128,9 @@ export type CoachState =
       id: "BREAKTHROUGH";
       kind: "topic_closed" | "mock_jump";
       topic?: string;
+      /** сила темы 0–100 при kind='topic_closed' — чтобы «60+» в тексте
+       * не превращалось в выдуманные «60 вопросов» */
+      strength?: number;
       mockDelta?: number;
       mockTotal?: number;
     }

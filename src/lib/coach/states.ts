@@ -207,7 +207,12 @@ export function detectStates(s: StudentSnapshot): CoachState[] {
       (datePart(s.lastMock.createdAt) ?? "") >= isoShift(s.today, -1) &&
       s.lastMock.total - s.prevMock.total >= COACH_RULES.breakthroughMockDelta;
     if (closedToday) {
-      list.push({ id: "BREAKTHROUGH", kind: "topic_closed", topic: closedToday.topic });
+      list.push({
+        id: "BREAKTHROUGH",
+        kind: "topic_closed",
+        topic: closedToday.topic,
+        strength: closedToday.strength,
+      });
     } else if (mockFresh && s.lastMock) {
       list.push({
         id: "BREAKTHROUGH",

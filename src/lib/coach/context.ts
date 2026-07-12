@@ -34,15 +34,15 @@ function stateLine(st: CoachState): string {
     case "STREAK_BROKEN":
       return `ARA VERDİ — ${st.daysSinceActivity} gündür girmiyor (son aktivite ${st.lastActivityDate}).`;
     case "TOPIC_FAILED":
-      return `KONU ZAYIF — «${trLabel(st.topic)}» ${st.strength}/100${st.recentErrors ? `, son 7 günde ${st.recentErrors} hata` : ""}.`;
+      return `KONU ZAYIF — «${trLabel(st.topic)}» güç ${st.strength}/100${st.recentErrors ? `, son 7 günde ${st.recentErrors} hata` : ""}.`;
     case "BEHIND":
       return st.reason === "deadline"
         ? `GERİDE — bu tempoyla sınav tarihine yetişmiyor (yük ${st.loadPct ?? "?"}%).`
         : `GERİDE — son 7 günde planın sadece %${st.weekDonePct} yapıldı.`;
     case "BREAKTHROUGH":
       return st.kind === "topic_closed"
-        ? `ATILIM — «${trLabel(st.topic ?? "")}» konusu bugün kapandı (60+).`
-        : `ATILIM — deneme ${st.mockTotal}/100, öncekinden ${st.mockDelta} puan yukarı.`;
+        ? `ATILIM — «${trLabel(st.topic ?? "")}» konusu bugün kapandı: güç ${st.strength ?? 60}/100 (eşik 60). Bu bir KONU GÜCÜ puanıdır, soru sayısı değil.`
+        : `ATILIM — deneme sınavı ${st.mockTotal}/100, öncekinden ${st.mockDelta} puan yukarı.`;
     case "PLATEAU":
       return `PLATO — düzenli çalışıyor ama «${trLabel(st.topic)}» (${st.strength}/100) ${st.daysSincePracticed} gündür hiç çalışılmadı.`;
     case "ON_TRACK":
@@ -122,7 +122,7 @@ export function buildAhuContext(
   const weak = s.topics.filter((t) => t.topic !== "other" && t.strength < 60).slice(0, 3);
   if (weak.length) {
     opt(
-      `ZAYIF: ${weak.map((t) => `${trLabel(t.topic)} (${t.strength}${t.errorCount ? `, ${t.errorCount} hata` : ""})`).join("; ")}.`,
+      `ZAYIF KONULAR (güç 0-100): ${weak.map((t) => `${trLabel(t.topic)} — güç ${t.strength}${t.errorCount ? `, ${t.errorCount} hata` : ""}`).join("; ")}.`,
       1,
     );
   }
