@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   else messages.push({ role: "user", content: message });
 
   const decision = decide(snapshot);
-  const system = `${buildAhuSystem({ channel: "chat", lang, gender: snapshot.gender })}
+  const system = `${buildAhuSystem({ channel: "chat", lang, gender: snapshot.gender, level: snapshot.level })}
 
 --- ÖĞRENCİNİN GERÇEK VERİLERİ ---
 ${buildAhuContext(snapshot, decision, "chat")}`;

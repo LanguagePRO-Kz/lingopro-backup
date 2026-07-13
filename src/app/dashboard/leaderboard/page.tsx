@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
+import { titleById } from "@/lib/coach/titles";
 
 type Scope = "global" | "city" | "country";
 type Row = {
@@ -18,6 +19,8 @@ type Row = {
   total_xp: number;
   rank: number;
   is_me: boolean;
+  /** честный титул (0011); null до миграции/первого титула */
+  title_slug?: string | null;
 };
 
 const T = {
@@ -116,6 +119,11 @@ export default function LeaderboardPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-foreground)]">
                     @{r.handle ?? "user"}
+                    {titleById(r.title_slug)?.tr && (
+                      <span className="rounded-full bg-[var(--color-brand)]/[0.08] px-2 py-0.5 text-[10px] font-bold text-[var(--color-brand)]">
+                        {titleById(r.title_slug)!.tr}
+                      </span>
+                    )}
                     {r.is_me && <span className="rounded-full bg-[var(--color-brand)] px-2 py-0.5 text-[10px] font-semibold text-white">{c.you}</span>}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 text-xs text-[var(--color-muted)]">

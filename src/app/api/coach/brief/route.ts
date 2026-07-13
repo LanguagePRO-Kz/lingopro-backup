@@ -3,6 +3,7 @@ import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import { consumeQuota } from "@/lib/ai/quota";
 import { buildAhuContext, buildAhuSystem, buildSnapshot, coachFallbackText, decide } from "@/lib/coach";
 import { matchesFeedbackLang } from "@/lib/coach/persona";
+import { buildCareerStats, computeTitle, titleById, titleCongratsText, titleFactsTr } from "@/lib/coach/titles";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -53,8 +54,18 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
 
-  const snapshot = await buildSnapshot(supabase, user.id, { kkNative: lang === "kk" });
+  const [snapshot, career] = await Promise.all([
+    buildSnapshot(supabase, user.id, { kkNative: lang === "kk" }),
+    buildCareerStats(supabase, user.id),
+  ]);
   const decision = decide(snapshot);
+
+  // титулы: заработанный (по реальному прогрессу) vs присуждённый ранее;
+  // присуждённое не отбирается — показываем максимум из двух
+  const earned = computeTitle(career.stats);
+  const stored = titleById(career.storedTitleSlug);
+  const upgraded = !!earned && (!stored || earned.rank > stored.rank);
+  const display = upgraded ? earned : stored && earned && earned.rank < stored.rank ? stored : (earned ?? stored ?? null);
 
   const respond = (text: string, source: "ai" | "cached" | "template") =>
     NextResponse.json({
@@ -65,8 +76,24 @@ export async function POST(req: Request) {
       actionTopic: decision.actionTopic,
       focusTopics: decision.focusTopics,
       replanHint: decision.replanHint,
+      level: snapshot.level,
+      title: display ? { id: display.id, tr: display.tr, rank: display.rank, label: display.label } : null,
     });
-  const template = () => respond(coachFallbackText(snapshot, decision, lang), "template");
+  const template = () =>
+    respond(
+      upgraded && earned ? titleCongratsText(earned, lang) : coachFallbackText(snapshot, decision, lang),
+      "template",
+    );
+
+  // апгрейд присуждается сразу (RLS: обновление собственного профиля);
+  // гонка двух вкладок безвредна — апдейт идемпотентен
+  if (upgraded && earned) {
+    const { error: titleErr } = await supabase
+      .from("profiles")
+      .update({ title_slug: earned.id, title_awarded_at: new Date().toISOString() })
+      .eq("id", user.id);
+    if (titleErr) console.error("[coach] title persist failed:", titleErr.message);
+  }
 
   // сегодняшние заметки (любое состояние дня) — свежие первыми
   const admin = createAdminClient();
@@ -83,7 +110,9 @@ export async function POST(req: Request) {
     todays = (data as { content: string; meta: ProactiveMeta }[] | null) ?? [];
   }
 
-  const exact = todays.find((r) => r.meta?.day_key === decision.dayKey && r.meta?.lang === lang);
+  // апгрейд титула перекрывает состояние дня: заметка дня = поздравление
+  const effectiveKey = upgraded && earned ? `${snapshot.today}#TITLE:${earned.id}` : decision.dayKey;
+  const exact = todays.find((r) => r.meta?.day_key === effectiveKey && r.meta?.lang === lang);
   if (exact) return respond(exact.content, "cached");
 
   // без admin дедуп/персист невозможны — честный шаблон вместо бесконтрольных AI-вызовов
@@ -97,10 +126,10 @@ export async function POST(req: Request) {
     return sameLang ? respond(sameLang.content, "cached") : template();
   }
 
-  const system = `${buildAhuSystem({ channel: "proactive", lang, gender: snapshot.gender })}
+  const system = `${buildAhuSystem({ channel: "proactive", lang, gender: snapshot.gender, level: snapshot.level })}
 
 --- ÖĞRENCİNİN GERÇEK VERİLERİ ---
-${buildAhuContext(snapshot, decision, "proactive")}`;
+${buildAhuContext(snapshot, decision, "proactive")}${upgraded && earned ? `\n${titleFactsTr(earned, career.stats)}` : ""}`;
 
   const LANG_TR: Record<FeedbackLang, string> = { ru: "RUSÇA", en: "İNGİLİZCE", tr: "TÜRKÇE", kk: "KAZAKÇA" };
   const ask = (content: string) =>
@@ -124,13 +153,14 @@ ${buildAhuContext(snapshot, decision, "proactive")}`;
   if (!text) return template();
 
   const meta: ProactiveMeta & Record<string, unknown> = {
-    day_key: decision.dayKey,
+    day_key: effectiveKey,
     lang,
     state: decision.state.id,
     action: decision.action,
     action_topic: decision.actionTopic,
     focus_topics: decision.focusTopics,
     replan_hint: decision.replanHint,
+    ...(upgraded && earned ? { title: earned.id } : {}),
   };
   const { error: insErr } = await admin.from("coach_messages").insert({
     user_id: user.id,
@@ -148,7 +178,7 @@ ${buildAhuContext(snapshot, decision, "proactive")}`;
         .update({ content: text, meta })
         .eq("user_id", user.id)
         .eq("channel", "proactive")
-        .eq("meta->>day_key", decision.dayKey);
+        .eq("meta->>day_key", effectiveKey);
     } else {
       console.error("[coach] brief persist failed:", insErr.message);
     }

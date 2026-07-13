@@ -12,6 +12,7 @@ import { decide, shouldHintReplan } from "../src/lib/coach/decide";
 import { buildAhuContext, MAX_CONTEXT_CHARS } from "../src/lib/coach/context";
 import { coachFallbackText } from "../src/lib/coach/templates";
 import { buildAhuSystem, matchesFeedbackLang } from "../src/lib/coach/persona";
+import { computeTitle, titleCongratsText, TITLES, TOPICS_PER_LEVEL, type CareerStats } from "../src/lib/coach/titles";
 import type { StudentSnapshot } from "../src/lib/coach/types";
 import type { Locale } from "../src/lib/i18n";
 
@@ -368,6 +369,107 @@ console.log("— persona: единая личность —");
   check("канал proactive: ≤35 слов", pro.includes("35 kelime"));
   check("канал proactive: KAZAKÇA", pro.includes("KAZAKÇA"));
   check("proactive не содержит чат-формата", !pro.includes("2-4 KISA mesaja"));
+}
+
+/* --------------------------------- титулы ---------------------------------- */
+console.log("— титулы: лестница честная, даром не даётся —");
+{
+  const stats = (over: Partial<CareerStats> = {}): CareerStats => ({
+    diagnosed: true,
+    diagLevel: "A1",
+    closedByLevel: { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0 },
+    activeDays: 0,
+    tasksDone: 0,
+    maxStreak: 0,
+    voiceLessons: 0,
+    essays: 0,
+    bestMockTotal: null,
+    mockComprehension: false,
+    konusmaAvg3: null,
+    ...over,
+  });
+
+  check("без диагностики → титула нет", computeTitle(stats({ diagnosed: false })) === null);
+  check("диагностика пройдена → Yeni Başlayan", computeTitle(stats())?.id === "yeni_baslayan");
+  check(
+    "5 акт. дней + 3 темы → Meraklı",
+    computeTitle(stats({ activeDays: 5, closedByLevel: { A1: 3, A2: 0, B1: 0, B2: 0, C1: 0 } }))?.id === "merakli",
+  );
+  check(
+    "XP-гринд без тем НЕ двигает (100 заданий, 0 тем → всё ещё ранг 1)",
+    computeTitle(stats({ activeDays: 30, tasksDone: 500 }))?.id === "yeni_baslayan",
+  );
+  check(
+    "Adım Atan: 8/13 A1 + 10 дней (правка основателя — ~2-я неделя)",
+    computeTitle(stats({ activeDays: 10, closedByLevel: { A1: 8, A2: 0, B1: 0, B2: 0, C1: 0 } }))?.id === "adim_atan",
+  );
+  check(
+    "…а 7/13 ещё НЕ Adım Atan",
+    computeTitle(stats({ activeDays: 10, closedByLevel: { A1: 7, A2: 0, B1: 0, B2: 0, C1: 0 } }))?.id === "merakli",
+  );
+  check(
+    "диагноз B1 зачитывает A1/A2, но достижения зарабатываются (0 активности → ранг 1)",
+    computeTitle(stats({ diagLevel: "B1" }))?.id === "yeni_baslayan",
+  );
+
+  const konusanStats = stats({
+    diagLevel: "B1", // A1/A2 зачтены уровнем
+    activeDays: 25,
+    tasksDone: 150,
+    maxStreak: 8,
+    closedByLevel: { A1: 0, A2: 0, B1: 3, B2: 0, C1: 0 },
+    voiceLessons: 8,
+    konusmaAvg3: 12.5,
+  });
+  check("Konuşan: B1-гейт + 8 уроков + konuşma ≥12", computeTitle(konusanStats)?.id === "konusan");
+  check(
+    "…7 уроков вместо 8 → застрял на Azimli (урок должен быть honestly earned)",
+    computeTitle({ ...konusanStats, voiceLessons: 7 })?.id === "azimli",
+  );
+  check("…+10 эссе → Yazan", computeTitle({ ...konusanStats, essays: 10 })?.id === "yazan");
+
+  const full = stats({
+    diagLevel: "C1",
+    activeDays: 120,
+    tasksDone: 900,
+    maxStreak: 15,
+    closedByLevel: { A1: 0, A2: 0, B1: 0, B2: 0, C1: 3 },
+    voiceLessons: 32,
+    essays: 25,
+    bestMockTotal: 78,
+    mockComprehension: true,
+    konusmaAvg3: 16.5,
+  });
+  check("полный набор + мок 78 (барем C1) → TÖMER Ustası", computeTitle(full)?.id === "tomer_ustasi");
+  check(
+    "…мок 74 (ниже барема 75) → НЕ TÖMER Ustası",
+    computeTitle({ ...full, bestMockTotal: 74 })?.id !== "tomer_ustasi",
+  );
+  // A1 = 12 БЕЗ служебной "other" (у неё level A1) — пороги от честной базы
+  check(
+    "реестр: пороги считаются от реальных количеств тем (без 'other')",
+    TOPICS_PER_LEVEL.A1 === 12 && TOPICS_PER_LEVEL.A2 === 11 && TOPICS_PER_LEVEL.B1 === 10 && TOPICS_PER_LEVEL.B2 === 7 && TOPICS_PER_LEVEL.C1 === 3,
+  );
+  for (const loc of LOCALES) {
+    const txt = titleCongratsText(TITLES[6], loc);
+    check(`шаблон поздравления (${loc}) непустой, с рангом`, txt.length > 20 && txt.includes("7"), txt.slice(0, 50));
+  }
+}
+
+/* ------------------------------ тон по уровню ------------------------------ */
+console.log("— эволюция тона Ahu по уровню —");
+{
+  const a1 = buildAhuSystem({ channel: "chat", lang: "ru", level: "A1" });
+  const c1 = buildAhuSystem({ channel: "chat", lang: "ru", level: "C1" });
+  const b2 = buildAhuSystem({ channel: "chat", lang: "ru", level: "B2" });
+  check("A1 → REHBER (наставница)", a1.includes("REHBER"));
+  check("A2-дефолт при неизвестном уровне", buildAhuSystem({ channel: "chat", lang: "ru", level: "A0" }).includes("ANTRENÖR"));
+  check("B1 → PARTNER", buildAhuSystem({ channel: "chat", lang: "ru", level: "B1" }).includes("PARTNER"));
+  check("B2 → MESLEKTAŞ + турецкий ведёт в чате", b2.includes("MESLEKTAŞ") && b2.includes("ağırlıklı TÜRKÇE"));
+  check("C1 → DOST", c1.includes("DOST"));
+  check("A1-чат: язык интерфейса строг", a1.includes("Türkçe sadece örnek ve alıntılarda"));
+  const proC1 = buildAhuSystem({ channel: "proactive", lang: "ru", level: "C1" });
+  check("бриф C1: строгость языка сохранена (страж не ломается)", proC1.includes("Türkçe yazdıysan"));
 }
 
 /* ---------------------------------- итог ---------------------------------- */

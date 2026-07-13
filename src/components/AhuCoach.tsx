@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { topicById } from "@/lib/ai/topics";
+import { AhuMascot } from "@/components/mascot/AhuMascot";
+import { GrowthTree } from "@/components/mascot/GrowthTree";
+import type { CoachStateId } from "@/lib/coach/types";
 
 /**
  * Ahu — единый агент на дашборде (замена AhuNote, DESIGN-COACH §7).
@@ -22,11 +25,15 @@ import { topicById } from "@/lib/ai/topics";
 type Brief = {
   text: string;
   source: "ai" | "cached" | "template";
-  state: string;
+  state: CoachStateId;
   action: "none" | "suggest_task" | "suggest_voice" | "suggest_mock" | "warn_pace" | "celebrate";
   actionTopic: string | null;
   focusTopics: string[];
   replanHint: boolean;
+  /** реальный уровень (A0..C1) — стадия символа роста */
+  level: string;
+  /** честный титул (15 ступеней) или null до первого */
+  title: { id: string; tr: string; rank: number; label: Record<string, string> } | null;
 };
 
 const T = {
@@ -63,6 +70,14 @@ export function AhuCoach() {
   const [brief, setBrief] = useState<Brief | null>(null);
   const [failed, setFailed] = useState(false);
   const [q, setQ] = useState("");
+  // кивок маскота на РЕАЛЬНОЕ действие: дашборд диспатчит lp:daily-updated
+  // при закрытии задачи — никакой анимации «просто так»
+  const [nudge, setNudge] = useState(0);
+  useEffect(() => {
+    const onDone = () => setNudge((n) => n + 1);
+    window.addEventListener("lp:daily-updated", onDone);
+    return () => window.removeEventListener("lp:daily-updated", onDone);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -125,11 +140,23 @@ export function AhuCoach() {
   return (
     <div className="mt-4 rounded-2xl border border-black/[0.06] bg-gradient-to-br from-[var(--color-brand)]/[0.05] to-[var(--color-brand-2)]/[0.05] px-4 py-3">
       <div className="flex items-start gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-2)] text-sm text-white">
-          👩🏻‍🏫
-        </span>
+        {/* маскот показывает РЕАЛЬНОЕ состояние из ядра (честность гарантируют
+            тесты ядра: праздника на нуле не бывает) */}
+        <AhuMascot state={brief?.state ?? "ON_TRACK"} size={52} nudge={nudge} className="shrink-0 -ml-1" />
         <div className="min-w-0 flex-1">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand)]">{c.from}</span>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand)]">{c.from}</span>
+            {brief && (
+              <span className="inline-flex items-center gap-1">
+                <GrowthTree level={brief.level} size={16} />
+                {brief.title && (
+                  <span className="rounded-full bg-[var(--color-brand)]/[0.08] px-2 py-0.5 text-[10px] font-bold text-[var(--color-brand)]">
+                    {brief.title.tr} · {brief.title.rank}/15
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
           {brief ? (
             <p className="mt-0.5 text-sm leading-relaxed text-[var(--color-foreground)]">{brief.text}</p>
           ) : failed ? (
