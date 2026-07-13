@@ -215,8 +215,14 @@ console.log("\nСамооценка (is_self_reported):");
     "recompute-запросы фильтруют is_self_reported = false",
     (src.match(/\.eq\("is_self_reported", false\)/g) ?? []).length >= 2,
   );
-  const ui = readFileSync("src/app/dashboard/grammar/page.tsx", "utf8");
-  check("счётчик грамматики фильтрует is_self_reported", ui.includes('.eq("is_self_reported", false)'));
+  const hook = readFileSync("src/lib/hooks/useSkillStats.ts", "utf8");
+  check("счётчик разделов (useSkillStats) фильтрует is_self_reported", hook.includes('.eq("is_self_reported", false)'));
+  const stats = readFileSync("src/lib/hooks/useStats.ts", "utf8");
+  check("страница статистики (useStats) фильтрует is_self_reported", stats.includes('.eq("is_self_reported", false)'));
+  for (const page of ["grammar", "reading", "listening"] as const) {
+    const src2 = readFileSync(`src/app/dashboard/${page}/page.tsx`, "utf8");
+    check(`${page} читает счётчик через useSkillStats`, src2.includes("useSkillStats"));
+  }
 }
 
 /* --------------------------------- итог ------------------------------------ */

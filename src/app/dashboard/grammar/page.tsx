@@ -8,7 +8,7 @@
  * студенту честно («не сохранено») с ретраем тем же client_attempt_id.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
@@ -16,15 +16,14 @@ import { GRAMMAR_TASKS } from "@/data/grammar-tasks";
 import { canonicalTopic } from "@/data/topic-map";
 import { topicById } from "@/lib/ai/topics";
 import { shuffleOptions } from "@/lib/shuffle";
-import { createClient } from "@/lib/supabase/client";
+import { submitAttempt } from "@/lib/attempts-client";
+import { useSkillStats } from "@/lib/hooks/useSkillStats";
 import type { Level, Question } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
 
 const LEVELS: Level[] = ["A1", "A2", "B1", "B2", "C1"];
 const SET_SIZE = 10;
-const WEAK_STRENGTH = 60; // единый порог слабости продукта (ядро/титулы/маршрут)
-const ACCURACY_WINDOW_DAYS = 90;
 
 const T = {
   ru: {
@@ -103,14 +102,6 @@ type SetItem = {
   save: SaveStatus | null;
 };
 
-type Stats = {
-  available: boolean; // false = таблицы ещё нет / select упал
-  answered: number; // всего попыток за всю историю
-  accuracy: number | null; // 0..100 за 90 дней; null = нечего оценивать
-  weakTopics: number;
-  answeredIds: Set<string>;
-};
-
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -128,57 +119,7 @@ export default function GrammarPage() {
   const [phase, setPhase] = useState<Phase>("home");
   const [items, setItems] = useState<SetItem[]>([]);
   const [current, setCurrent] = useState(0);
-  const [stats, setStats] = useState<Stats | null>(null);
-
-  const loadStats = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setStats({ available: false, answered: 0, accuracy: null, weakTopics: 0, answeredIds: new Set() });
-        return;
-      }
-      const since = new Date(Date.now() - ACCURACY_WINDOW_DAYS * 86_400_000).toISOString();
-      const [attemptsRes, weakRes] = await Promise.all([
-        supabase
-          .from("attempts")
-          .select("question_id, is_correct, answered_at")
-          .eq("user_id", user.id)
-          .eq("skill", "grammar")
-          .eq("is_self_reported", false)
-          .order("answered_at", { ascending: false })
-          .limit(5000),
-        supabase
-          .from("topic_mastery")
-          .select("topic, strength")
-          .eq("user_id", user.id)
-          .lt("strength", WEAK_STRENGTH)
-          .neq("topic", "other"),
-      ]);
-      if (attemptsRes.error) {
-        setStats({ available: false, answered: 0, accuracy: null, weakTopics: 0, answeredIds: new Set() });
-        return;
-      }
-      const rows = attemptsRes.data ?? [];
-      const inWindow = rows.filter((r) => (r.answered_at as string) >= since);
-      const correct = inWindow.filter((r) => r.is_correct).length;
-      setStats({
-        available: true,
-        answered: rows.length,
-        accuracy: inWindow.length > 0 ? Math.round((100 * correct) / inWindow.length) : null,
-        weakTopics: (weakRes.data ?? []).length,
-        answeredIds: new Set(rows.map((r) => r.question_id as string)),
-      });
-    } catch {
-      setStats({ available: false, answered: 0, accuracy: null, weakTopics: 0, answeredIds: new Set() });
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
+  const { stats, reload: loadStats } = useSkillStats("grammar");
 
   const pool = useMemo(
     () => GRAMMAR_TASKS.filter((q) => level === "all" || q.level === level),
@@ -214,23 +155,13 @@ export default function GrammarPage() {
     setItems((prev) =>
       prev.map((it) => (it.clientAttemptId === item.clientAttemptId ? { ...it, save: "saving" } : it)),
     );
-    let ok = false;
-    try {
-      const res = await fetch("/api/attempts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          questionId: item.q.id,
-          selected: selectedOriginal,
-          timeSpentMs: item.timeSpentMs,
-          clientAttemptId: item.clientAttemptId,
-          source: "free_practice",
-        }),
-      });
-      ok = res.ok;
-    } catch {
-      ok = false;
-    }
+    const ok = await submitAttempt({
+      questionId: item.q.id,
+      selected: selectedOriginal,
+      source: "free_practice",
+      timeSpentMs: item.timeSpentMs,
+      clientAttemptId: item.clientAttemptId,
+    });
     setItems((prev) =>
       prev.map((it) =>
         it.clientAttemptId === item.clientAttemptId ? { ...it, save: ok ? "saved" : "failed" } : it,

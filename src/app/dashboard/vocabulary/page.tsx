@@ -6,6 +6,7 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { VOCABULARY } from "@/data/vocabulary";
 import { awardXp, XP } from "@/lib/xp";
+import { submitSelfReport } from "@/lib/attempts-client";
 import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
 
@@ -225,7 +226,15 @@ function Flashcards({ words, c, locale, onBack }: { words: Word[]; c: (typeof T)
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState(false);
 
-  function answer() {
+  function answer(known: boolean) {
+    // самооценка → attempts с is_self_reported = true: история есть,
+    // в точность и mastery не входит («я знаю» — мнение, не проверка)
+    void submitSelfReport({
+      itemId: deck[i].w,
+      known,
+      source: "free_practice",
+      clientAttemptId: crypto.randomUUID(),
+    });
     setRevealed(false);
     if (i + 1 >= deck.length) setDone(true);
     else setI((x) => x + 1);
@@ -262,9 +271,9 @@ function Flashcards({ words, c, locale, onBack }: { words: Word[]; c: (typeof T)
         <button type="button" onClick={() => setRevealed(true)} className="btn-primary mt-5 w-full rounded-full px-6 py-3 text-sm">{c.reveal}</button>
       ) : (
         <div className="mt-5 grid grid-cols-3 gap-2">
-          <button type="button" onClick={answer} className="rounded-full bg-[#16a34a]/12 px-3 py-3 text-sm font-semibold text-[#16a34a] transition-colors hover:bg-[#16a34a]/20">✅ {c.know}</button>
-          <button type="button" onClick={answer} className="rounded-full bg-[#f59e0b]/12 px-3 py-3 text-sm font-semibold text-[#d97706] transition-colors hover:bg-[#f59e0b]/20">🔄 {c.repeat}</button>
-          <button type="button" onClick={answer} className="rounded-full bg-[#dc2626]/12 px-3 py-3 text-sm font-semibold text-[#dc2626] transition-colors hover:bg-[#dc2626]/20">❌ {c.hard}</button>
+          <button type="button" onClick={() => answer(true)} className="rounded-full bg-[#16a34a]/12 px-3 py-3 text-sm font-semibold text-[#16a34a] transition-colors hover:bg-[#16a34a]/20">✅ {c.know}</button>
+          <button type="button" onClick={() => answer(false)} className="rounded-full bg-[#f59e0b]/12 px-3 py-3 text-sm font-semibold text-[#d97706] transition-colors hover:bg-[#f59e0b]/20">🔄 {c.repeat}</button>
+          <button type="button" onClick={() => answer(false)} className="rounded-full bg-[#dc2626]/12 px-3 py-3 text-sm font-semibold text-[#dc2626] transition-colors hover:bg-[#dc2626]/20">❌ {c.hard}</button>
         </div>
       )}
     </div>

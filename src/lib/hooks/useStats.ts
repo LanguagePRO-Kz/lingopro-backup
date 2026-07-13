@@ -15,13 +15,19 @@ import { LEVELS } from "@/data/types";
  * tables that actually exist in this project:
  *   - `daily_progress` (date, tasks[], completed/total) → streak, week, per-skill
  *     completed counts and words learned;
- *   - `task_results`   (skill, score, max_score)        → per-skill score %;
- *   - `profiles.quiz_result.level`                      → current CEFR level.
+ *   - `attempts` (append-only, Фаза 1) → reading/listening accuracy % —
+ *     ТОТ ЖЕ источник, куда разделы и план дня пишут ответы (один источник
+ *     правды); самооценка (is_self_reported) исключена;
+ *   - `task_results` (skill, score, max_score) → writing/speaking score % —
+ *     эти навыки ещё не пишут attempts (письмо — AI-ревью, голос — Фаза 2);
+ *     после их переезда убрать и этот остаток;
+ *   - `profiles.quiz_result.level` → current CEFR level.
  * The goal is the platform's fixed target (C1).
  *
  * Note: streak and the week strip are always "current" (period-independent).
- * The period selector filters the per-skill counts / words. Score % is all-time
- * because `task_results` has no reliable timestamp column.
+ * The period selector filters the per-skill counts / words and the
+ * reading/listening accuracy; writing/speaking score % is all-time because
+ * `task_results` has no reliable timestamp column.
  */
 
 export type Skill = "reading" | "listening" | "writing" | "speaking";
@@ -86,7 +92,7 @@ export function useStats(period: Period): StatsData {
         return;
       }
 
-      const [profileRes, daysRes, resultsRes] = await Promise.all([
+      const [profileRes, daysRes, resultsRes, attemptsRes] = await Promise.all([
         supabase.from("profiles").select("quiz_result, target_level").eq("id", user.id).maybeSingle(),
         supabase
           .from("daily_progress")
@@ -94,6 +100,14 @@ export function useStats(period: Period): StatsData {
           .eq("user_id", user.id)
           .order("date"),
         supabase.from("task_results").select("skill, score, max_score").eq("user_id", user.id),
+        supabase
+          .from("attempts")
+          .select("skill, is_correct, answered_at")
+          .eq("user_id", user.id)
+          .in("skill", ["reading", "listening"])
+          .eq("is_self_reported", false)
+          .order("answered_at", { ascending: false })
+          .limit(5000),
       ]);
 
       if (cancelled) return;
@@ -121,7 +135,22 @@ export function useStats(period: Period): StatsData {
         }
       }
 
-      // --- task_results → per-skill score % (all-time) ---
+      // --- attempts → reading/listening accuracy % за период ---
+      // тот же источник, куда пишут разделы и план дня; нет данных → null («—»)
+      const attemptAcc: Record<"reading" | "listening", { correct: number; n: number }> = {
+        reading: { correct: 0, n: 0 },
+        listening: { correct: 0, n: 0 },
+      };
+      for (const r of (attemptsRes.data as { skill: string; is_correct: boolean; answered_at: string }[] | null) ?? []) {
+        if ((r.answered_at ?? "") < from) continue;
+        const bucket = attemptAcc[r.skill as "reading" | "listening"];
+        if (!bucket) continue;
+        bucket.n += 1;
+        if (r.is_correct) bucket.correct += 1;
+      }
+
+      // --- task_results → writing/speaking score % (all-time) ---
+      // письмо/говорение ещё не пишут attempts (AI-ревью / Фаза 2)
       const acc: Record<Skill, { sum: number; n: number }> = {
         reading: { sum: 0, n: 0 }, listening: { sum: 0, n: 0 }, writing: { sum: 0, n: 0 }, speaking: { sum: 0, n: 0 },
       };
@@ -132,7 +161,9 @@ export function useStats(period: Period): StatsData {
       }
       const avg = (a: { sum: number; n: number }) => (a.n ? Math.round(a.sum / a.n) : null);
       const scores = {
-        reading: avg(acc.reading), listening: avg(acc.listening), writing: avg(acc.writing), speaking: avg(acc.speaking),
+        reading: attemptAcc.reading.n ? Math.round((100 * attemptAcc.reading.correct) / attemptAcc.reading.n) : null,
+        listening: attemptAcc.listening.n ? Math.round((100 * attemptAcc.listening.correct) / attemptAcc.listening.n) : null,
+        writing: avg(acc.writing), speaking: avg(acc.speaking),
       };
 
       // --- profile → level + goal progress (goal is the student's B2/C1 choice) ---

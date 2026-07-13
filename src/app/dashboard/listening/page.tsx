@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Аудирование (Фаза 1 P0-ядра): каждый ответ немедленно уходит в attempts
+ * через POST /api/attempts (правильность судит сервер); шапка показывает
+ * точность и число ответов из ТОГО ЖЕ источника. Чек-лист «X/80 пройдено»
+ * удалён. Галочка записи = все вопросы верны (сессия или история).
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
@@ -8,6 +15,8 @@ import { LISTENING_TASKS } from "@/data/listening-tasks";
 import AUDIO_MANIFEST from "@/data/listening-audio.json";
 import { shuffleQuestionMap } from "@/lib/shuffle";
 import { awardXp, XP } from "@/lib/xp";
+import { submitAttempt, type AttemptSaveStatus } from "@/lib/attempts-client";
+import { useSkillStats } from "@/lib/hooks/useSkillStats";
 import type { Level, ReadingTask } from "@/data/types";
 import { SectionBack } from "@/components/SectionBack";
 import { SectionHint } from "@/components/SectionHint";
@@ -37,10 +46,10 @@ function speakSeq(lines: string[], onEnd?: () => void) {
 }
 
 const T = {
-  ru: { title: "Тренировка аудирования", sub: "Слушай турецкую речь и отвечай на вопросы", back: "К списку", play: "Прослушать", playing: "Воспроизведение…", showText: "Показать текст", hideText: "Скрыть текст", correct: "Верно!", wrong: "Неверно", answer: "Правильный ответ", explanation: "Объяснение", questions: "вопросов", done: "пройдено", all: "Все", unfinished: "Непройденные", allLevels: "Все уровни", empty: "Нет записей по выбранным фильтрам." },
-  en: { title: "Listening practice", sub: "Listen to Turkish speech and answer", back: "To list", play: "Play audio", playing: "Playing…", showText: "Show transcript", hideText: "Hide transcript", correct: "Correct!", wrong: "Wrong", answer: "Correct answer", explanation: "Explanation", questions: "questions", done: "done", all: "All", unfinished: "Unfinished", allLevels: "All levels", empty: "No recordings match the selected filters." },
-  tr: { title: "Dinleme pratiği", sub: "Türkçe dinle ve soruları cevapla", back: "Listeye dön", play: "Dinle", playing: "Çalıyor…", showText: "Metni göster", hideText: "Metni gizle", correct: "Doğru!", wrong: "Yanlış", answer: "Doğru cevap", explanation: "Açıklama", questions: "soru", done: "tamamlandı", all: "Tümü", unfinished: "Tamamlanmamış", allLevels: "Tüm seviyeler", empty: "Seçilen filtrelere uygun kayıt yok." },
-  kk: { title: "Тыңдалым жаттығуы", sub: "Түрік тілін тыңда да жауап бер", back: "Тізімге", play: "Тыңдау", playing: "Ойнатылуда…", showText: "Мәтінді көрсету", hideText: "Мәтінді жасыру", correct: "Дұрыс!", wrong: "Қате", answer: "Дұрыс жауап", explanation: "Түсіндірме", questions: "сұрақ", done: "орындалды", all: "Барлығы", unfinished: "Орындалмаған", allLevels: "Барлық деңгей", empty: "Таңдалған сүзгілерге сай жазба жоқ." },
+  ru: { title: "Тренировка аудирования", sub: "Слушай турецкую речь и отвечай на вопросы", back: "К списку", play: "Прослушать", playing: "Воспроизведение…", showText: "Показать текст", hideText: "Скрыть текст", correct: "Верно!", wrong: "Неверно", answer: "Правильный ответ", explanation: "Объяснение", questions: "вопросов", accuracy: "Точность", answered: "отвечено", accuracyHint: "по ответам за 90 дней", noData: "—", saved: "сохранено", saving: "сохраняем…", saveFailed: "не сохранено", retry: "повторить", all: "Все", unfinished: "Непройденные", allLevels: "Все уровни", empty: "Нет записей по выбранным фильтрам." },
+  en: { title: "Listening practice", sub: "Listen to Turkish speech and answer", back: "To list", play: "Play audio", playing: "Playing…", showText: "Show transcript", hideText: "Hide transcript", correct: "Correct!", wrong: "Wrong", answer: "Correct answer", explanation: "Explanation", questions: "questions", accuracy: "Accuracy", answered: "answered", accuracyHint: "answers over 90 days", noData: "—", saved: "saved", saving: "saving…", saveFailed: "not saved", retry: "retry", all: "All", unfinished: "Unfinished", allLevels: "All levels", empty: "No recordings match the selected filters." },
+  tr: { title: "Dinleme pratiği", sub: "Türkçe dinle ve soruları cevapla", back: "Listeye dön", play: "Dinle", playing: "Çalıyor…", showText: "Metni göster", hideText: "Metni gizle", correct: "Doğru!", wrong: "Yanlış", answer: "Doğru cevap", explanation: "Açıklama", questions: "soru", accuracy: "Doğruluk", answered: "cevaplandı", accuracyHint: "son 90 günün cevapları", noData: "—", saved: "kaydedildi", saving: "kaydediliyor…", saveFailed: "kaydedilmedi", retry: "tekrar dene", all: "Tümü", unfinished: "Tamamlanmamış", allLevels: "Tüm seviyeler", empty: "Seçilen filtrelere uygun kayıt yok." },
+  kk: { title: "Тыңдалым жаттығуы", sub: "Түрік тілін тыңда да жауап бер", back: "Тізімге", play: "Тыңдау", playing: "Ойнатылуда…", showText: "Мәтінді көрсету", hideText: "Мәтінді жасыру", correct: "Дұрыс!", wrong: "Қате", answer: "Дұрыс жауап", explanation: "Түсіндірме", questions: "сұрақ", accuracy: "Дәлдік", answered: "жауап берілді", accuracyHint: "90 күндегі жауаптар бойынша", noData: "—", saved: "сақталды", saving: "сақталуда…", saveFailed: "сақталмады", retry: "қайталау", all: "Барлығы", unfinished: "Орындалмаған", allLevels: "Барлық деңгей", empty: "Таңдалған сүзгілерге сай жазба жоқ." },
 };
 
 export default function ListeningPage() {
@@ -51,23 +60,16 @@ export default function ListeningPage() {
   const [active, setActive] = useState<ReadingTask | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const shuffled = useMemo(() => shuffleQuestionMap(LISTENING_TASKS.flatMap((t) => t.questions)), []);
+  const { stats, reload } = useSkillStats("listening");
 
+  // запись «пройдена» = все вопросы верны в сессии ИЛИ когда-либо (история)
   const isDone = useMemo(
-    () => (t: ReadingTask) => t.questions.every((q) => answers[q.id] === shuffled[q.id].answer),
-    [answers, shuffled],
+    () => (t: ReadingTask) =>
+      t.questions.every(
+        (q) => answers[q.id] === shuffled[q.id].answer || stats?.correctIds.has(q.id),
+      ),
+    [answers, shuffled, stats],
   );
-  const doneCount = useMemo(() => LISTENING_TASKS.filter(isDone).length, [isDone]);
-
-  // award XP once per listening exercise the first time it's fully answered correctly
-  const awarded = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    for (const t of LISTENING_TASKS) {
-      if (!awarded.current.has(t.id) && isDone(t)) {
-        awarded.current.add(t.id);
-        void awardXp("listening_test", XP.LISTENING_TEST, { dedupKey: `listening:${t.id}`, metadata: { taskId: t.id, level: t.level } });
-      }
-    }
-  }, [isDone]);
 
   const list = useMemo(
     () =>
@@ -79,7 +81,20 @@ export default function ListeningPage() {
     [level, onlyUnfinished, isDone],
   );
 
-  if (active) return <Player ex={active} c={c} answers={answers} setAnswers={setAnswers} shuffled={shuffled} onBack={() => setActive(null)} />;
+  if (active)
+    return (
+      <Player
+        ex={active}
+        c={c}
+        answers={answers}
+        setAnswers={setAnswers}
+        shuffled={shuffled}
+        onBack={() => {
+          setActive(null);
+          void reload();
+        }}
+      />
+    );
 
   return (
     <div>
@@ -87,9 +102,21 @@ export default function ListeningPage() {
       <SectionHint id="listening" />
       <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">{c.sub}</p>
-      <div className="mt-2 text-sm text-[var(--color-muted)]">
-        <span className="font-semibold text-[var(--color-brand)]">{doneCount}</span> / {LISTENING_TASKS.length} {c.done}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-muted)]">
+        <span>
+          {c.accuracy}:{" "}
+          <span className="font-semibold text-[var(--color-brand)]">
+            {stats?.accuracy != null ? `${stats.accuracy}%` : c.noData}
+          </span>
+        </span>
+        <span>
+          {c.answered}:{" "}
+          <span className="font-semibold text-[var(--color-foreground)]">
+            {stats?.available ? stats.answered : c.noData}
+          </span>
+        </span>
       </div>
+      <div className="mt-0.5 text-[11px] text-[var(--color-muted)]">{c.accuracyHint}</div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <FilterBtn active={level === "all"} onClick={() => setLevel("all")}>{c.allLevels}</FilterBtn>
@@ -121,6 +148,8 @@ export default function ListeningPage() {
 function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingTask; c: (typeof T)["ru"]; answers: Record<string, number>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, number>>>; shuffled: Shuffled; onBack: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [showText, setShowText] = useState(false);
+  const [saves, setSaves] = useState<Record<string, { status: AttemptSaveStatus; attemptId: string; original: number }>>({});
+  const [xpAwarded, setXpAwarded] = useState(false);
   const mounted = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lines = useMemo(() => ex.text.split("\n").filter(Boolean), [ex.text]);
@@ -161,6 +190,32 @@ function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingT
     speakSeq(lines, () => mounted.current && setPlaying(false));
   }
 
+  async function persist(qid: string, original: number, attemptId: string) {
+    setSaves((s) => ({ ...s, [qid]: { status: "saving", attemptId, original } }));
+    const ok = await submitAttempt({
+      questionId: qid,
+      selected: original,
+      source: "free_practice",
+      clientAttemptId: attemptId,
+    });
+    setSaves((s) => ({ ...s, [qid]: { status: ok ? "saved" : "failed", attemptId, original } }));
+  }
+
+  function answerQuestion(qid: string, oi: number) {
+    if (answers[qid] !== undefined) return;
+    const next = { ...answers, [qid]: oi };
+    setAnswers(next);
+    const original = ex.questions
+      .find((q) => q.id === qid)!
+      .options.indexOf(shuffled[qid].options[oi]);
+    void persist(qid, original, crypto.randomUUID());
+    // все вопросы записи верны в этой сессии → XP (как раньше; дедуп по ключу)
+    if (!xpAwarded && ex.questions.every((q) => next[q.id] === shuffled[q.id].answer)) {
+      setXpAwarded(true);
+      void awardXp("listening_test", XP.LISTENING_TEST, { dedupKey: `listening:${ex.id}`, metadata: { taskId: ex.id, level: ex.level } });
+    }
+  }
+
   return (
     <div>
       <button type="button" onClick={onBack} className="text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)]">← {c.back}</button>
@@ -190,6 +245,7 @@ function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingT
         {ex.questions.map((q) => {
           const sel = answers[q.id];
           const answered = sel !== undefined;
+          const save = saves[q.id];
           return (
             <div key={q.id} className="glass rounded-2xl p-5">
               <div className="text-sm font-semibold text-[var(--color-foreground)]">{q.question}</div>
@@ -199,7 +255,7 @@ function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingT
                   if (answered && oi === shuffled[q.id].answer) cls = "border-[#16a34a] bg-[#16a34a]/[0.08]";
                   else if (answered && oi === sel) cls = "border-[#dc2626] bg-[#dc2626]/[0.06]";
                   return (
-                    <button key={oi} type="button" disabled={answered} onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))} className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all disabled:cursor-default ${cls}`}>
+                    <button key={oi} type="button" disabled={answered} onClick={() => answerQuestion(q.id, oi)} className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all disabled:cursor-default ${cls}`}>
                       {opt}
                     </button>
                   );
@@ -211,6 +267,19 @@ function Player({ ex, c, answers, setAnswers, shuffled, onBack }: { ex: ReadingT
                     {sel === shuffled[q.id].answer ? <span className="text-[#16a34a]">✅ {c.correct}</span> : <span className="text-[#dc2626]">❌ {c.wrong} · {c.answer}: {shuffled[q.id].options[shuffled[q.id].answer]}</span>}
                   </div>
                   <p className="mt-1 leading-relaxed text-[var(--color-muted)]">{q.explanation}</p>
+                  {/* честный статус сохранения: несохранённое не «есть» */}
+                  <div className="mt-1.5">
+                    {save?.status === "saved" && <span className="text-[#16a34a]">✓ {c.saved}</span>}
+                    {save?.status === "saving" && <span className="text-[var(--color-muted)]">{c.saving}</span>}
+                    {save?.status === "failed" && (
+                      <span className="text-[#dc2626]">
+                        ⚠️ {c.saveFailed}{" "}
+                        <button type="button" onClick={() => void persist(q.id, save.original, save.attemptId)} className="font-semibold underline underline-offset-2">
+                          {c.retry}
+                        </button>
+                      </span>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </div>

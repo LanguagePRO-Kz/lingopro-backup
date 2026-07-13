@@ -9,6 +9,7 @@ import { useTTS } from "@/hooks/useTTS";
 import type { Question, VocabWord } from "@/data/types";
 import { SKILL_META, skillLabel, type DailyTask } from "@/lib/daily-plan";
 import { resolveTaskContent, type TaskContent } from "@/lib/task-content";
+import { submitAttempt, submitSelfReport, type AttemptSaveStatus } from "@/lib/attempts-client";
 
 type Result = { score: number; maxScore: number; answers: unknown };
 
@@ -19,6 +20,7 @@ const T = {
     doneTitle: "Готово!", correctOf: "правильных", closeConfirm: "Прогресс задания не сохранится. Закрыть?",
     showTranslation: "Показать перевод", know: "Знаю ✓", learning: "Учу ✗", example: "Пример",
     vocabResult: "Выучено", onReview: "на повторении",
+    attemptSaved: "сохранено", attemptSaving: "сохраняем…", attemptFailed: "не сохранено", attemptRetry: "повторить",
     play: "▶ Прослушать", pause: "⏸ Пауза", again: "🔄 Ещё раз", slower: "🐢 Медленнее",
     listening: "🎧 Слушайте внимательно…", showTranscript: "📝 Показать транскрипт", hideTranscript: "📝 Скрыть транскрипт",
     ttsUnsupported: "⚠️ Ваш браузер не поддерживает озвучку. Откройте в Chrome для аудио.",
@@ -31,6 +33,7 @@ const T = {
     doneTitle: "Done!", correctOf: "correct", closeConfirm: "Your progress won't be saved. Close?",
     showTranslation: "Show translation", know: "Know ✓", learning: "Learning ✗", example: "Example",
     vocabResult: "Learned", onReview: "to review",
+    attemptSaved: "saved", attemptSaving: "saving…", attemptFailed: "not saved", attemptRetry: "retry",
     play: "▶ Play", pause: "⏸ Pause", again: "🔄 Again", slower: "🐢 Slower",
     listening: "🎧 Listen carefully…", showTranscript: "📝 Show transcript", hideTranscript: "📝 Hide transcript",
     ttsUnsupported: "⚠️ Your browser doesn't support audio. Open in Chrome for sound.",
@@ -43,6 +46,7 @@ const T = {
     doneTitle: "Tamam!", correctOf: "doğru", closeConfirm: "İlerlemen kaydedilmeyecek. Kapatılsın mı?",
     showTranslation: "Çeviriyi göster", know: "Biliyorum ✓", learning: "Öğreniyorum ✗", example: "Örnek",
     vocabResult: "Öğrenildi", onReview: "tekrar için",
+    attemptSaved: "kaydedildi", attemptSaving: "kaydediliyor…", attemptFailed: "kaydedilmedi", attemptRetry: "tekrar dene",
     play: "▶ Dinle", pause: "⏸ Duraklat", again: "🔄 Tekrar", slower: "🐢 Daha yavaş",
     listening: "🎧 Dikkatle dinle…", showTranscript: "📝 Metni göster", hideTranscript: "📝 Metni gizle",
     ttsUnsupported: "⚠️ Tarayıcın sesi desteklemiyor. Ses için Chrome'da aç.",
@@ -55,6 +59,7 @@ const T = {
     doneTitle: "Дайын!", correctOf: "дұрыс", closeConfirm: "Прогресс сақталмайды. Жабылсын ба?",
     showTranslation: "Аударманы көрсету", know: "Білемін ✓", learning: "Үйренемін ✗", example: "Мысал",
     vocabResult: "Үйренілді", onReview: "қайталауға",
+    attemptSaved: "сақталды", attemptSaving: "сақталуда…", attemptFailed: "сақталмады", attemptRetry: "қайталау",
     play: "▶ Тыңдау", pause: "⏸ Кідірту", again: "🔄 Қайта", slower: "🐢 Баяуырақ",
     listening: "🎧 Мұқият тыңда…", showTranscript: "📝 Транскриптті көрсету", hideTranscript: "📝 Транскриптті жасыру",
     ttsUnsupported: "⚠️ Браузерің дыбысты қолдамайды. Дыбыс үшін Chrome-да аш.",
@@ -187,6 +192,8 @@ function MCFlow({ content, c, onComplete }: { content: MCContent; c: C; onComple
   const [correct, setCorrect] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [finished, setFinished] = useState(false);
+  // сохранение ответа в attempts: честный статус на текущем шаге + ретрай
+  const [save, setSave] = useState<{ status: AttemptSaveStatus; attemptId: string; original: number } | null>(null);
 
   if (!steps.length) {
     // no content resolved → let the student mark it done anyway
@@ -206,13 +213,30 @@ function MCFlow({ content, c, onComplete }: { content: MCContent; c: C; onComple
   const s = steps[step];
   const isLast = step + 1 >= steps.length;
 
+  async function persist(questionId: string, original: number, attemptId: string) {
+    setSave({ status: "saving", attemptId, original });
+    const ok = await submitAttempt({
+      questionId,
+      selected: original,
+      source: "daily_plan",
+      clientAttemptId: attemptId,
+    });
+    setSave((cur) =>
+      cur?.attemptId === attemptId ? { status: ok ? "saved" : "failed", attemptId, original } : cur,
+    );
+  }
+
   function check() {
     if (selected === null) return;
     setChecked(true);
     if (selected === s.answer) setCorrect((n) => n + 1);
     setAnswers((a) => [...a, selected]);
+    // по-вопросная запись в attempts (перетасованный индекс → оригинальный)
+    const original = s.q.options.indexOf(s.options[selected]);
+    void persist(s.q.id, original, crypto.randomUUID());
   }
   function next() {
+    setSave(null);
     if (isLast) setFinished(true);
     else {
       setStep((n) => n + 1);
@@ -270,6 +294,23 @@ function MCFlow({ content, c, onComplete }: { content: MCContent; c: C; onComple
             </div>
             <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.explanation}</div>
             <p className="mt-1 text-sm leading-relaxed text-[var(--color-foreground)]">{s.q.explanation}</p>
+            {/* честный статус сохранения ответа: несохранённое не «есть» */}
+            <div className="mt-2 text-[11px]">
+              {save?.status === "saved" && <span className="text-[#16a34a]">✓ {c.attemptSaved}</span>}
+              {save?.status === "saving" && <span className="text-[var(--color-muted)]">{c.attemptSaving}</span>}
+              {save?.status === "failed" && (
+                <span className="text-[#dc2626]">
+                  ⚠️ {c.attemptFailed}{" "}
+                  <button
+                    type="button"
+                    onClick={() => save && void persist(s.q.id, save.original, save.attemptId)}
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    {c.attemptRetry}
+                  </button>
+                </span>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -385,6 +426,13 @@ function VocabFlow({ content, c, onComplete }: { content: Extract<TaskContent, {
   const total = initial.length;
 
   function answer(isKnown: boolean) {
+    // самооценка → attempts с is_self_reported = true (в mastery не входит)
+    void submitSelfReport({
+      itemId: w.word,
+      known: isKnown,
+      source: "daily_plan",
+      clientAttemptId: crypto.randomUUID(),
+    });
     if (isKnown) setKnown((n) => n + 1);
     else {
       setReview((n) => n + 1);
