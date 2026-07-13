@@ -33,9 +33,20 @@ if (!url || !key) {
   process.exit(1);
 }
 
-console.log(`БД: ${new URL(url).host}`);
-console.log(`Пересборка topic_mastery из attempts для ${userId}…`);
+async function main() {
+  console.log(`БД: ${new URL(url).host}`);
+  console.log(`Пересборка topic_mastery из attempts для ${userId}…`);
 
-const db = createClient(url, key, { auth: { persistSession: false } });
-const { topics } = await recomputeAllMastery(db, userId);
-console.log(topics.length > 0 ? `Пересчитаны темы (${topics.length}): ${topics.join(", ")}` : "У пользователя нет попыток с темами — нечего пересчитывать.");
+  const db = createClient(url, key, { auth: { persistSession: false } });
+  const { topics } = await recomputeAllMastery(db, userId);
+  console.log(
+    topics.length > 0
+      ? `Пересчитаны темы (${topics.length}): ${topics.join(", ")}`
+      : "У пользователя нет попыток с темами — нечего пересчитывать.",
+  );
+}
+
+main().catch((e) => {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+});

@@ -173,6 +173,30 @@ console.log("\nШтраф за AI-ошибки:");
   check("пол нуля: 0 − штраф не уходит в минус", floor.mode === "stats" && floor.strength === 0, JSON.stringify(floor));
 }
 
+/* --------- владение sparse-строкой (поймано живым прогоном 13.07) ---------- */
+
+console.log("\nВладение sparse-строкой topic_mastery:");
+{
+  // доступ к внутренней сборке через recomputeAllMastery невозможен без БД —
+  // проверяем контракт через исходник: keepExisting требует hasAiEvidence
+  const src = readFileSync("src/lib/attempts.ts", "utf8");
+  check(
+    "sparse сохраняет существующую строку ТОЛЬКО при следе посева/AI (hasAiEvidence)",
+    src.includes('res.mode === "sparse" && b.existing != null && b.hasAiEvidence'),
+  );
+  check(
+    "наличие AI-следа определяется по error_events за всю историю, не за окно штрафа",
+    src.includes("hasAiEvidence: allErrors.length > 0"),
+  );
+  // сама seed-формула: 1 верная + 1 неверная = 50+8−12 = 46, ошибка не исчезает
+  const mixed = computeStrength([attempt(true, 0), attempt(false, 0)], [], NOW);
+  check(
+    "строка, рождённая попытками: 1 верная + 1 ошибка → seed 46 (ошибка видна)",
+    mixed.mode === "sparse" && mixed.seedStrength === 46,
+    JSON.stringify(mixed),
+  );
+}
+
 /* -------------- самооценка: фильтруется ДО расчёта (по контракту) ----------- */
 
 console.log("\nСамооценка (is_self_reported):");

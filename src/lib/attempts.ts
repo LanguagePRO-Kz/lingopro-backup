@@ -52,7 +52,7 @@ export function weightedAccuracy(attempts: AttemptForMastery[], nowMs: number): 
 export type StrengthResult =
   /** ≥3 попыток: статистика правит, strength применяется всегда */
   | { mode: "stats"; strength: number }
-  /** <3 попыток: strength применяется ТОЛЬКО при создании новой строки */
+  /** <3 попыток: seed применяется, если строкой не владеет посев/AI-поток */
   | { mode: "sparse"; seedStrength: number };
 
 /**
@@ -101,6 +101,8 @@ type TopicBundle = {
   attempts: AttemptForMastery[]; // окно, cap, без self-reported, свежие первыми
   aiErrors: AiErrorForMastery[];
   existing: MasteryRow | null;
+  /** есть error_events по теме (за всю историю) — тему трогал посев/AI */
+  hasAiEvidence: boolean;
 };
 
 function buildMasteryUpsert(
@@ -110,8 +112,6 @@ function buildMasteryUpsert(
   nowMs: number,
 ): Record<string, unknown> | null {
   const res = computeStrength(b.attempts, b.aiErrors, nowMs);
-  // <3 попыток и строка уже есть: strength принадлежит посеву/AI-потоку,
-  // попытки лишь отмечают практику — обновляем даты, не оценку
   if (res.mode === "sparse" && b.existing == null && b.attempts.length === 0) return null;
 
   const correct = b.attempts.filter((a) => a.isCorrect).length;
@@ -121,8 +121,11 @@ function buildMasteryUpsert(
   const maxIso = (a: string | null, b2: string | null) =>
     a && b2 ? (a > b2 ? a : b2) : (a ?? b2);
 
-  // sparse + строка существует: strength и счётчиками владеет посев/AI-поток
-  const keepExisting = res.mode === "sparse" && b.existing != null;
+  // sparse: если тему трогал посев диагностики / AI-поток (след — error_events),
+  // strength и счётчиками владеет он; строку, рождённую самими попытками,
+  // честно пересчитываем (иначе первая же ошибка исчезала из счётчиков —
+  // поймано живым прогоном 13.07)
+  const keepExisting = res.mode === "sparse" && b.existing != null && b.hasAiEvidence;
   const strength =
     res.mode === "stats" ? res.strength : keepExisting ? b.existing!.strength : res.seedStrength;
 
@@ -160,12 +163,14 @@ export async function recomputeTopicMastery(
         .gte("answered_at", isoDaysAgo(nowMs, MASTERY_WINDOW_DAYS))
         .order("answered_at", { ascending: false })
         .limit(MASTERY_ATTEMPTS_CAP),
+      // вся история: свежие (окно штрафа) считаем в коде, само наличие —
+      // признак, что темой владеет посев/AI-поток
       supabase
         .from("error_events")
-        .select("severity")
+        .select("severity, created_at")
         .eq("user_id", userId)
         .eq("topic", topic)
-        .gte("created_at", isoDaysAgo(nowMs, AI_PENALTY_WINDOW_DAYS)),
+        .limit(500),
       supabase
         .from("topic_mastery")
         .select("strength, success_count, error_count, last_error_at, last_practiced_at")
@@ -174,15 +179,18 @@ export async function recomputeTopicMastery(
         .maybeSingle(),
     ]);
 
+    const penaltySince = isoDaysAgo(nowMs, AI_PENALTY_WINDOW_DAYS);
+    const allErrors = errorsRes.data ?? [];
     const bundle: TopicBundle = {
       attempts: (attemptsRes.data ?? []).map((r) => ({
         isCorrect: r.is_correct as boolean,
         answeredAt: r.answered_at as string,
       })),
-      aiErrors: (errorsRes.data ?? []).map((r) => ({
-        severity: r.severity === "major" ? "major" : "minor",
-      })),
+      aiErrors: allErrors
+        .filter((r) => (r.created_at as string) >= penaltySince)
+        .map((r) => ({ severity: r.severity === "major" ? "major" : "minor" })),
       existing: (existingRes.data as MasteryRow | null) ?? null,
+      hasAiEvidence: allErrors.length > 0,
     };
 
     const row = buildMasteryUpsert(userId, topic, bundle, nowMs);
@@ -218,9 +226,9 @@ export async function recomputeAllMastery(
       .limit(5000),
     supabase
       .from("error_events")
-      .select("topic, severity")
+      .select("topic, severity, created_at")
       .eq("user_id", userId)
-      .gte("created_at", isoDaysAgo(nowMs, AI_PENALTY_WINDOW_DAYS)),
+      .limit(2000),
     supabase
       .from("topic_mastery")
       .select("topic, strength, success_count, error_count, last_error_at, last_practiced_at")
@@ -232,16 +240,21 @@ export async function recomputeAllMastery(
     const t = r.topic as string;
     let b = byTopic.get(t);
     if (!b) {
-      b = { attempts: [], aiErrors: [], existing: null };
+      b = { attempts: [], aiErrors: [], existing: null, hasAiEvidence: false };
       byTopic.set(t, b);
     }
     if (b.attempts.length < MASTERY_ATTEMPTS_CAP) {
       b.attempts.push({ isCorrect: r.is_correct as boolean, answeredAt: r.answered_at as string });
     }
   }
+  const penaltySince = isoDaysAgo(nowMs, AI_PENALTY_WINDOW_DAYS);
   for (const r of errorsRes.data ?? []) {
     const b = byTopic.get(r.topic as string);
-    if (b) b.aiErrors.push({ severity: r.severity === "major" ? "major" : "minor" });
+    if (!b) continue;
+    b.hasAiEvidence = true;
+    if ((r.created_at as string) >= penaltySince) {
+      b.aiErrors.push({ severity: r.severity === "major" ? "major" : "minor" });
+    }
   }
   for (const r of existingRes.data ?? []) {
     const b = byTopic.get(r.topic as string);
