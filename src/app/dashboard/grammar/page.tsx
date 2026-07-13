@@ -280,10 +280,14 @@ export default function GrammarPage() {
           </span>
         </span>
         <span>
-          {c.answered}: <span className="font-semibold text-[var(--color-foreground)]">{stats?.answered ?? c.noData}</span>
+          {c.answered}:{" "}
+          <span className="font-semibold text-[var(--color-foreground)]">
+            {stats?.available ? stats.answered : c.noData}
+          </span>
         </span>
         <span>
-          {c.weak}: <span className="font-semibold text-[#d97706]">{stats ? stats.weakTopics : c.noData}</span>
+          {c.weak}:{" "}
+          <span className="font-semibold text-[#d97706]">{stats?.available ? stats.weakTopics : c.noData}</span>
         </span>
       </div>
       <div className="mt-0.5 text-[11px] text-[var(--color-muted)]">{c.accuracyHint}</div>
