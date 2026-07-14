@@ -19,7 +19,9 @@ export type AiTask =
   | "diagnostic_analysis"
   | "voice_review"
   | "route_plan"
-  | "motivator_note"; // daily one-liner from Ahu on the dashboard
+  | "motivator_note" // daily one-liner from Ahu on the dashboard
+  | "task_gen" // генератор заданий (Фаза 7.5) — фоновый, не в запросе юзера
+  | "task_qa"; // «злой экзаменатор»: ДРУГОЙ провайдер судит сгенерированное
 
 export type AiProvider = "anthropic" | "deepseek";
 export type FeedbackLang = "ru" | "en" | "tr" | "kk";
@@ -38,6 +40,10 @@ const TASK_MODELS: Record<AiTask, ModelChoice> = {
   writing_review: DEEPSEEK_PRO,
   diagnostic_analysis: DEEPSEEK_PRO,
   motivator_note: DEEPSEEK_PRO, // 1 short line/day — the cheap path
+  // генерация и QA НАМЕРЕННО у разных провайдеров: модель, написавшая
+  // задание, уверена в его корректности — судит другая (Фаза 7.5)
+  task_gen: SONNET,
+  task_qa: DEEPSEEK_PRO,
 };
 
 // Language quality beats price here: writing is capped at 3/day anyway.
@@ -48,9 +54,13 @@ const LANG_OVERRIDES: Partial<Record<AiTask, Partial<Record<FeedbackLang, ModelC
 };
 
 /** When the primary provider fails or returns garbage, retry once here. */
+// anthropic → DeepSeek добавлен 15.07.2026: на живом прогоне Anthropic
+// ответил «credit balance is too low» — без фолбэка чат Ahu, голосовой
+// разбор и роуты падали бы молча до пополнения баланса. При живом
+// Anthropic ничего не меняется (фолбэк срабатывает только на сбое).
 export const FALLBACK: Record<AiProvider, ModelChoice | null> = {
   deepseek: SONNET,
-  anthropic: null,
+  anthropic: DEEPSEEK_PRO,
 };
 
 export function resolveModel(task: AiTask, lang?: FeedbackLang): ModelChoice {

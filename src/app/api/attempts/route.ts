@@ -209,7 +209,31 @@ export async function POST(req: Request) {
   }
 
   /* --------------------------- проверяемый ответ -------------------------- */
-  const q = typeof body.questionId === "string" ? QUESTION_BANK.get(body.questionId) : undefined;
+  // gen:<uuid> — сгенерированное задание (Фаза 7.5): банк живёт в БД,
+  // судим по одобренной строке (rejected студентам не отдаётся RLS-ом)
+  let q = typeof body.questionId === "string" ? QUESTION_BANK.get(body.questionId) : undefined;
+  if (!q && typeof body.questionId === "string" && body.questionId.startsWith("gen:")) {
+    const genId = body.questionId.slice(4);
+    if (UUID_RE.test(genId)) {
+      const { data: gen } = await supabase
+        .from("generated_tasks")
+        .select("id, skill, level, topic, payload, status")
+        .eq("id", genId)
+        .eq("status", "approved")
+        .maybeSingle();
+      const p = (gen?.payload ?? null) as { question?: string; options?: string[]; correctAnswer?: number } | null;
+      if (gen && p && Array.isArray(p.options) && Number.isInteger(p.correctAnswer)) {
+        q = {
+          id: `gen:${gen.id}`,
+          options: p.options,
+          correctAnswer: p.correctAnswer as number,
+          skill: gen.skill as BankEntry["skill"],
+          level: gen.level as string,
+          topic: (gen.topic as string) ?? null,
+        };
+      }
+    }
+  }
   const selected = body.selected;
   if (
     !q ||
