@@ -26,6 +26,7 @@ import {
   sectionTimeLimit,
   type ExamFormatSlug,
 } from "@/lib/exam/format";
+import { STRATEGIES, STRATEGY_DISCLAIMER } from "@/data/strategies";
 
 /**
  * Mock runner (UX audit #9) — honest TÖMER format from the reviewed content
@@ -58,6 +59,7 @@ const T = {
     vNoPromise: "Пороги этого экзамена плавающие (Modern Test Theory) — конкретный балл обещать нельзя. Работай по слабейшей секции.",
     vUnclear: "Выше провальной черты, но порог этого сертификата центр не публикует — уточни в своём центре.",
     vBelowMin: (m: number) => `❌ ниже минимума ${m}/25`,
+    stratTitle: "Стратегии сдачи",
   },
   en: {
     title: "TÖMER mock exam", sub: "Exam format: 4 sections, each scored out of 25. Original tasks — AI-generated and continuously improved.",
@@ -81,6 +83,7 @@ const T = {
     vNoPromise: "This exam's thresholds float (Modern Test Theory) — no score promise. Work on your weakest section.",
     vUnclear: "Above the failing line, but the centre doesn't publish this certificate's threshold — confirm with your centre.",
     vBelowMin: (m: number) => `❌ below the ${m}/25 minimum`,
+    stratTitle: "Passing strategies",
   },
   tr: {
     title: "TÖMER Deneme Sınavı", sub: "Sınav formatı: 4 bölüm, her biri 25 üzerinden. Özgün görevler — yapay zekâ üretir, sürekli iyileştirilir.",
@@ -104,6 +107,7 @@ const T = {
     vNoPromise: "Bu sınavın eşikleri değişkendir (Modern Test Theory) — puan sözü verilemez. En zayıf bölümüne çalış.",
     vUnclear: "Başarısızlık çizgisinin üstünde, ancak merkez bu sertifikanın eşiğini yayımlamıyor — merkezinden doğrula.",
     vBelowMin: (m: number) => `❌ ${m}/25 asgarisinin altında`,
+    stratTitle: "Geçiş stratejileri",
   },
   kk: {
     title: "Сынақ TÖMER", sub: "Емтихан форматы: 4 бөлім, әрқайсысы 25 ұпайдан. Тапсырмалар төл — AI жасайды және үнемі жетілдіріледі.",
@@ -127,6 +131,7 @@ const T = {
     vNoPromise: "Бұл емтиханның шектері өзгермелі (Modern Test Theory) — нақты балл уәде етілмейді. Ең әлсіз бөліміңмен жұмыс істе.",
     vUnclear: "Құлау сызығынан жоғары, бірақ орталық бұл сертификаттың шегін жарияламайды — өз орталығыңнан нақтыла.",
     vBelowMin: (m: number) => `❌ ${m}/25 минимумынан төмен`,
+    stratTitle: "Тапсыру стратегиялары",
   },
 };
 
@@ -766,6 +771,31 @@ export default function MockPage() {
         </div>
 
         <p className="mt-4 text-[11px] text-[var(--color-muted)]">{c.sourceOriginal}</p>
+      </div>
+
+      {/* стратегии сдачи (7.6): тактики, которые отрабатываются на этих же
+          пробниках с реальным таймером */}
+      <div className="glass mt-5 rounded-3xl p-6">
+        <h3 className="text-base font-semibold text-[var(--color-foreground)]">🧠 {c.stratTitle}</h3>
+        <div className="mt-3 flex flex-col gap-2">
+          {STRATEGIES.map((s) => (
+            <details key={s.id} className="group rounded-2xl border border-black/[0.07] bg-white p-4">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--color-foreground)]">
+                {s.emoji} {s.title[locale]}
+                <span className="float-right text-[var(--color-muted)] transition-transform group-open:rotate-180">▾</span>
+              </summary>
+              <ul className="mt-3 flex flex-col gap-2">
+                {s.tips[locale].map((tip, i) => (
+                  <li key={i} className="flex gap-2 text-sm leading-relaxed text-[var(--color-foreground)]">
+                    <span className="text-[var(--color-brand)]">·</span>
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--color-muted)]">{STRATEGY_DISCLAIMER[locale]}</p>
       </div>
     </div>
   );
