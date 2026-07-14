@@ -33,6 +33,9 @@ const T = {
     levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
     choosePlan: "Выберите план подготовки",
     discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
+    diagCtaTitle: "Сначала — бесплатная диагностика",
+    diagCtaBody: "Пройдите её, чтобы увидеть свой уровень и персональный план подготовки.",
+    diagCtaBtn: "Пройти диагностику",
     names: { "1m": "1 месяц", "3m": "3 месяца", "6m": "6 месяцев" } as Record<string, string>,
     save: (n: number) => `Экономия ${n}%`,
     saveMax: (n: number) => `Максимальная экономия — ${n}%`,
@@ -63,6 +66,9 @@ const T = {
     levels: (n: number) => (n === 1 ? "level" : "levels"),
     choosePlan: "Choose a prep plan",
     discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
+    diagCtaTitle: "Start with the free diagnostic",
+    diagCtaBody: "Take it to see your level and get a preparation plan built for you.",
+    diagCtaBtn: "Take the diagnostic",
     names: { "1m": "1 month", "3m": "3 months", "6m": "6 months" } as Record<string, string>,
     save: (n: number) => `Save ${n}%`,
     saveMax: (n: number) => `Maximum savings — ${n}%`,
@@ -93,6 +99,9 @@ const T = {
     levels: () => "seviye",
     choosePlan: "Bir hazırlık planı seç",
     discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
+    diagCtaTitle: "Önce ücretsiz seviye tespiti",
+    diagCtaBody: "Seviyeni görmek ve sana göre kurulan hazırlık planını almak için tespiti çöz.",
+    diagCtaBtn: "Seviye tespitine başla",
     names: { "1m": "1 ay", "3m": "3 ay", "6m": "6 ay" } as Record<string, string>,
     save: (n: number) => `%${n} tasarruf`,
     saveMax: (n: number) => `En yüksek tasarruf — %${n}`,
@@ -123,6 +132,9 @@ const T = {
     levels: () => "деңгей",
     choosePlan: "Дайындық жоспарын таңда",
     discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
+    diagCtaTitle: "Алдымен — тегін диагностика",
+    diagCtaBody: "Деңгейіңді біліп, өзіңе бейімделген дайындық жоспарын алу үшін диагностикадан өт.",
+    diagCtaBtn: "Диагностикадан өту",
     names: { "1m": "1 ай", "3m": "3 ай", "6m": "6 ай" } as Record<string, string>,
     save: (n: number) => `${n}% үнемдеу`,
     saveMax: (n: number) => `Ең көп үнемдеу — ${n}%`,
@@ -149,6 +161,9 @@ export default function PricingPage() {
 
   const router = useRouter();
   const [result, setResult] = useState<QuizResult | null>(null);
+  // «результата нет» утверждаем только ПОСЛЕ проверки обоих источников
+  // (localStorage + профиль) — иначе CTA диагностики мигает у прошедших
+  const [checked, setChecked] = useState(false);
   const [name, setName] = useState("");
   const [authed, setAuthed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -171,7 +186,8 @@ export default function PricingPage() {
             saveResult(profile.quiz_result);
           }
         }
-      });
+      })
+      .finally(() => setChecked(true));
   }, []);
 
   // pick a plan → checkout. Not authed yet? register first. Otherwise open
@@ -237,6 +253,18 @@ export default function PricingPage() {
             />
             <p className="text-base font-semibold text-white sm:text-lg">{c.discountBanner}</p>
           </motion.div>
+        )}
+
+        {/* честная деградация: диагностики нет → приглашение вместо белого
+            экрана (юзер бросил квиз / потерял интернет / пришёл напрямую) */}
+        {checked && !result && (
+          <div className="glass mt-5 rounded-2xl border border-[var(--color-brand)]/25 px-5 py-4">
+            <p className="text-base font-semibold text-[var(--color-foreground)]">🧭 {c.diagCtaTitle}</p>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">{c.diagCtaBody}</p>
+            <Link href="/quiz" className="btn-primary mt-3 inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+              {c.diagCtaBtn} →
+            </Link>
+          </div>
         )}
 
         {/* funnel message — authed user who just finished the diagnostic */}

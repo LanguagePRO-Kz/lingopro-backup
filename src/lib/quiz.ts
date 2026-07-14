@@ -296,6 +296,23 @@ export function levelIndex(level: Level): number {
 
 const RESULT_KEY = "lingopro:quizResult";
 
+/**
+ * Валидатор формы результата на ГРАНИЦАХ (localStorage, profiles.quiz_result).
+ * Битый/частичный объект = результата НЕТ (правило 1.3), а не «почти результат»:
+ * страницы обращаются к PLANS[result.plan].title и result.skills без защиты,
+ * и один неполный JSONB кладёт /pricing и /quiz/result белым экраном.
+ * Все 52 живых результата в проде эту форму проходят (проверено 14.07.2026).
+ */
+export function sanitizeResult(raw: unknown): QuizResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.level !== "string" || !LEVEL_ORDER.includes(r.level as Level)) return null;
+  if (typeof r.plan !== "string" || !(r.plan in PLANS)) return null;
+  if (typeof r.overall !== "number" || !Number.isFinite(r.overall)) return null;
+  if (!Array.isArray(r.skills)) return null;
+  return raw as QuizResult;
+}
+
 export function saveResult(r: QuizResult) {
   try {
     window.localStorage.setItem(RESULT_KEY, JSON.stringify(r));
@@ -307,7 +324,7 @@ export function saveResult(r: QuizResult) {
 export function loadResult(): QuizResult | null {
   try {
     const raw = window.localStorage.getItem(RESULT_KEY);
-    return raw ? (JSON.parse(raw) as QuizResult) : null;
+    return raw ? sanitizeResult(JSON.parse(raw)) : null;
   } catch {
     return null;
   }

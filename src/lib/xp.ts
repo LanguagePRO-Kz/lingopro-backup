@@ -69,6 +69,19 @@ export async function awardXp(
       ...(options.dedupKey ? { dedup_key: options.dedupKey } : {}),
     };
 
+    // once-only награда: сперва проверяем, не начислена ли уже — повторный
+    // insert бился об уникальный индекс и красил консоль 409-ом на каждом
+    // визите /quiz/result (данные были целы, но «ошибка» на странице продажи)
+    if (options.dedupKey) {
+      const { data: existing } = await supabase
+        .from("xp_events")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("metadata->>dedup_key", options.dedupKey)
+        .limit(1);
+      if (existing && existing.length > 0) return { ok: true };
+    }
+
     const { error } = await supabase.from("xp_events").insert({
       user_id: user.id,
       amount: Math.round(amount),
@@ -76,7 +89,8 @@ export async function awardXp(
       metadata,
     });
 
-    // 23505 = unique_violation → the once-only award already exists. Not an error.
+    // 23505 = unique_violation → гонка двух вкладок добежала до insert
+    // одновременно; награда уже существует — не ошибка
     if (error && error.code !== "23505") {
       console.error("[awardXp]", error);
       return { ok: false };

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeResult } from "@/lib/quiz";
 import DashboardShell from "./DashboardShell";
 
 /**
@@ -37,8 +38,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     .eq("id", user.id)
     .maybeSingle();
 
-  // воронка: без диагностики — на квиз (он бесплатный вход в продукт)
-  if (!profile?.quiz_result) redirect("/quiz");
+  // воронка: без диагностики — на квиз (он бесплатный вход в продукт);
+  // битый quiz_result = диагностики нет (страницы дашборда падают на нём)
+  if (!profile || !sanitizeResult(profile.quiz_result)) redirect("/quiz");
 
   const { active, trialMsLeft } = accessState(
     (profile.plan as string | null) ?? null,

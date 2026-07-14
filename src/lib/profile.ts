@@ -6,7 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
-import type { QuizResult } from "./quiz";
+import { sanitizeResult, type QuizResult } from "./quiz";
 import type { Progress } from "./studyplan";
 
 /** Daily study intensity chosen on first dashboard visit. */
@@ -38,7 +38,9 @@ export async function fetchProfile(): Promise<Profile | null> {
 
   return {
     plan: (data?.plan as string | null) ?? null,
-    quiz_result: (data?.quiz_result as QuizResult | null) ?? null,
+    // битый JSONB = результата нет — потребители (pricing, quiz/result,
+    // гидрация дашборда) не должны падать на неполной форме
+    quiz_result: sanitizeResult(data?.quiz_result),
     plan_progress: (data?.plan_progress as Progress | null) ?? {},
   };
 }
