@@ -40,6 +40,11 @@ async function main() {
   const base: Snap = {
     today: TODAY,
     timezone: null,
+    examFormatSlug: "tomer_generic",
+    readiness: { verdict: "no_data", total: null, knownCount: 0, sections: {}, weakestSection: null, belowMin: [], gapToPass: null },
+    skillAccuracy: {},
+    weakestSkill: null,
+    lastChatQuestion: null,
     name: "Dana",
     gender: "female",
     level: "A2",

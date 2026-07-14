@@ -33,6 +33,11 @@ const d = (n: number) => isoShift(TODAY, n); // d(-1) = вчера
 const snap = (over: Partial<StudentSnapshot> = {}): StudentSnapshot => ({
   today: TODAY,
   timezone: null,
+  examFormatSlug: "tomer_generic",
+  readiness: { verdict: "no_data", total: null, knownCount: 0, sections: {}, weakestSection: null, belowMin: [], gapToPass: null },
+  skillAccuracy: {},
+  weakestSkill: null,
+  lastChatQuestion: null,
   name: "Dana",
   gender: "female",
   level: "A2",
@@ -516,6 +521,55 @@ console.log("— валидатор фактов на выходе Ahu —");
     topics: [{ topic: "present_iyor", strength: 40, errorCount: 2, successCount: 1, lastErrorAt: null, lastPracticedAt: null, updatedAt: null }],
   });
   check("тема из истории проходит", validateAhuFacts({ text: "Şimdiki zaman (-yor) хромает — повторим.", contextStr: "ZAYIF KONULAR: Şimdiki zaman (-yor) — güç 40.", snapshot: sTopics, decision: decide(sTopics) }).ok);
+}
+
+/* ------------------ готовность к экзамену (Фаза 8.2) ------------------ */
+console.log("— готовность: главное число агента —");
+{
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { examReadiness, mergeSectionEstimates } = require("../src/lib/coach/readiness") as typeof import("../src/lib/coach/readiness");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { EXAM_FORMATS } = require("../src/lib/exam/format") as typeof import("../src/lib/exam/format");
+  const est = (d: number | null, o: number | null, y: number | null, k: number | null) => {
+    const mk = (score: number | null) => (score == null ? undefined : { score, source: "mock" as const, at: null });
+    return { dinleme: mk(d), okuma: mk(o), yazma: mk(y), konusma: mk(k) };
+  };
+
+  const g = EXAM_FORMATS.tomer_generic;
+  check("70/100 при пороге 60 → ready", examReadiness(g, est(20, 20, 15, 15)).verdict === "ready");
+  check("62/100 → borderline (одна секция качает)", examReadiness(g, est(16, 16, 15, 15)).verdict === "borderline");
+  const nr = examReadiness(g, est(13, 13, 12, 12));
+  check("50/100 → not_ready + разрыв 10", nr.verdict === "not_ready" && nr.gapToPass === 10);
+  check("нет ни одной оценки → no_data (не хвалим пустоту)", examReadiness(g, est(null, null, null, null)).verdict === "no_data");
+  check("3 из 4 секций при целых минимумах → no_data (частичной суммой не хвалим)", examReadiness(g, est(20, 20, 20, null)).verdict === "no_data");
+
+  const b = EXAM_FORMATS.tomer_bayburt;
+  const sink = examReadiness(b, est(24, 24, 23, 9));
+  check("Bayburt 80/100 с konusma 9 → not_ready (слабое звено)", sink.verdict === "not_ready" && sink.belowMin[0] === "konusma");
+  check("слабое звено топит уже по ЧАСТИЧНЫМ данным", examReadiness(b, est(null, null, null, 9)).verdict === "not_ready");
+  check("TYS → no_promise (балл не обещаем)", examReadiness(EXAM_FORMATS.tys, est(20, 20, 20, 20)).verdict === "no_promise");
+
+  const merged = mergeSectionEstimates({
+    mockRows: [
+      { section_scores: { okuma: 18 }, created_at: "2026-07-14T10:00:00Z" },
+      { section_scores: { okuma: 12, dinleme: 14 }, created_at: "2026-07-10T10:00:00Z" },
+    ],
+    diagnosticSections: { okuma: 5, yazma: 9 },
+    diagnosticAt: "2026-07-01T00:00:00Z",
+  });
+  check("merge: свежий мок бьёт старый и диагностику (okuma 18)", merged.okuma?.score === 18 && merged.okuma.source === "mock");
+  check("merge: диагностика заполняет дыры (yazma 9)", merged.yazma?.score === 9 && merged.yazma.source === "diagnostic");
+  check("merge: неизвестное остаётся неизвестным (konusma)", merged.konusma == null);
+
+  // контекст: блок HAZIRLIK доносит вердикт до модели
+  const sReady = snap({
+    readiness: { verdict: "not_ready", total: 50, knownCount: 4, sections: est(13, 13, 12, 12) as never, weakestSection: "konusma", belowMin: [], gapToPass: 10 },
+    weakestSkill: "speaking",
+    skillAccuracy: { speaking: { n: 12, pct: 40 } },
+  });
+  const ctxR = buildAhuContext(sReady, decide(sReady), "proactive");
+  check("контекст несёт SINAV HAZIRLIĞI + вердикт", ctxR.includes("SINAV HAZIRLIĞI") && ctxR.includes("BU HALİYLE GEÇMEZ"));
+  check("контекст несёт слабейший навык", ctxR.includes("EN ZAYIF BECERİ") && ctxR.includes("speaking"));
 }
 
 /* ---------------------------------- итог ---------------------------------- */

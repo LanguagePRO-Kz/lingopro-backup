@@ -59,6 +59,16 @@ export type StudentSnapshot = {
   /** IANA-таймзона профиля (null = не сохранена → UTC): все «вчера/N дней
    *  назад» по таймстампам считаются в сутках студента, не в UTC */
   timezone: string | null;
+  /** пресет формата экзамена ЕГО центра (lib/exam/format.ts) */
+  examFormatSlug: string;
+  /** готовность к экзамену — главное число агента (считает КОД, Фаза 8.2) */
+  readiness: import("./readiness").Readiness;
+  /** per-skill точность за 30д (только навыки с ≥5 попытками) */
+  skillAccuracy: Record<string, { n: number; pct: number }>;
+  /** слабейший навык по точности — агент бьёт сюда, не в среднее */
+  weakestSkill: string | null;
+  /** последняя реплика студента в чате — единая память каналов */
+  lastChatQuestion: { text: string; at: string } | null;
   name: string | null;
   gender: "female" | "male" | null;
   /** сырой уровень диагностики (A0..C1) */

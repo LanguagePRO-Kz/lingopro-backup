@@ -133,6 +133,35 @@ export function buildAhuContext(
   if (act.yesterdayPlan) opt(`DÜN: ${act.yesterdayPlan.done}/${act.yesterdayPlan.total} görev.`, 2);
   if (s.topicsClosed > 0) opt(`KAPANAN KONULAR: ${s.topicsClosed}.`, 2);
 
+  // — готовность к экзамену (Фаза 8.2): числа посчитал КОД, модель может
+  //   их только переформулировать; слабое звено — против минимума ЕГО центра
+  const r = s.readiness;
+  if (r && r.verdict !== "no_data") {
+    const secLine = (["dinleme", "okuma", "yazma", "konusma"] as const)
+      .map((id) => `${id} ${r.sections[id] != null ? `${r.sections[id]!.score}/25` : "veri yok"}`)
+      .join(", ");
+    const verdictTr = {
+      ready: "GEÇER görünüyor",
+      borderline: "SINIRDA — bir bölüm sonucu değiştirir",
+      not_ready: "BU HALİYLE GEÇMEZ",
+      no_promise: "eşikler değişken (TYS/MTT) — puan sözü VERME, bölümlere odaklan",
+      no_data: "",
+    }[r.verdict];
+    keep(
+      `SINAV HAZIRLIĞI (${s.examFormatSlug}): ${secLine}${r.total != null ? `; toplam ${r.total}/100` : ""}; karar: ${verdictTr}${
+        r.belowMin.length ? `; ASGARİNİN ALTINDA: ${r.belowMin.join(", ")} — zayıf halka sınavı batırır` : ""
+      }${r.weakestSection ? `; en zayıf bölüm: ${r.weakestSection}` : ""}${r.gapToPass ? `; geçmeye ${r.gapToPass} puan eksik` : ""}.`,
+    );
+  }
+  if (s.weakestSkill && s.skillAccuracy[s.weakestSkill]) {
+    const sk = s.skillAccuracy[s.weakestSkill];
+    opt(`EN ZAYIF BECERİ (son 30 gün): ${s.weakestSkill} — doğruluk %${sk.pct} (${sk.n} deneme).`, 2);
+  }
+  // единая память: бриф помнит, о чём студент спрашивал в чате
+  if (s.lastChatQuestion) {
+    opt(`SON SOHBETTE SORDUĞU (${agoTr(agoDays(s.lastChatQuestion.at, s.today, s.timezone))}): «${s.lastChatQuestion.text}»`, 3);
+  }
+
   // — слабые темы (топ-3)
   const weak = s.topics.filter((t) => t.topic !== "other" && t.strength < 60).slice(0, 3);
   if (weak.length) {

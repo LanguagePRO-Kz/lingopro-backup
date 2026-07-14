@@ -4,6 +4,7 @@ import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/ai/client";
 import { consumeQuota } from "@/lib/ai/quota";
 import { buildAhuContext, buildAhuSystem, buildSnapshot, decide } from "@/lib/coach";
+import { validateAhuFacts } from "@/lib/coach/validate";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -90,10 +91,11 @@ export async function POST(req: Request) {
   else messages.push({ role: "user", content: message });
 
   const decision = decide(snapshot);
+  const contextStr = buildAhuContext(snapshot, decision, "chat");
   const system = `${buildAhuSystem({ channel: "chat", lang, gender: snapshot.gender, level: snapshot.level })}
 
 --- ÖĞRENCİNİN GERÇEK VERİLERİ ---
-${buildAhuContext(snapshot, decision, "chat")}`;
+${contextStr}`;
 
   const result = await callAI({ task: "tutor_chat", feedbackLang: lang, system, messages, maxTokens: 1200 });
   if (!result?.text) {
@@ -101,6 +103,15 @@ ${buildAhuContext(snapshot, decision, "chat")}`;
     return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
   }
   const text = result.text.trim();
+
+  // валидатор фактов (8.4) и на чат-канале: числа диалога легальны (студент
+  // сам их называет) — «белый список» = контекст + вся переписка запроса
+  const dialogNumbers = messages.map((m) => m.content).join("\n");
+  const facts = validateAhuFacts({ text, contextStr: `${contextStr}\n${dialogNumbers}`, snapshot, decision });
+  if (!facts.ok) {
+    console.error(`[coach] chat failed fact-check (${facts.reason})`, quota.userId);
+    return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
+  }
 
   const admin = createAdminClient();
   if (admin) {
