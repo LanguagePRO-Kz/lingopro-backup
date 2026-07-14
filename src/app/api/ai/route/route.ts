@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { callAI, isConfigured } from "@/lib/ai";
 import { buildRoutePlanSystem, buildRoutePlanUserMessage } from "@/lib/ai/prompts/route-plan";
 import { consumeQuota } from "@/lib/ai/quota";
@@ -29,6 +30,10 @@ export async function POST(req: Request) {
   if (!checkRateLimit(`route:${clientKey(req)}`, 6, 60_000)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
+
+  // платная фича: подписка ДО квоты (P0-2)
+  const access = await requireActivePlan();
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   // session + 3/day, 10/month (src/lib/ai/limits.ts)
   const quota = await consumeQuota("route");

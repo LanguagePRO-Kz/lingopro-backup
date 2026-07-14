@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { GRAMMAR_TASKS } from "@/data/grammar-tasks";
 import { READING_TASKS } from "@/data/reading-tasks";
 import { LISTENING_TASKS } from "@/data/listening-tasks";
@@ -58,7 +59,7 @@ for (const t of LISTENING_TASKS) {
   }
 }
 
-const SOURCES = new Set(["free_practice", "daily_plan"]);
+const SOURCES = new Set(["free_practice", "daily_plan", "diagnostic"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: Request) {
@@ -93,6 +94,13 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
+
+  // диагностика — бесплатный вход в продукт (решение основателя, P0-2);
+  // остальные источники — только активная подписка/триал
+  if (source !== "diagnostic") {
+    const access = await requireActivePlan(supabase);
+    if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
+  }
 
   /* ------------------------- самооценка (словарь) ------------------------- */
   if (body.selfReport === true) {

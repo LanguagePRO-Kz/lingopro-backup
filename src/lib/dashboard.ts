@@ -53,6 +53,10 @@ export const CURRENT_WEEK = 3;
 export const PLAN_MONTHS: Record<PackageId, string> = { "1m": "1", "3m": "3", "6m": "6" };
 
 export function planBadge(plan: string | null, locale: Locale): string {
+  if (plan === "trial") {
+    const t: Loc = { ru: "Пробный доступ", en: "Trial access", tr: "Deneme erişimi", kk: "Сынақ қолжетімділік" };
+    return t[locale];
+  }
   const mo = plan ? PLAN_MONTHS[plan as PackageId] : undefined;
   if (!mo) return "Premium";
   const unit: Loc = { ru: "мес", en: "mo", tr: "ay", kk: "ай" };

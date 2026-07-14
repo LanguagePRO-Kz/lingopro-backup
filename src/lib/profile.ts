@@ -62,7 +62,9 @@ async function upsert(patch: Record<string, unknown>): Promise<boolean> {
   return !error;
 }
 
-export const saveProfilePlan = (plan: string) => upsert({ plan });
+// saveProfilePlan удалён (P0-2): plan/plan_expires_at пишет только сервер —
+// вебхук оплаты (grant.ts) и redeem_promo(); клиентская запись заблокирована
+// триггером profiles_protect_plan (миграция 0014).
 export const saveProfileResult = (quiz_result: QuizResult) => upsert({ quiz_result });
 export const saveProfileProgress = (plan_progress: Progress) => upsert({ plan_progress });
 

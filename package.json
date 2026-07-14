@@ -11,7 +11,8 @@
     "test:plan": "npx -y tsx scripts/test-plan-engine.ts",
     "test:voice": "npx -y tsx scripts/test-voice-review.ts",
     "test:coach": "npx -y tsx scripts/test-coach.ts",
-    "test:attempts": "npx -y tsx scripts/test-attempts.ts"
+    "test:attempts": "npx -y tsx scripts/test-attempts.ts",
+    "test:paywall": "npx -y tsx scripts/test-paywall.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

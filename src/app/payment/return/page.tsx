@@ -16,10 +16,7 @@ import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
-import { savePlan } from "@/lib/billing";
-import type { PackageId } from "@/lib/billing";
 
-const PKG_IDS = ["1m", "3m", "6m"];
 
 const T = {
   ru: {
@@ -100,7 +97,7 @@ function ReturnInner() {
       if (cancelled) return;
 
       if (paid) {
-        if (itemId && PKG_IDS.includes(itemId)) savePlan(itemId as PackageId); // локальный кэш гейта
+        // доступ уже выдан сервером (вебхук → grant.ts); кэшей гейта нет (P0-2)
         setState("done");
         const dest = itemId?.startsWith("vp") ? "/dashboard/speaking/live" : "/dashboard";
         setTimeout(() => (window.location.href = dest), 1500);

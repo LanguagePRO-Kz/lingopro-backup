@@ -1,9 +1,11 @@
 /**
  * Promo redemption — the ONLY promo path. Codes live in the `promo_codes`
  * table and are validated + consumed atomically by the `redeem_promo()` RPC
- * (block E1, migration 0002): one code per user, use-limited, expiry-aware.
+ * (0002, переписан в 0014): one code per user, use-limited, expiry-aware.
+ * Два типа кодов (P0-2): 'trial' — RPC САМ выдаёт доступ на N дней (клиент
+ * план не пишет никогда); 'discount' — % скидки к реальной оплате.
  * There is no client-side code list — the database is the single source of
- * truth. See supabase/migrations/0002_foundation.sql line ~503.
+ * truth.
  */
 import { createClient } from "@/lib/supabase/client";
 import type { PackageId } from "@/lib/billing";
@@ -15,23 +17,24 @@ export type PromoReason =
   | "expired"
   | "exhausted"
   | "wrong_package"
-  | "not_first_purchase";
+  | "not_first_purchase"
+  | "already_used"
+  | "trial_used"
+  | "already_active";
 
 export type PromoResult =
-  | { ok: true; discountPercent: number; alreadyRedeemed: boolean }
+  | { ok: true; kind: "trial"; trialDays: number }
+  | { ok: true; kind: "discount"; discountPercent: number }
   | { ok: false; reason: PromoReason | "error" };
 
 type RpcResponse = {
   ok: boolean;
-  reason?: PromoReason | "already_used";
+  reason?: PromoReason;
+  kind?: "trial" | "discount";
   discount_percent?: number;
+  trial_days?: number;
 };
 
-/**
- * Redeem `code` for `pkgId`. `already_used` is surfaced as success with
- * `alreadyRedeemed: true` — the user legitimately redeemed this code before,
- * so they keep the access it grants (idempotent from the caller's view).
- */
 export async function redeemPromo(code: string, pkgId: PackageId): Promise<PromoResult> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("redeem_promo", {
@@ -50,11 +53,11 @@ export async function redeemPromo(code: string, pkgId: PackageId): Promise<Promo
   }
 
   const res = data as RpcResponse | null;
-  if (res?.ok) {
-    return { ok: true, discountPercent: res.discount_percent ?? 0, alreadyRedeemed: false };
+  if (res?.ok && res.kind === "trial") {
+    return { ok: true, kind: "trial", trialDays: res.trial_days ?? 3 };
   }
-  if (res?.reason === "already_used") {
-    return { ok: true, discountPercent: 0, alreadyRedeemed: true };
+  if (res?.ok) {
+    return { ok: true, kind: "discount", discountPercent: res.discount_percent ?? 0 };
   }
   return { ok: false, reason: res?.reason ?? "error" };
 }

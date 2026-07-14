@@ -4,12 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useExam } from "@/lib/exam-context";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { loadPlan, type PackageId } from "@/lib/billing";
 import { contentLevel } from "@/lib/daily-plan";
 import { planBadge } from "@/lib/dashboard";
 import { PACE_CHOICES } from "@/lib/plan/feasibility";
 import { PlanVerdictCard } from "@/components/PlanVerdictCard";
-import { fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
+import { fetchProfile, fetchProfileLocation, saveProfileLocation } from "@/lib/profile";
 import { setOnboarded } from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase/client";
 import { daysToExam, fetchExamPlan, saveExamPlanToProfile, saveStudyMinutes, type ExamDateMode } from "@/lib/exam-plan";
@@ -103,7 +102,7 @@ export default function SettingsPage() {
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [saved, setSaved] = useState(false);
-  const [plan, setPlan] = useState<PackageId | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
 
   // exam plan (block D): real values from the profile, editable
   const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
@@ -120,7 +119,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setName(window.localStorage.getItem("lingopro:name") || "");
-    setPlan(loadPlan());
+    // пакет — из профиля БД (доступ решает сервер; localStorage-флага нет)
+    void fetchProfile().then((p) => setPlan((p?.plan as string | null) ?? null));
     let active = true;
     // the real account email — «student@lingopro.app» for everyone was a lie
     void createClient()

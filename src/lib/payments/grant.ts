@@ -114,14 +114,36 @@ export async function applyWebhookEvent(
     return { status: 200, body: { ok: true, paid: true, minutes: packMinutes } };
   }
 
-  /* ------------- пакет доступа → тот же флаг, что redeem_promo ------------- */
-  const { error: grantErr } = await admin.from("profiles").update({ plan: row.package_id }).eq("id", row.user_id);
+  /* --------------- пакет доступа → plan + срок (P0-2, 0014) --------------- */
+  const days = ACCESS_DAYS[row.package_id];
+  if (!days) {
+    console.error("[payments] unknown access package", row.package_id);
+    return { status: 500, body: { ok: false, reason: "grant_failed" } };
+  }
+  // продление стакается: остаток ОПЛАЧЕННОГО срока не сгорает; триал
+  // не продлевается, а заменяется платным сроком от «сейчас»
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("plan, plan_expires_at")
+    .eq("id", row.user_id)
+    .maybeSingle();
+  const nowMs = Date.now();
+  const currentMs = prof?.plan_expires_at ? Date.parse(prof.plan_expires_at as string) : 0;
+  const baseMs = prof?.plan && prof.plan !== "trial" && currentMs > nowMs ? currentMs : nowMs;
+  const expiresAt = new Date(baseMs + days * 86_400_000).toISOString();
+
+  const { error: grantErr } = await admin
+    .from("profiles")
+    .update({ plan: row.package_id, plan_expires_at: expiresAt })
+    .eq("id", row.user_id);
   if (grantErr) {
     console.error("[payments] grant failed", grantErr.message);
     return { status: 500, body: { ok: false, reason: "grant_failed" } };
   }
 
-  return { status: 200, body: { ok: true, paid: true } };
+  return { status: 200, body: { ok: true, paid: true, expiresAt } };
 }
 
 const VP_MINUTES: Record<string, number> = { vp30: 30, vp60: 60, vp120: 120 };
+/** Дни доступа по тарифу — источник срока plan_expires_at. */
+const ACCESS_DAYS: Record<string, number> = { "1m": 30, "3m": 90, "6m": 180 };

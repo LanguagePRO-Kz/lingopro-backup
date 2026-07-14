@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/ai/client";
 import { consumeQuota } from "@/lib/ai/quota";
@@ -42,6 +43,10 @@ export async function POST(req: Request) {
   if (!isConfigured("tutor_chat", lang)) {
     return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
   }
+
+  // платная фича: подписка ДО квоты — бесплатный не жжёт лимиты (P0-2)
+  const access = await requireActivePlan();
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   // квота ДО любых вставок: отбитый лимитом вопрос не должен осесть в истории
   const quota = await consumeQuota("tutor");

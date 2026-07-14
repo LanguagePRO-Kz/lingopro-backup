@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { callAI, isConfigured, type ChatMessage } from "@/lib/ai";
 import { consumeQuota } from "@/lib/ai/quota";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
@@ -74,6 +75,10 @@ export async function POST(req: Request) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const mode: Mode = body.mode ?? "free";
   const kind: Kind = body.kind ?? "chat";
+
+  // платная фича: подписка ДО квоты (P0-2)
+  const access = await requireActivePlan();
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   // session + server-side quota (30/day, 500/month — src/lib/ai/limits.ts)
   const quota = await consumeQuota("speaking");

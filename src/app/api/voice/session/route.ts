@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
@@ -93,6 +94,11 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
+
+  // платная фича (самые дорогие минуты): только активная подписка/триал.
+  // end/wrap НЕ гейтятся — биллинг-сеттл начатого урока обязан отработать.
+  const access = await requireActivePlan(supabase);
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   const [{ data: profile }, { data: weak }] = await Promise.all([
     supabase

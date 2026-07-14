@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import { consumeQuota } from "@/lib/ai/quota";
 import { buildAhuContext, buildAhuSystem, buildSnapshot, coachFallbackText, decide } from "@/lib/coach";
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
+
+  // платная фича: только активная подписка/триал (P0-2)
+  const access = await requireActivePlan(supabase);
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   const [snapshot, career] = await Promise.all([
     buildSnapshot(supabase, user.id, { kkNative: lang === "kk" }),

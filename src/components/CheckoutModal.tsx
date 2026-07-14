@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
-import { savePlan, type PackageId } from "@/lib/billing";
-import { saveProfilePlan } from "@/lib/profile";
+import type { PackageId } from "@/lib/billing";
 import { redeemPromo, type PromoReason } from "@/lib/promo";
 import { currencyFor, fmtMoney, planRow, type Currency } from "@/lib/pricing";
 
@@ -42,12 +41,13 @@ const T = {
     paying: "Открываем оплату…",
     payErr: "Не удалось открыть оплату — попробуй ещё раз.",
     payOff: "Оплата временно недоступна — попробуй чуть позже.",
+    paySoon: "Оплата скоро будет доступна",
     qrHint: "Отсканируй в приложении Kaspi:",
     promoQ: "Есть промокод?",
     promoPlaceholder: "Промокод",
     promoApply: "Применить",
     promoChecking: "Проверяем…",
-    promoGranted: "Промокод активирован! Открываем доступ…",
+    promoTrial: (n: number) => `Пробный доступ на ${n} дн. активирован! Открываем…`,
     promoSaved: (n: number) => `Скидка ${n}% применится к оплате.`,
     reasons: {
       not_found: "Промокод не найден",
@@ -55,6 +55,9 @@ const T = {
       exhausted: "Лимит промокода исчерпан",
       wrong_package: "Промокод не подходит к этому пакету",
       not_first_purchase: "Промокод только для первой покупки",
+      already_used: "Этот промокод уже был использован",
+      trial_used: "Пробный доступ уже был активирован раньше",
+      already_active: "У тебя уже есть активная подписка",
       unauthenticated: "Войди, чтобы применить промокод",
       error: "Не удалось проверить промокод — попробуй ещё раз",
     } as Record<PromoReason | "error", string>,
@@ -70,12 +73,13 @@ const T = {
     paying: "Opening checkout…",
     payErr: "Couldn't open checkout — please try again.",
     payOff: "Payments are temporarily unavailable — please try again later.",
+    paySoon: "Payments are coming soon",
     qrHint: "Scan in the Kaspi app:",
     promoQ: "Have a promo code?",
     promoPlaceholder: "Promo code",
     promoApply: "Apply",
     promoChecking: "Checking…",
-    promoGranted: "Promo code activated! Opening your access…",
+    promoTrial: (n: number) => `${n}-day trial activated! Opening your access…`,
     promoSaved: (n: number) => `A ${n}% discount will apply to your payment.`,
     reasons: {
       not_found: "Promo code not found",
@@ -83,6 +87,9 @@ const T = {
       exhausted: "This promo code has reached its limit",
       wrong_package: "This promo code doesn't apply to this package",
       not_first_purchase: "This promo code is for the first purchase only",
+      already_used: "This promo code was already used",
+      trial_used: "Your trial has already been activated before",
+      already_active: "You already have an active subscription",
       unauthenticated: "Sign in to apply the promo code",
       error: "Couldn't verify the promo code — try again",
     } as Record<PromoReason | "error", string>,
@@ -98,12 +105,13 @@ const T = {
     paying: "Ödeme açılıyor…",
     payErr: "Ödeme açılamadı — lütfen tekrar dene.",
     payOff: "Ödeme geçici olarak kullanılamıyor — lütfen daha sonra tekrar dene.",
+    paySoon: "Ödeme yakında kullanılabilir olacak",
     qrHint: "Kaspi uygulamasında tara:",
     promoQ: "Promosyon kodun var mı?",
     promoPlaceholder: "Promosyon kodu",
     promoApply: "Uygula",
     promoChecking: "Kontrol ediliyor…",
-    promoGranted: "Kod etkinleştirildi! Erişimin açılıyor…",
+    promoTrial: (n: number) => `${n} günlük deneme erişimi açıldı! Yönlendiriliyorsun…`,
     promoSaved: (n: number) => `Ödemene %${n} indirim uygulanacak.`,
     reasons: {
       not_found: "Kod bulunamadı",
@@ -111,6 +119,9 @@ const T = {
       exhausted: "Bu kod limitine ulaştı",
       wrong_package: "Bu kod bu pakete uygun değil",
       not_first_purchase: "Bu kod yalnızca ilk satın alma için",
+      already_used: "Bu kod zaten kullanıldı",
+      trial_used: "Deneme erişimi daha önce etkinleştirilmiş",
+      already_active: "Zaten aktif bir aboneliğin var",
       unauthenticated: "Kodu uygulamak için giriş yap",
       error: "Kod doğrulanamadı — tekrar dene",
     } as Record<PromoReason | "error", string>,
@@ -126,12 +137,13 @@ const T = {
     paying: "Төлем ашылуда…",
     payErr: "Төлемді ашу мүмкін болмады — қайталап көр.",
     payOff: "Төлем уақытша қолжетімсіз — сәлден соң қайталап көр.",
+    paySoon: "Төлем жақында қолжетімді болады",
     qrHint: "Kaspi қосымшасында сканерле:",
     promoQ: "Промокод бар ма?",
     promoPlaceholder: "Промокод",
     promoApply: "Қолдану",
     promoChecking: "Тексерілуде…",
-    promoGranted: "Промокод іске қосылды! Қолжетімділік ашылуда…",
+    promoTrial: (n: number) => `${n} күндік сынақ қолжетімділік ашылды! Ашылуда…`,
     promoSaved: (n: number) => `Төлеміңе ${n}% жеңілдік қолданылады.`,
     reasons: {
       not_found: "Промокод табылмады",
@@ -139,6 +151,9 @@ const T = {
       exhausted: "Промокодтың лимиті таусылды",
       wrong_package: "Бұл промокод бұл пакетке келмейді",
       not_first_purchase: "Бұл промокод тек алғашқы сатып алуға",
+      already_used: "Бұл промокод бұрын қолданылған",
+      trial_used: "Сынақ қолжетімділік бұрын іске қосылған",
+      already_active: "Сенде белсенді жазылым бар",
       unauthenticated: "Промокодты қолдану үшін кір",
       error: "Промокодты тексеру мүмкін болмады — қайталап көр",
     } as Record<PromoReason | "error", string>,
@@ -148,7 +163,7 @@ const T = {
 type PromoStatus =
   | { kind: "idle" }
   | { kind: "checking" }
-  | { kind: "granted" }
+  | { kind: "trial"; days: number }
   | { kind: "saved"; discount: number }
   | { kind: "error"; msg: string };
 
@@ -186,6 +201,24 @@ export function CheckoutModal({
   /* ------------------------------ оплата ------------------------------ */
   const [payState, setPayState] = useState<"idle" | "busy" | "off" | "error">("idle");
   const [qr, setQr] = useState<string | null>(null);
+
+  // доступность провайдера ДО клика: off → отключённая кнопка + честный
+  // текст «оплата скоро будет доступна» (старт на триалах, P0-2)
+  useEffect(() => {
+    let cancelled = false;
+    setPayState("idle");
+    fetch(`/api/payments/status?currency=${currency}`)
+      .then((r) => r.json())
+      .then((d: { ok: boolean; mode?: string }) => {
+        if (!cancelled && (!d.ok || d.mode === "off")) setPayState("off");
+      })
+      .catch(() => {
+        /* статус не узнали — кнопка живая, клик ответит честно */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currency]);
 
   async function payNow() {
     if (payState === "busy") return;
@@ -233,19 +266,18 @@ export function CheckoutModal({
       setPromo({ kind: "error", msg: c.reasons[res.reason] });
       return;
     }
-    // 100% (или уже активированный ранее код) — доступ открывается сразу;
-    // частичный код сохраняется и применится к оплате на сервере
-    if (res.discountPercent === 100 || res.alreadyRedeemed) {
-      setPromo({ kind: "granted" });
-      savePlan(pkgId);
-      await saveProfilePlan(pkgId);
+    // триал: доступ уже выдан СЕРВЕРОМ (redeem_promo, security definer) —
+    // клиент план не пишет никогда, просто идёт в дашборд
+    if (res.kind === "trial") {
+      setPromo({ kind: "trial", days: res.trialDays });
       router.push("/dashboard");
       return;
     }
+    // скидка сохранена на сервере и применится к оплате
     setPromo({ kind: "saved", discount: res.discountPercent });
   }
 
-  const promoBusy = promo.kind === "checking" || promo.kind === "granted";
+  const promoBusy = promo.kind === "checking" || promo.kind === "trial";
 
   return (
     <motion.div
@@ -309,16 +341,16 @@ export function CheckoutModal({
           </div>
         </div>
 
-        {/* оплатить */}
+        {/* оплатить: провайдер off → отключённая кнопка + честный текст */}
         <button
           type="button"
           onClick={payNow}
-          disabled={payState === "busy"}
+          disabled={payState === "busy" || payState === "off"}
           className="btn-primary mt-4 w-full rounded-full px-6 py-4 text-base font-semibold disabled:opacity-60"
         >
           {payState === "busy" ? c.paying : c.pay(priceLabel)}
         </button>
-        {payState === "off" && <div className="mt-2 text-center text-xs font-medium text-[#b45309]">⏳ {c.payOff}</div>}
+        {payState === "off" && <div className="mt-2 text-center text-xs font-medium text-[#b45309]">⏳ {c.paySoon}</div>}
         {payState === "error" && <div className="mt-2 text-center text-xs font-medium text-[#dc2626]">❌ {c.payErr}</div>}
         {qr && (
           <div className="mt-3 rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4 text-center">
@@ -360,7 +392,7 @@ export function CheckoutModal({
           </button>
         </div>
         {promo.kind === "error" && <div className="mt-2 text-xs font-medium text-[#dc2626]">❌ {promo.msg}</div>}
-        {promo.kind === "granted" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoGranted}</div>}
+        {promo.kind === "trial" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoTrial(promo.days)}</div>}
         {promo.kind === "saved" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoSaved(promo.discount)}</div>}
       </motion.div>
     </motion.div>

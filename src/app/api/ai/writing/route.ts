@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActivePlan } from "@/lib/access";
 import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import { recordErrors } from "@/lib/ai/mastery";
 import {
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
   if (!isConfigured("writing_review", lang)) {
     return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
   }
+
+  // платная фича: подписка ДО квоты (P0-2)
+  const access = await requireActivePlan();
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   // session + 3/day, 60/month (src/lib/ai/limits.ts)
   const quota = await consumeQuota("writing");
