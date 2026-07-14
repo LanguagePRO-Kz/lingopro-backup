@@ -8,6 +8,7 @@
  * теперь общее для всех каналов.
  */
 
+import { dateInTimezone } from "@/lib/ai/limits";
 import { topicById } from "@/lib/ai/topics";
 import type { CoachChannel, CoachDecision, CoachState, StudentSnapshot } from "./types";
 import { activityOf, daysBetween } from "./states";
@@ -17,8 +18,11 @@ export const MAX_CONTEXT_CHARS = 1800;
 
 const trLabel = (id: string) => topicById(id)?.label.tr ?? id;
 
-const agoDays = (ts: string | null | undefined, today: string): number | null =>
-  ts ? Math.max(0, daysBetween(ts.slice(0, 10), today)) : null;
+/** «N дней назад» в СУТКАХ СТУДЕНТА: и таймстамп, и today — в его таймзоне.
+ *  Прежний срез UTC-строки подписывал ночную работу (00:00–05:00 по Алматы)
+ *  вчерашним днём. */
+const agoDays = (ts: string | null | undefined, today: string, tz: string | null): number | null =>
+  ts ? Math.max(0, daysBetween(dateInTimezone(ts, tz), today)) : null;
 
 const agoTr = (n: number | null): string =>
   n == null ? "" : n === 0 ? "bugün" : n === 1 ? "dün" : `${n} gün önce`;
@@ -140,24 +144,29 @@ export function buildAhuContext(
 
   // — свежие ошибки (топ-3): чат ссылается на РЕАЛЬНЫЕ ошибки студента
   for (const e of s.recentErrors.slice(0, 3)) {
-    opt(`HATA (${agoTr(agoDays(e.createdAt, s.today))}, ${e.source}): «${e.quote}» → «${e.correction}» [${trLabel(e.topic)}]`, 4);
+    opt(`HATA (${agoTr(agoDays(e.createdAt, s.today, s.timezone))}, ${e.source}): «${e.quote}» → «${e.correction}» [${trLabel(e.topic)}]`, 4);
   }
 
   // — последний голосовой урок и mock
   if (s.lastVoice?.endedAt) {
+    // «hatasız» ТОЛЬКО при существующем ревью (правило 1.3): без ревью
+    // errorCount=0 значит «данных нет», не «без ошибок» — прежняя версия
+    // рождала боевое враньё «SON SESLİ DERS: konu kaydı yok, hatasız»
+    const reviewBits =
+      s.lastVoice.criteriaTotal != null
+        ? `${s.lastVoice.errorCount ? `, ${s.lastVoice.errorCount} hata` : ", hatasız"}, değerlendirme ${s.lastVoice.criteriaTotal}/20`
+        : ", yazılı değerlendirme YOK (hata verisi yok — 'hatasız' DEME)";
     opt(
-      `SON SESLİ DERS (${agoTr(agoDays(s.lastVoice.endedAt, s.today))}, ${s.lastVoice.minutes} dk): ${
+      `SON SESLİ DERS (${agoTr(agoDays(s.lastVoice.endedAt, s.today, s.timezone))}, ${s.lastVoice.minutes} dk): ${
         s.lastVoice.topicsWorked.length ? s.lastVoice.topicsWorked.map(trLabel).join(", ") : "konu kaydı yok"
-      }${s.lastVoice.errorCount ? `, ${s.lastVoice.errorCount} hata` : ", hatasız"}${
-        s.lastVoice.criteriaTotal != null ? `, değerlendirme ${s.lastVoice.criteriaTotal}/20` : ""
-      }.`,
+      }${reviewBits}.`,
       5,
     );
   }
   if (s.lastMock?.total != null) {
     const delta =
       s.prevMock?.total != null ? ` (önceki ${s.prevMock.total}, ${s.lastMock.total - s.prevMock.total >= 0 ? "+" : ""}${s.lastMock.total - s.prevMock.total})` : "";
-    opt(`SON DENEME (${agoTr(agoDays(s.lastMock.createdAt, s.today))}): ${s.lastMock.total}/100${delta}.`, 5);
+    opt(`SON DENEME (${agoTr(agoDays(s.lastMock.createdAt, s.today, s.timezone))}): ${s.lastMock.total}/100${delta}.`, 5);
   }
 
   // — решение ядра (всегда)

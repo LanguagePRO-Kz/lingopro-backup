@@ -11,7 +11,7 @@ import { pick } from "@/lib/localized";
 import { NAV, activeNav, planBadge } from "@/lib/dashboard";
 import { trialLeftLabel } from "@/lib/trial";
 import { createClient } from "@/lib/supabase/client";
-import { fetchProfile } from "@/lib/profile";
+import { fetchProfile, syncProfileTimezone } from "@/lib/profile";
 import { saveResult } from "@/lib/quiz";
 import { saveProgress } from "@/lib/studyplan";
 import { peekToday } from "@/lib/daily-plan";
@@ -137,6 +137,8 @@ export default function DashboardShell({
       const full = (u.user_metadata?.full_name as string) || u.email || "";
       setUser({ name: full, email: u.email ?? "", avatar: (u.user_metadata?.avatar_url as string) ?? null });
       if (full) setName(full);
+      // таймзона: «сегодня» Ahu и квот должно совпадать с сутками студента
+      void syncProfileTimezone();
       const profile = await fetchProfile();
       if (!active) return;
       if (profile?.quiz_result) saveResult(profile.quiz_result);

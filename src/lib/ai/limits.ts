@@ -48,14 +48,25 @@ export function userMonthBudgetUsd(referenceDay: Date, purchasedMinutes = 0): nu
 
 /** Current date (YYYY-MM-DD) in the user's timezone — per-user midnight reset. */
 export function todayInTimezone(tz?: string | null): string {
+  return dateInTimezone(new Date(), tz);
+}
+
+/**
+ * Календарная дата (YYYY-MM-DD) момента `at` в таймзоне юзера. Датировать
+ * таймстампы срезом UTC-строки нельзя: активность в 01:30 ночи по Алматы
+ * (UTC+5) — это ещё «вчера» по UTC, и Ahu честную сегодняшнюю работу
+ * подписывала «dün» (правило 1.3).
+ */
+export function dateInTimezone(at: Date | string, tz?: string | null): string {
+  const d = typeof at === "string" ? new Date(at) : at;
   try {
     return new Intl.DateTimeFormat("en-CA", {
       timeZone: tz || "UTC",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).format(new Date());
+    }).format(d);
   } catch {
-    return new Date().toISOString().slice(0, 10); // unknown tz string → UTC
+    return d.toISOString().slice(0, 10); // unknown tz string → UTC
   }
 }

@@ -7,9 +7,11 @@
  * Run: npm run test:coach   (npx tsx scripts/test-coach.ts)
  */
 
+import { dateInTimezone } from "../src/lib/ai/limits";
 import { detectStates, isoShift, daysBetween } from "../src/lib/coach/states";
 import { decide, shouldHintReplan } from "../src/lib/coach/decide";
 import { buildAhuContext, MAX_CONTEXT_CHARS } from "../src/lib/coach/context";
+import { validateAhuFacts } from "../src/lib/coach/validate";
 import { coachFallbackText } from "../src/lib/coach/templates";
 import { buildAhuSystem, matchesFeedbackLang } from "../src/lib/coach/persona";
 import { computeTitle, titleCongratsText, TITLES, TOPICS_PER_LEVEL, type CareerStats } from "../src/lib/coach/titles";
@@ -30,6 +32,7 @@ const d = (n: number) => isoShift(TODAY, n); // d(-1) = вчера
 
 const snap = (over: Partial<StudentSnapshot> = {}): StudentSnapshot => ({
   today: TODAY,
+  timezone: null,
   name: "Dana",
   gender: "female",
   level: "A2",
@@ -470,6 +473,49 @@ console.log("— эволюция тона Ahu по уровню —");
   check("A1-чат: язык интерфейса строг", a1.includes("Türkçe sadece örnek ve alıntılarda"));
   const proC1 = buildAhuSystem({ channel: "proactive", lang: "ru", level: "C1" });
   check("бриф C1: строгость языка сохранена (страж не ломается)", proC1.includes("Türkçe yazdıysan"));
+}
+
+/* --------------------- честность фактов (Фаза 3) --------------------- */
+console.log("— таймзона: «вчера» в сутках студента —");
+{
+  // 2026-07-13T20:30 UTC = 2026-07-14 01:30 по Алматы (UTC+5)
+  check("ночная работа Алматы — сегодня, не «вчера»", dateInTimezone("2026-07-13T20:30:00Z", "Asia/Almaty") === "2026-07-14");
+  check("та же метка по UTC — прошлые сутки", dateInTimezone("2026-07-13T20:30:00Z", null) === "2026-07-13");
+  check("битая таймзона → UTC, не краш", dateInTimezone("2026-07-13T20:30:00Z", "Not/AZone") === "2026-07-13");
+
+  // context: пустое ревью урока НЕ превращается в «hatasız»
+  const sNoReview = snap({
+    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 3, topicsWorked: [], errorCount: 0, criteriaTotal: null },
+  });
+  const ctxNoReview = buildAhuContext(sNoReview, decide(sNoReview), "proactive");
+  check("урок без ревью: «değerlendirme YOK», не «hatasız»", ctxNoReview.includes("değerlendirme YOK") && !ctxNoReview.includes(", hatasız"));
+  const sClean = snap({
+    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 5, topicsWorked: ["present_iyor"], errorCount: 0, criteriaTotal: 15 },
+  });
+  const ctxClean = buildAhuContext(sClean, decide(sClean), "proactive");
+  check("урок с чистым ревью: «hatasız» честен", ctxClean.includes("hatasız") && ctxClean.includes("15/20"));
+}
+
+console.log("— валидатор фактов на выходе Ahu —");
+{
+  const emptySnap = snap(); // пустая история (NEWBIE)
+  const ctx = "PLAN: tempo 45 dk/gün.";
+  const v = (text: string, s = emptySnap, c = ctx) => validateAhuFacts({ text, contextStr: c, snapshot: s, decision: decide(s) });
+
+  check("выдуманное число → фолбэк («13 заданий» из воздуха)", !v("Ты сделал 13 заданий, отлично!").ok);
+  check("число из контекста проходит", v("Сегодня по плану 45 минут — начнём.").ok);
+  check("малые числа (стилистика) проходят", v("Сделай 2-3 предложения для начала.").ok);
+  check("отсылка к прошлому при пустой истории → фолбэк", !v("Вчера ты хорошо поработал!").ok);
+  check("«dün» при пустой истории → фолбэк", !v("Dün iyi çalıştın!").ok);
+  check("чистый текст без прошлого проходит", v("Начнём с малого — первый шаг сегодня.").ok);
+
+  const withHistory = snap({ days: [{ date: d(-1), done: 3, total: 5 }] });
+  check("с историей «вчера» разрешено", validateAhuFacts({ text: "Вчера ты сделал 3 задания из 5.", contextStr: "DÜN: 3/5 görev.", snapshot: withHistory, decision: decide(withHistory) }).ok);
+
+  const sTopics = snap({
+    topics: [{ topic: "present_iyor", strength: 40, errorCount: 2, successCount: 1, lastErrorAt: null, lastPracticedAt: null, updatedAt: null }],
+  });
+  check("тема из истории проходит", validateAhuFacts({ text: "Şimdiki zaman (-yor) хромает — повторим.", contextStr: "ZAYIF KONULAR: Şimdiki zaman (-yor) — güç 40.", snapshot: sTopics, decision: decide(sTopics) }).ok);
 }
 
 /* ---------------------------------- итог ---------------------------------- */

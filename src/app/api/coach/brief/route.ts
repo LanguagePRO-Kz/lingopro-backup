@@ -4,6 +4,7 @@ import { callAI, isConfigured, type FeedbackLang } from "@/lib/ai";
 import { consumeQuota } from "@/lib/ai/quota";
 import { buildAhuContext, buildAhuSystem, buildSnapshot, coachFallbackText, decide } from "@/lib/coach";
 import { matchesFeedbackLang } from "@/lib/coach/persona";
+import { validateAhuFacts } from "@/lib/coach/validate";
 import { buildCareerStats, computeTitle, titleById, titleCongratsText, titleFactsTr } from "@/lib/coach/titles";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -72,10 +73,13 @@ export async function POST(req: Request) {
   const upgraded = !!earned && (!stored || earned.rank > stored.rank);
   const display = upgraded ? earned : stored && earned && earned.rank < stored.rank ? stored : (earned ?? stored ?? null);
 
-  const respond = (text: string, source: "ai" | "cached" | "template") =>
+  // persisted=false — заметка НЕ легла в память Ahu (видимый факт для
+  // клиента и админ-вкладки «Сломанное», а не только строка в логе)
+  const respond = (text: string, source: "ai" | "cached" | "template", persisted = true) =>
     NextResponse.json({
       text,
       source,
+      persisted,
       state: decision.state.id,
       action: decision.action,
       actionTopic: decision.actionTopic,
@@ -131,10 +135,11 @@ export async function POST(req: Request) {
     return sameLang ? respond(sameLang.content, "cached") : template();
   }
 
+  const contextStr = `${buildAhuContext(snapshot, decision, "proactive")}${upgraded && earned ? `\n${titleFactsTr(earned, career.stats)}` : ""}`;
   const system = `${buildAhuSystem({ channel: "proactive", lang, gender: snapshot.gender, level: snapshot.level })}
 
 --- ÖĞRENCİNİN GERÇEK VERİLERİ ---
-${buildAhuContext(snapshot, decision, "proactive")}${upgraded && earned ? `\n${titleFactsTr(earned, career.stats)}` : ""}`;
+${contextStr}`;
 
   const LANG_TR: Record<FeedbackLang, string> = { ru: "RUSÇA", en: "İNGİLİZCE", tr: "TÜRKÇE", kk: "KAZAKÇA" };
   const ask = (content: string) =>
@@ -155,7 +160,20 @@ ${buildAhuContext(snapshot, decision, "proactive")}${upgraded && earned ? `\n${t
     text = result?.text?.trim();
     if (text && !matchesFeedbackLang(text, lang)) text = undefined;
   }
-  if (!text) return template();
+  // валидатор ФАКТОВ (Фаза 3.1): темы/числа/время против снапшота — не
+  // прошло → честный шаблон. Квота сожжена — цена честности, зато не врём.
+  if (text) {
+    const facts = validateAhuFacts({ text, contextStr, snapshot, decision });
+    if (!facts.ok) {
+      console.error(`[coach] brief failed fact-check (${facts.reason}), falling back to template`, user.id);
+      text = undefined;
+    }
+  }
+  if (!text) {
+    // AI сжёг квоту без результата (null/язык/факты) — видно в логах, а не тихо
+    console.error("[coach] brief AI produced no usable text, quota burned", user.id);
+    return template();
+  }
 
   const meta: ProactiveMeta & Record<string, unknown> = {
     day_key: effectiveKey,
@@ -174,19 +192,27 @@ ${buildAhuContext(snapshot, decision, "proactive")}${upgraded && earned ? `\n${t
     content: text,
     meta,
   });
+  let persisted = !insErr;
   if (insErr) {
     if (insErr.code === "23505") {
       // гонка (две вкладки) или смена языка в течение дня: строка этого
       // day_key уже существует — обновляем содержимое, а не плодим строки
-      await admin
+      const { error: updErr } = await admin
         .from("coach_messages")
         .update({ content: text, meta })
         .eq("user_id", user.id)
         .eq("channel", "proactive")
         .eq("meta->>day_key", effectiveKey);
+      persisted = !updErr;
+      if (updErr) console.error("[coach] brief persist failed on update:", updErr.message, user.id);
+    } else if (insErr.code === "23503") {
+      // FK: юзер удалён между auth-проверкой и insert (AI-генерация растягивает
+      // окно на десятки секунд — e2e-уборка одноразовых юзеров или удаление
+      // аккаунта с открытой вкладкой). Памяти у этого юзера уже не будет.
+      console.error("[coach] brief persist failed: user deleted mid-request", user.id);
     } else {
-      console.error("[coach] brief persist failed:", insErr.message);
+      console.error("[coach] brief persist failed:", insErr.code, insErr.message, user.id);
     }
   }
-  return respond(text, "ai");
+  return respond(text, "ai", persisted);
 }

@@ -78,6 +78,30 @@ export const saveProfileProgress = (plan_progress: Progress) => upsert({ plan_pr
 export const saveProfileLocation = (city: string | null, country: string | null) =>
   upsert({ city, country });
 
+/**
+ * Синхронизация таймзоны профиля с браузером. До этого timezone не писал
+ * НИКТО (0 из 57 профилей в проде на 14.07.2026) — «сегодня» всех юзеров
+ * считалось по UTC, и Ahu подписывала ночную работу Казахстана (00:00–05:00
+ * локального) вчерашним днём. Пишем только при реальном расхождении.
+ */
+export async function syncProfileTimezone(): Promise<void> {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz) return;
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+    if (!data || data.timezone === tz) return;
+    const { error } = await supabase.from("profiles").update({ timezone: tz }).eq("id", user.id);
+    if (error) console.error("[profile] timezone sync failed:", error.message);
+  } catch {
+    /* Intl/сеть недоступны — не критично, следующий заход попробует снова */
+  }
+}
+
 /** Read the current user's city/country (error-tolerant — returns nulls if the columns don't exist yet). */
 export async function fetchProfileLocation(): Promise<{ city: string | null; country: string | null }> {
   const supabase = createClient();

@@ -56,6 +56,9 @@ export type SnapshotVoice = {
 export type StudentSnapshot = {
   /** YYYY-MM-DD в таймзоне студента — единственное «сегодня» ядра */
   today: string;
+  /** IANA-таймзона профиля (null = не сохранена → UTC): все «вчера/N дней
+   *  назад» по таймстампам считаются в сутках студента, не в UTC */
+  timezone: string | null;
   name: string | null;
   gender: "female" | "male" | null;
   /** сырой уровень диагностики (A0..C1) */

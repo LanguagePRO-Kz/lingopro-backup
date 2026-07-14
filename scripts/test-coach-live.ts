@@ -39,6 +39,7 @@ async function main() {
   const d = (n: number) => isoShift(TODAY, n);
   const base: Snap = {
     today: TODAY,
+    timezone: null,
     name: "Dana",
     gender: "female",
     level: "A2",

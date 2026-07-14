@@ -177,6 +177,9 @@ export async function buildSnapshot(
 
   return {
     today,
+    // таймзона нужна потребителям, датирующим таймстампы («вчера/сегодня»
+    // считается в сутках СТУДЕНТА, не в UTC — правило 1.3)
+    timezone: (profile?.timezone as string | null) ?? null,
     name: (profile?.full_name as string | null) ?? (profile?.handle as string | null) ?? null,
     gender: (genderRow?.gender as "female" | "male" | null) ?? null,
     level,
