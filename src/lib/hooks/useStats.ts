@@ -104,7 +104,7 @@ export function useStats(period: Period): StatsData {
           .from("attempts")
           .select("skill, is_correct, answered_at")
           .eq("user_id", user.id)
-          .in("skill", ["reading", "listening"])
+          .in("skill", ["reading", "listening", "speaking"])
           .eq("is_self_reported", false)
           .order("answered_at", { ascending: false })
           .limit(5000),
@@ -135,22 +135,25 @@ export function useStats(period: Period): StatsData {
         }
       }
 
-      // --- attempts → reading/listening accuracy % за период ---
-      // тот же источник, куда пишут разделы и план дня; нет данных → null («—»)
-      const attemptAcc: Record<"reading" | "listening", { correct: number; n: number }> = {
+      // --- attempts → reading/listening/speaking accuracy % за период ---
+      // тот же источник, куда пишут разделы, план дня и разбор голосового
+      // урока (source='voice_lesson'); нет данных → null («—»)
+      const attemptAcc: Record<"reading" | "listening" | "speaking", { correct: number; n: number }> = {
         reading: { correct: 0, n: 0 },
         listening: { correct: 0, n: 0 },
+        speaking: { correct: 0, n: 0 },
       };
       for (const r of (attemptsRes.data as { skill: string; is_correct: boolean; answered_at: string }[] | null) ?? []) {
         if ((r.answered_at ?? "") < from) continue;
-        const bucket = attemptAcc[r.skill as "reading" | "listening"];
+        const bucket = attemptAcc[r.skill as "reading" | "listening" | "speaking"];
         if (!bucket) continue;
         bucket.n += 1;
         if (r.is_correct) bucket.correct += 1;
       }
 
-      // --- task_results → writing/speaking score % (all-time) ---
-      // письмо/говорение ещё не пишут attempts (AI-ревью / Фаза 2)
+      // --- task_results → writing score % (all-time) ---
+      // письмо ещё не пишет attempts (AI-ревью); speaking берёт task_results
+      // только как миграционный фолбэк — до первого разобранного урока
       const acc: Record<Skill, { sum: number; n: number }> = {
         reading: { sum: 0, n: 0 }, listening: { sum: 0, n: 0 }, writing: { sum: 0, n: 0 }, speaking: { sum: 0, n: 0 },
       };
@@ -160,10 +163,12 @@ export function useStats(period: Period): StatsData {
         acc[r.skill as Skill].n += 1;
       }
       const avg = (a: { sum: number; n: number }) => (a.n ? Math.round(a.sum / a.n) : null);
+      const pct = (a: { correct: number; n: number }) => (a.n ? Math.round((100 * a.correct) / a.n) : null);
       const scores = {
-        reading: attemptAcc.reading.n ? Math.round((100 * attemptAcc.reading.correct) / attemptAcc.reading.n) : null,
-        listening: attemptAcc.listening.n ? Math.round((100 * attemptAcc.listening.correct) / attemptAcc.listening.n) : null,
-        writing: avg(acc.writing), speaking: avg(acc.speaking),
+        reading: pct(attemptAcc.reading),
+        listening: pct(attemptAcc.listening),
+        writing: avg(acc.writing),
+        speaking: pct(attemptAcc.speaking) ?? avg(acc.speaking),
       };
 
       // --- profile → level + goal progress (goal is the student's B2/C1 choice) ---

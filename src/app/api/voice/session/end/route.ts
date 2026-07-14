@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
-import { callAI, type FeedbackLang } from "@/lib/ai";
 import { AI_COST_ESTIMATE_USD, AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { recordErrors, recordSuccesses } from "@/lib/ai/mastery";
-import {
-  buildVoiceReviewSystem,
-  buildVoiceReviewUserMessage,
-  validateVoiceReport,
-  type VoiceReport,
-} from "@/lib/ai/prompts/voice-review";
-import { topicById } from "@/lib/ai/topics";
+import { type VoiceReport } from "@/lib/ai/prompts/voice-review";
 import { recordVoiceSummary } from "@/lib/coach/voice-summary";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  fetchConversation,
+  generateVoiceReport,
+  isFinalized,
+  maturePendingReport,
+  persistSpeakingAttempts,
+  studentLineCount,
+  tooShortReport,
+  transcriptLines,
+  type ConvSnapshot,
+  type ReportState,
+} from "@/lib/voice/report";
 
 export const runtime = "nodejs";
 
@@ -55,28 +60,23 @@ export async function POST(req: Request) {
   }
 
   // ElevenLabs finalizes the call record a few seconds AFTER the WebRTC
-  // disconnect — an immediate fetch 404s or returns no duration/transcript,
-  // which used to leave the student with a bare "lesson finished" and no
-  // review. Poll until the record is ready (or give up and let the client
-  // retry; settling is idempotent).
-  let conv: {
-    agent_id?: string;
-    status?: string;
-    metadata?: { call_duration_secs?: number; start_time_unix_secs?: number; dynamic_variables?: Record<string, string> };
-    conversation_initiation_client_data?: { dynamic_variables?: Record<string, string> };
-    transcript?: { role?: string; message?: string | null }[];
-  } | null = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    conv = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
-      headers: { "xi-api-key": apiKey },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null);
-    const ready = !!conv && (conv.status === "done" || conv.status === "failed" || (conv.metadata?.call_duration_secs ?? 0) > 0);
-    if (ready) break;
-    if (attempt < 4) await new Promise((r) => setTimeout(r, 2500));
+  // disconnect. Poll for the TERMINAL status — duration>0 arrives earlier
+  // than the transcript and is NOT readiness (that shortcut froze 8 live
+  // sessions with an empty transcript). If the record isn't final in ~15s we
+  // still settle the billing with the metadata we have; the review then
+  // matures via the retry/webhook path.
+  let conv: ConvSnapshot | null = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    conv = await fetchConversation(conversationId, apiKey);
+    if (conv && isFinalized(conv)) break;
+    if (attempt < 5) await new Promise((r) => setTimeout(r, 2500));
   }
   if (!conv) return NextResponse.json({ error: "conversation_not_found" }, { status: 404 });
+  // биллинг требует хотя бы метаданных с длительностью; совсем сырая запись —
+  // честный отказ, клиент ретраит (ничего ещё не списано и не зафиксировано)
+  if (!isFinalized(conv) && (conv.metadata?.call_duration_secs ?? 0) <= 0) {
+    return NextResponse.json({ error: "settle_not_ready" }, { status: 503 });
+  }
 
   if (conv.agent_id !== process.env.ELEVENLABS_AGENT_ID) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -120,8 +120,10 @@ export async function POST(req: Request) {
   }
   const minutes = billedSeconds > 10 ? Math.ceil(billedSeconds / 60) : 0; // <10s connects are free
 
-  // idempotency: a retry of the same conversation must not double-bill;
-  // return the stored report so the client can re-render it
+  // idempotency: a retry of the same conversation must not double-bill.
+  // Терминальна ЗАПИСЬ РАЗБОРА, а не сессия: report IS NULL → повторный
+  // вызов ДОЗРЕВАЕТ разбор (прежняя версия возвращала null навсегда, и
+  // кнопка «Получить разбор» была декорацией — 8 живых сессий заморожены).
   if (admin) {
     const { data: existing } = await admin
       .from("voice_sessions")
@@ -130,9 +132,32 @@ export async function POST(req: Request) {
       .eq("transcript->>conversation_id", conversationId)
       .maybeSingle();
     if (existing) {
+      let report = (existing.report as VoiceReport | null) ?? null;
+      let reportState: ReportState = report ? (report.valid ? "ready" : "too_short") : "pending_transcript";
+      if (!report) {
+        const { data: genderRow } = await supabase.from("profiles").select("gender").eq("id", user.id).maybeSingle();
+        const matured = await maturePendingReport(admin, {
+          sessionId: existing.id as string,
+          userId: user.id,
+          conversationId,
+          conv,
+          gender: (genderRow?.gender as "female" | "male" | null) ?? null,
+          minutes: Math.ceil(((existing.seconds as number | null) ?? 0) / 60),
+        });
+        report = matured.report;
+        reportState = matured.state;
+      }
       // minutes: null → the client shows the stored report without re-stating
       // a spend that happened on the first settle
-      return NextResponse.json({ alreadySettled: true, seconds: existing.seconds, minutes: null, fromBase: 0, fromCredits: 0, report: existing.report ?? null });
+      return NextResponse.json({
+        alreadySettled: true,
+        seconds: existing.seconds,
+        minutes: null,
+        fromBase: 0,
+        fromCredits: 0,
+        report,
+        reportState,
+      });
     }
   }
 
@@ -158,53 +183,31 @@ export async function POST(req: Request) {
   }
 
   // --- written review (C5): transcript → TÖMER Konuşma report ---
-  const rawItems: { role?: string; message?: string | null }[] = Array.isArray(conv.transcript) ? conv.transcript : [];
-  const lines = rawItems
-    .filter((t) => typeof t.message === "string" && t.message.trim())
-    .map((t) => ({
-      role: (t.role === "user" ? "student" : "teacher") as "student" | "teacher",
-      text: (t.message as string).trim(),
-    }));
-  const studentLines = lines.filter((l) => l.role === "student").length;
+  // Терминальное состояние ТОЛЬКО при реальных данных (правило 1.3):
+  //  запись финализирована + речи мало  → too_short (терминально);
+  //  запись финализирована + речь есть  → генерация (null = failed, повтор);
+  //  запись НЕ финализирована           → pending, дозреет ретраем/вебхуком.
+  const lines = transcriptLines(conv);
+  const finalized = isFinalized(conv);
 
   let report: VoiceReport | null = null;
-  if (studentLines >= 2) {
-    const lang = (["ru", "en", "tr", "kk"].includes(dynVars.feedback_lang_code)
-      ? dynVars.feedback_lang_code
-      : "en") as FeedbackLang;
-    const lessonFocusTr = String(dynVars.lesson_focus_ids ?? "")
-      .split(",")
-      .map((id) => topicById(id.trim())?.label.tr)
-      .filter(Boolean)
-      .join(", ");
-    const result = await callAI({
-      task: "voice_review",
-      feedbackLang: lang,
-      system: buildVoiceReviewSystem(lang, (genderRow?.gender as "female" | "male" | null) ?? null),
-      messages: [
-        {
-          role: "user",
-          content: buildVoiceReviewUserMessage({
-            transcriptLines: lines,
-            lessonFocusTr,
-            level: String(dynVars.level ?? "A2"),
-            targetLevel: String(dynVars.target_level ?? "C1"),
-          }),
-        },
-      ],
-      maxTokens: 12000,
-      json: true,
-      thinking: true,
-    });
-    report = result ? validateVoiceReport(result.parsed) : null;
-    if (report?.valid) {
-      if (report.errors.length > 0) {
-        await recordErrors(supabase, user.id, "voice", report.errors);
+  let reportState: ReportState = "pending_transcript";
+  if (finalized) {
+    if (studentLineCount(lines) < 2) {
+      report = tooShortReport();
+      reportState = "too_short";
+    } else {
+      report = await generateVoiceReport(lines, dynVars, (genderRow?.gender as "female" | "male" | null) ?? null);
+      reportState = report ? (report.valid ? "ready" : "too_short") : "failed";
+      if (report?.valid) {
+        if (report.errors.length > 0) {
+          await recordErrors(supabase, user.id, "voice", report.errors);
+        }
+        // topics worked without a single error grow stronger and eventually
+        // leave the lesson focus
+        const erredTopics = new Set(report.errors.map((e) => e.topic));
+        await recordSuccesses(supabase, user.id, report.topics_worked.filter((t) => !erredTopics.has(t)));
       }
-      // topics worked without a single error grow stronger and eventually
-      // leave the lesson focus
-      const erredTopics = new Set(report.errors.map((e) => e.topic));
-      await recordSuccesses(supabase, user.id, report.topics_worked.filter((t) => !erredTopics.has(t)));
     }
   }
 
@@ -221,9 +224,11 @@ export async function POST(req: Request) {
       transcript: { conversation_id: conversationId, items: conv.transcript ?? [] },
       report,
     });
-    // единый агент: карточка-итог урока в ленту Ahu (best-effort, после
-    // биллинга — сбой не ломает завершение; DESIGN-COACH §6)
     if (report?.valid) {
+      // разбор → attempts: Speaking виден в статистике как реальные попытки
+      await persistSpeakingAttempts(admin, user.id, conversationId, report, String(dynVars.level ?? "A2"));
+      // единый агент: карточка-итог урока в ленту Ahu (best-effort, после
+      // биллинга — сбой не ломает завершение; DESIGN-COACH §6)
       await recordVoiceSummary(admin, { userId: user.id, conversationId, minutes, report });
     }
   }
@@ -234,5 +239,6 @@ export async function POST(req: Request) {
     fromBase: settle.from_base ?? 0,
     fromCredits: settle.from_credits ?? 0,
     report,
+    reportState,
   });
 }

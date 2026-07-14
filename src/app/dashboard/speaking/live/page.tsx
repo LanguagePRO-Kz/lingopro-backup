@@ -43,6 +43,8 @@ const T = {
     crit: { fluency: "Беглость", grammar: "Грамматика", vocab: "Лексика", coherence: "Связность" },
     errors: "Ошибки из разговора", noErrors: "Заметных ошибок в разговоре не найдено!", rule: "Правило",
     topicsWorked: "Проработанные темы", nextSteps: "Что дальше", reportNone: "Разговор был слишком коротким для разбора.",
+    reportPendingT: "Транскрипт урока ещё готовится на стороне провайдера. Нажми «Получить разбор» через минуту — он никуда не денется.",
+    reportFailedT: "Разбор не построился — транскрипт цел. Попробуй ещё раз.",
     again: "Ещё урок",
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errNoMinutes: "На сегодня минуты закончились. База обновится в полночь — или докупи пакет минут.", buyMinutes: "Докупить минуты",
@@ -65,6 +67,8 @@ const T = {
     crit: { fluency: "Fluency", grammar: "Grammar", vocab: "Vocabulary", coherence: "Coherence" },
     errors: "Errors from the conversation", noErrors: "No notable errors found in the conversation!", rule: "Rule",
     topicsWorked: "Topics worked on", nextSteps: "Next steps", reportNone: "The conversation was too short for a review.",
+    reportPendingT: "The lesson transcript is still being prepared by the provider. Press “Get the review” in a minute — it isn't going anywhere.",
+    reportFailedT: "The review could not be built — your transcript is safe. Try again.",
     again: "Another lesson",
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
     errNoMinutes: "You're out of minutes for today. The base quota resets at midnight — or top up with a minute pack.", buyMinutes: "Buy minutes",
@@ -87,6 +91,8 @@ const T = {
     crit: { fluency: "Akıcılık", grammar: "Dil bilgisi", vocab: "Kelime", coherence: "Tutarlılık" },
     errors: "Konuşmadaki hatalar", noErrors: "Konuşmada kayda değer hata bulunamadı!", rule: "Kural",
     topicsWorked: "Çalışılan konular", nextSteps: "Sonraki adımlar", reportNone: "Konuşma değerlendirme için çok kısaydı.",
+    reportPendingT: "Ders dökümü sağlayıcı tarafında hâlâ hazırlanıyor. Bir dakika sonra «Değerlendirmeyi al»a bas — kaybolmaz.",
+    reportFailedT: "Değerlendirme oluşturulamadı — dökümün yerinde. Tekrar dene.",
     again: "Yeni ders",
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir — ya da dakika paketi al.", buyMinutes: "Dakika al",
@@ -109,6 +115,8 @@ const T = {
     crit: { fluency: "Еркіндік", grammar: "Грамматика", vocab: "Лексика", coherence: "Байланыстылық" },
     errors: "Әңгімедегі қателер", noErrors: "Әңгімеде елеулі қате табылмады!", rule: "Ереже",
     topicsWorked: "Өтілген тақырыптар", nextSteps: "Келесі қадамдар", reportNone: "Әңгіме талдау үшін тым қысқа болды.",
+    reportPendingT: "Сабақ транскрипті провайдер жағында әлі дайындалуда. Бір минуттан кейін «Талдауды алу» батырмасын бас — ол жоғалмайды.",
+    reportFailedT: "Талдау құрылмады — транскрипт сақтаулы. Қайта көр.",
     again: "Тағы бір сабақ",
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады — немесе минут пакетін ал.", buyMinutes: "Минут алу",
@@ -208,8 +216,17 @@ function LiveLesson() {
   const [lessonFocus, setLessonFocus] = useState<{ id: string; label: Record<Locale, string> }[]>([]);
   // «почему эта тема» — решение ядра агента на языке интерфейса (null = фокус не от ядра)
   const [focusReason, setFocusReason] = useState<string | null>(null);
-  const [settle, setSettle] = useState<{ minutes: number | null; seconds: number; fromBase: number; fromCredits: number; report: VoiceReport | null } | null>(null);
+  const [settle, setSettle] = useState<{
+    minutes: number | null;
+    seconds: number;
+    fromBase: number;
+    fromCredits: number;
+    report: VoiceReport | null;
+    /** ready | too_short (терминально) | pending_transcript | failed (повтор разрешён) */
+    reportState?: "ready" | "too_short" | "pending_transcript" | "failed";
+  } | null>(null);
   const [reportPending, setReportPending] = useState(false);
+  const [reportRetrying, setReportRetrying] = useState(false);
   const [settleFailed, setSettleFailed] = useState(false);
   // billing cutoff confirmed server-side: everything after the press is free
   const [wrapFree, setWrapFree] = useState(false);
@@ -366,6 +383,33 @@ function LiveLesson() {
       settlingRef.current = false;
     } finally {
       setReportPending(false);
+    }
+  }
+
+  /** Повторная попытка получить разбор: settle идемпотентен, report IS NULL
+   *  на сервере дозревает (транскрипт финализировался / AI ожил). */
+  async function retryReport() {
+    if (!convIdRef.current || reportRetrying) return;
+    setReportRetrying(true);
+    try {
+      const res = await fetch("/api/voice/session/end", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ conversationId: convIdRef.current }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setSettle((prev) =>
+          prev
+            ? { ...prev, report: d.report ?? prev.report, reportState: d.reportState }
+            : { minutes: d.minutes ?? null, seconds: d.seconds ?? 0, fromBase: d.fromBase ?? 0, fromCredits: d.fromCredits ?? 0, report: d.report ?? null, reportState: d.reportState },
+        );
+        if (d.report?.valid) void attachKonusmaScore();
+      }
+    } catch {
+      /* сеть моргнула — состояние не меняем, кнопка остаётся */
+    } finally {
+      setReportRetrying(false);
     }
   }
 
@@ -724,8 +768,25 @@ function LiveLesson() {
             </div>
           )}
 
+          {/* нет разбора — три ЧЕСТНЫХ состояния вместо одной заглушки:
+              too_short — терминально; pending/failed — рабочая кнопка повтора */}
           {!reportPending && !settleFailed && settle && !report && (settle.minutes == null || settle.minutes > 0) && (
-            <p className="mt-3 text-sm text-[var(--color-muted)]">{c.reportNone}</p>
+            (settle.reportState ?? "pending_transcript") === "too_short" ? (
+              <p className="mt-3 text-sm text-[var(--color-muted)]">{c.reportNone}</p>
+            ) : (
+              <div className="mt-4 rounded-xl bg-[var(--color-brand)]/[0.06] px-4 py-3 text-sm text-[var(--color-foreground)]">
+                <p>{settle.reportState === "failed" ? c.reportFailedT : c.reportPendingT}</p>
+                <button
+                  type="button"
+                  onClick={() => void retryReport()}
+                  disabled={reportRetrying}
+                  className="btn-primary mt-2 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60"
+                >
+                  {reportRetrying && <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                  {c.settleRetry}
+                </button>
+              </div>
+            )
           )}
 
           {report && (
