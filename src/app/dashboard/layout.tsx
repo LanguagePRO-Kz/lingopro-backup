@@ -16,11 +16,12 @@ function accessState(plan: string | null, planExpiresAt: string | null) {
   const now = Date.now();
   const expiresAt = planExpiresAt ? Date.parse(planExpiresAt) : null;
   const active = !!plan && expiresAt != null && expiresAt > now;
-  const trialDaysLeft =
-    active && plan === "trial" && expiresAt != null
-      ? Math.max(1, Math.ceil((expiresAt - now) / 86_400_000))
-      : null;
-  return { active, trialDaysLeft };
+  // сырой остаток в ms; в дни/часы переводит trialLeftLabel (честное
+  // округление вниз — Math.ceil здесь показывал «4 дня» у 3-дневного триала
+  // при секундном перекосе часов БД и сервера рендера)
+  const trialMsLeft =
+    active && plan === "trial" && expiresAt != null ? expiresAt - now : null;
+  return { active, trialMsLeft };
 }
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -39,14 +40,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   // воронка: без диагностики — на квиз (он бесплатный вход в продукт)
   if (!profile?.quiz_result) redirect("/quiz");
 
-  const { active, trialDaysLeft } = accessState(
+  const { active, trialMsLeft } = accessState(
     (profile.plan as string | null) ?? null,
     (profile.plan_expires_at as string | null) ?? null,
   );
   if (!active) redirect("/pricing");
 
   return (
-    <DashboardShell plan={profile.plan as string} trialDaysLeft={trialDaysLeft}>
+    <DashboardShell plan={profile.plan as string} trialMsLeft={trialMsLeft}>
       {children}
     </DashboardShell>
   );

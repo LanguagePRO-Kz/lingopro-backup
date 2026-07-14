@@ -9,6 +9,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { NAV, activeNav, planBadge } from "@/lib/dashboard";
+import { trialLeftLabel } from "@/lib/trial";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
 import { saveResult } from "@/lib/quiz";
@@ -32,16 +33,16 @@ const ENROLL_MAILTO = `mailto:lingopro2026@gmail.com?subject=${encodeURIComponen
 /**
  * Клиентская оболочка дашборда. Доступ уже решён СЕРВЕРОМ (layout.tsx:
  * auth + активный план из БД, редиректы до рендера) — здесь только UI.
- * plan/trialDaysLeft приходят с сервера; localStorage доступ не решает.
+ * plan/trialMsLeft приходят с сервера; localStorage доступ не решает.
  */
 export default function DashboardShell({
   children,
   plan,
-  trialDaysLeft,
+  trialMsLeft,
 }: {
   children: ReactNode;
   plan: string;
-  trialDaysLeft: number | null;
+  trialMsLeft: number | null;
 }) {
   const pathname = usePathname();
   const { locale } = useI18n();
@@ -445,17 +446,12 @@ export default function DashboardShell({
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-7 sm:px-8">
-        {/* триал: честный статус + путь к подписке, без сюрпризов */}
-        {plan === "trial" && trialDaysLeft != null && (
+        {/* триал: честный статус + путь к подписке, без сюрпризов
+            (остаток форматирует trialLeftLabel — округление вниз, не вверх) */}
+        {plan === "trial" && trialMsLeft != null && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] px-4 py-3">
             <span className="text-sm font-medium text-[var(--color-foreground)]">
-              ⏳{" "}
-              {pick(locale, {
-                ru: `Пробный доступ · ${trialDaysLeft === 1 ? "остался 1 день" : `осталось ${trialDaysLeft} ${trialDaysLeft < 5 ? "дня" : "дней"}`}`,
-                en: `Trial access · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`,
-                tr: `Deneme erişimi · ${trialDaysLeft} gün kaldı`,
-                kk: `Сынақ қолжетімділік · ${trialDaysLeft} күн қалды`,
-              })}
+              ⏳ {planBadge(plan, locale)} · {trialLeftLabel(trialMsLeft, locale)}
             </span>
             <Link
               href="/pricing"
