@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
+import { FeedbackButton } from "@/components/FeedbackButton";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
@@ -465,6 +466,9 @@ export default function DashboardShell({
         )}
         {children}
       </main>
+
+      {/* Фаза 6: «Сообщить о проблеме» — виден на каждой странице кабинета */}
+      <FeedbackButton />
     </div>
   );
 }
