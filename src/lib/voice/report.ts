@@ -10,7 +10,6 @@
  * (проверено по проду 14.07.2026): «урок без ошибок», которого не было.
  */
 
-import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callAI, type FeedbackLang } from "@/lib/ai";
 import { recordErrors, recordSuccesses } from "@/lib/ai/mastery";
@@ -21,7 +20,7 @@ import {
   type VoiceReport,
 } from "@/lib/ai/prompts/voice-review";
 import { topicById } from "@/lib/ai/topics";
-import { recomputeTopicMastery } from "@/lib/attempts";
+import { deterministicUuid, recomputeTopicMastery } from "@/lib/attempts";
 import { recordVoiceSummary } from "@/lib/coach/voice-summary";
 
 /** Снимок разговора из API ElevenLabs (нужные поля). */
@@ -76,10 +75,7 @@ export function dynVarsOf(conv: ConvSnapshot): Record<string, string> {
 }
 
 /** Детерминированный uuid для client_attempt_id — дедуп повторной генерации. */
-function detUuid(key: string): string {
-  const h = createHash("sha256").update(key).digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
-}
+const detUuid = deterministicUuid;
 
 /** Терминальная отметка «речи не хватило» — хранится вместо NULL, чтобы
  *  идемпотентность отличала «нечего разбирать» от «разбор ещё не построен». */

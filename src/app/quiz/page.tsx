@@ -59,20 +59,25 @@ import { PostQuizAuth } from "@/components/PostQuizAuth";
 
 /* ------------------------------ Shuffled item ----------------------------- */
 
-type ShuffledItem = { item: BankItem; options: string[]; answer: number };
+type ShuffledItem = { item: BankItem; options: string[]; answer: number; perm: number[] };
 
 function shuffleItem(item: BankItem): ShuffledItem {
   const perm = permutation(item.options.length);
-  return { item, options: applyPerm(item.options, perm), answer: perm.indexOf(item.answer) };
+  return { item, options: applyPerm(item.options, perm), answer: perm.indexOf(item.answer), perm };
 }
 
-function toRecord(s: ShuffledItem, module: AnswerRecord["module"], chosen: number): AnswerRecord {
+/** chosen=null — студент нажал «Не знаю»: фиксируется как skipped (незнание),
+ *  а не как случайный неверный ответ (угадывание) — агент их различает.
+ *  selected хранит ОРИГИНАЛЬНЫЙ индекс банка — сервер пересуживает сам. */
+function toRecord(s: ShuffledItem, module: AnswerRecord["module"], chosen: number | null): AnswerRecord {
   return {
     module,
+    id: s.item.id,
     prompt: s.item.prompt,
     topic: s.item.topic !== "other" ? s.item.topic : undefined,
     level: s.item.level,
-    correct: chosen === s.answer,
+    correct: chosen !== null && chosen === s.answer,
+    ...(chosen === null ? { skipped: true } : { selected: s.perm[chosen] }),
     correctAnswer: s.options[s.answer] ?? "",
   };
 }
@@ -711,12 +716,19 @@ function RouterStage({
   });
   const [selected, setSelected] = useState<number | null>(null);
   const recordsRef = useRef<AnswerRecord[]>([]);
+  // «Назад» в адаптивной лестнице = откат снапшота шага (state/вопрос/выбор);
+  // после перезагрузки страницы стек пуст — возврат недоступен, честно
+  const undoRef = useRef<{ state: RouterState; current: ShuffledItem; selected: number | null }[]>([]);
+  const [undoDepth, setUndoDepth] = useState(0);
 
-  function next() {
-    if (!current || selected === null) return;
-    const correct = selected === current.answer;
-    recordsRef.current = [...recordsRef.current, toRecord(current, "grammar", selected)];
-    const nextState = applyRouterAnswer(state, current.item, correct);
+  // chosen=null → «Не знаю»: лестница трактует как неверный (уровень вниз —
+  // незнание уровня и есть), запись помечается skipped
+  function advance(chosen: number | null) {
+    if (!current) return;
+    undoRef.current.push({ state, current, selected: chosen });
+    setUndoDepth(undoRef.current.length);
+    recordsRef.current = [...recordsRef.current, toRecord(current, "grammar", chosen)];
+    const nextState = applyRouterAnswer(state, current.item, chosen !== null && chosen === current.answer);
     onProgress(nextState);
 
     const q = routerDone(nextState) ? null : nextRouterQuestion(nextState, seed);
@@ -727,6 +739,18 @@ function RouterStage({
     setState(nextState);
     setCurrent(shuffleItem(q));
     setSelected(null);
+  }
+  const next = () => selected !== null && advance(selected);
+
+  function back() {
+    const snap = undoRef.current.pop();
+    if (!snap) return;
+    setUndoDepth(undoRef.current.length);
+    recordsRef.current = recordsRef.current.slice(0, -1);
+    setState(snap.state);
+    onProgress(snap.state);
+    setCurrent(snap.current);
+    setSelected(snap.selected);
   }
 
   if (!current) return null;
@@ -781,6 +805,24 @@ function RouterStage({
           </motion.button>
         )}
       </AnimatePresence>
+
+      <div className="mt-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={back}
+          disabled={undoDepth === 0}
+          className="rounded-full px-4 py-2 text-xs font-medium text-[var(--color-muted)] transition-colors hover:bg-black/[0.04] hover:text-[var(--color-foreground)] disabled:invisible"
+        >
+          {qt(locale, "backQ")}
+        </button>
+        <button
+          type="button"
+          onClick={() => advance(null)}
+          className="rounded-full border border-black/[0.08] px-4 py-2 text-xs font-medium text-[var(--color-muted)] transition-colors hover:bg-black/[0.04] hover:text-[var(--color-foreground)]"
+        >
+          {qt(locale, "skip")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -808,34 +850,41 @@ function SetStage({
   const [shuffled] = useState(() =>
     ordered.map((s) => s.questions.map((q) => shuffleItem(q))),
   );
-  const [setIdx, setSetIdx] = useState(0);
-  const [qIdx, setQIdx] = useState(0);
+  // ответы по глобальному индексу: number = выбор, null = «не знаю»,
+  // undefined = ещё не отвечен. «Назад» до завершения модуля перезаписывает.
+  const answersRef = useRef<(number | null | undefined)[]>([]);
+  const [pos, setPos] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const recordsRef = useRef<AnswerRecord[]>([]);
-  const correctRef = useRef(0);
 
-  const totalQuestions = shuffled.reduce((n, s) => n + s.length, 0);
-  const answered = shuffled.slice(0, setIdx).reduce((n, s) => n + s.length, 0) + qIdx;
+  const flat = shuffled.flatMap((qs, si) => qs.map((q) => ({ q, si })));
+  const totalQuestions = flat.length;
+  const answered = pos;
 
+  const setIdx = flat[pos]?.si ?? 0;
   const set = ordered[setIdx];
-  const q = shuffled[setIdx][qIdx];
+  const q = flat[pos].q;
   const stage: StageId = module === "listening" ? "dinleme" : "okuma";
 
-  function next() {
-    if (selected === null) return;
-    if (selected === q.answer) correctRef.current += 1;
-    recordsRef.current = [...recordsRef.current, toRecord(q, module, selected)];
-    setSelected(null);
-
-    if (qIdx + 1 < shuffled[setIdx].length) {
-      setQIdx(qIdx + 1);
-    } else if (setIdx + 1 < ordered.length) {
-      setSetIdx(setIdx + 1);
-      setQIdx(0);
-    } else {
-      onDone({ correct: correctRef.current, total: totalQuestions }, recordsRef.current);
-    }
+  function goTo(nextPos: number) {
+    setPos(nextPos);
+    const prev = answersRef.current[nextPos];
+    setSelected(typeof prev === "number" ? prev : null);
   }
+
+  function advance(chosen: number | null) {
+    answersRef.current[pos] = chosen;
+    if (pos + 1 < totalQuestions) {
+      goTo(pos + 1);
+      return;
+    }
+    // конец модуля: агрегат и записи строятся из финальных ответов —
+    // перезаписанные через «Назад» варианты считаются один раз
+    const records = flat.map(({ q: fq }, i) => toRecord(fq, module, answersRef.current[i] ?? null));
+    const correct = records.filter((r) => r.correct).length;
+    onDone({ correct, total: totalQuestions }, records);
+  }
+  const next = () => selected !== null && advance(selected);
+  const back = () => pos > 0 && goTo(pos - 1);
 
   return (
     <div className="glass-strong rounded-3xl p-6 sm:p-8">
@@ -894,6 +943,24 @@ function SetStage({
           </motion.button>
         )}
       </AnimatePresence>
+
+      <div className="mt-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={back}
+          disabled={pos === 0}
+          className="rounded-full px-4 py-2 text-xs font-medium text-[var(--color-muted)] transition-colors hover:bg-black/[0.04] hover:text-[var(--color-foreground)] disabled:invisible"
+        >
+          {qt(locale, "backQ")}
+        </button>
+        <button
+          type="button"
+          onClick={() => advance(null)}
+          className="rounded-full border border-black/[0.08] px-4 py-2 text-xs font-medium text-[var(--color-muted)] transition-colors hover:bg-black/[0.04] hover:text-[var(--color-foreground)]"
+        >
+          {qt(locale, "skip")}
+        </button>
+      </div>
     </div>
   );
 }

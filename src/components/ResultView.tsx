@@ -586,7 +586,7 @@ export function ResultView({
               <span className="flex flex-wrap items-center gap-2">
                 {qt(locale, "konusmaPending")}
                 <Link
-                  href="/dashboard/speaking/live"
+                  href="/quiz/speaking"
                   className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
                 >
                   {qt(locale, "konusmaCta")} →

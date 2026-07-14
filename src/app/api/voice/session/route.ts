@@ -53,12 +53,14 @@ export async function GET(req: Request) {
   return NextResponse.json(state ?? { busy: false, etaMinutes: 0, active: 0 });
 }
 
-type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full";
+type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking";
 
 // Injected into the agent prompt as {{mode_instructions}} (Turkish — the
 // agent thinks in Turkish; per-part framing mirrors TÖMER Konuşma).
 const MODE_INSTRUCTIONS: Record<Mode, string> = {
   free: "Serbest sohbet: öğrencinin günlük hayatına dair doğal bir konuşma yürüt.",
+  diagnostic_speaking:
+    "2 dakikalık KONUŞMA SEVİYE TESPİTİ: kısa tanışma (ad, nereden), 2-3 basit günlük soru, sonra kısa bir konu (ailen veya şehrin). Cevaplar çok kısa olabilir — sabırlı ol, sustuğunda bekle, düzeltme yapma; amaç ders değil, seviyeyi duymak.",
   bolum1:
     "TÖMER Konuşma Bölüm 1 (karşılıklı konuşma, ~2 dakika): kişisel sorular sor — kendini tanıtma, aile, günlük rutin, hobiler.",
   bolum2:
@@ -97,8 +99,21 @@ export async function POST(req: Request) {
 
   // платная фича (самые дорогие минуты): только активная подписка/триал.
   // end/wrap НЕ гейтятся — биллинг-сеттл начатого урока обязан отработать.
-  const access = await requireActivePlan(supabase);
-  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
+  // Исключение — diagnostic_speaking (Фаза 4): бесплатная 2-минутная проба
+  // уровня говорения, СТРОГО одна на юзера — говорение обычно слабейший
+  // навык, и без него план строится вслепую (диагностика бесплатна by design)
+  if (mode === "diagnostic_speaking") {
+    const adminForDiag = createAdminClient();
+    if (!adminForDiag) return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
+    const { count } = await adminForDiag
+      .from("voice_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if ((count ?? 0) > 0) return NextResponse.json({ error: "diag_used" }, { status: 403 });
+  } else {
+    const access = await requireActivePlan(supabase);
+    if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
+  }
 
   const [{ data: profile }, { data: weak }] = await Promise.all([
     supabase
@@ -239,7 +254,11 @@ export async function POST(req: Request) {
 
   const baseLeft = a.base_left ?? 0;
   const creditsLeft = a.credits_left ?? 0;
-  const maxSeconds = Math.min(900, (baseLeft + creditsLeft) * 60);
+  // проба уровня — жёсткий потолок ~2 минуты (+ запас на прощание агента)
+  const maxSeconds =
+    mode === "diagnostic_speaking"
+      ? Math.min(180, (baseLeft + creditsLeft) * 60)
+      : Math.min(900, (baseLeft + creditsLeft) * 60);
 
   const feedbackLangCode = body.feedbackLang && body.feedbackLang in FEEDBACK_LANG_TR ? body.feedbackLang : "en";
 

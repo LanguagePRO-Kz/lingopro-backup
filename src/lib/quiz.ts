@@ -236,12 +236,18 @@ export type SkillScore = { id: ModuleId; percent: number; level: Level };
 /** One answered question — the raw material for an honest breakdown. */
 export type AnswerRecord = {
   module: ModuleId;
+  /** Bank question id (v3+) — ties the record to attempts / the item bank */
+  id?: string;
   prompt: string;
   /** Topic id from src/lib/ai/topics.ts, when the question is tagged */
   topic?: string;
   tag?: Localized;
   level: Level;
   correct: boolean;
+  /** Студент нажал «Не знаю»: незнание ≠ угадывание (correct всегда false) */
+  skipped?: boolean;
+  /** Выбранный вариант в ОРИГИНАЛЬНОМ порядке банка (v3+) — сервер судит сам */
+  selected?: number;
   /** The correct option's text (locale-resolved at answer time) */
   correctAnswer: string;
 };
@@ -468,6 +474,9 @@ const T = {
     tr: "Uyarlanabilir test: sorular cevaplarına göre ayarlanır. Dürüst cevapla.",
     kk: "Бейімделгіш тест: сұрақтар жауаптарыңа қарай өзгереді. Шынайы жауап бер.",
   },
+  // пропуск и возврат (незнание ≠ угадывание — агент их различает)
+  skip: { ru: "Не знаю — дальше", en: "I don't know — next", tr: "Bilmiyorum — geç", kk: "Білмеймін — келесі" },
+  backQ: { ru: "← Назад", en: "← Back", tr: "← Geri", kk: "← Артқа" },
   // dinleme audio player
   play: { ru: "Прослушать", en: "Play", tr: "Dinle", kk: "Тыңдау" },
   playing: { ru: "Играет…", en: "Playing…", tr: "Çalıyor…", kk: "Ойнап тұр…" },
@@ -489,12 +498,12 @@ const T = {
   secTitle: { ru: "Секции TÖMER", en: "TÖMER sections", tr: "TÖMER bölümleri", kk: "TÖMER бөлімдері" },
   ofSections: { ru: "по секциям", en: "across sections", tr: "bölüm toplamı", kk: "бөлімдер бойынша" },
   konusmaPending: {
-    ru: "Оценим на первом живом уроке с AI-преподавателем",
-    en: "Assessed on your first live lesson with the AI teacher",
-    tr: "İlk canlı AI dersinde değerlendirilecek",
-    kk: "AI ұстазбен алғашқы жанды сабақта бағаланады",
+    ru: "Оценим за 2-минутную голосовую пробу с AI-преподавателем",
+    en: "Assessed in a 2-minute voice probe with the AI teacher",
+    tr: "AI öğretmenle 2 dakikalık konuşma denemesinde değerlendirilecek",
+    kk: "AI ұстазбен 2 минуттық дауыс сынамасында бағаланады",
   },
-  konusmaCta: { ru: "Пройти первый урок", en: "Take the first lesson", tr: "İlk derse başla", kk: "Алғашқы сабақтан өту" },
+  konusmaCta: { ru: "Пройти пробу (2 мин)", en: "Take the probe (2 min)", tr: "Denemeye başla (2 dk)", kk: "Сынамадан өту (2 мин)" },
   yazmaChecking: { ru: "AI-экзаменатор проверяет эссе…", en: "The AI examiner is reviewing the essay…", tr: "Yapay zekâ kompozisyonu değerlendiriyor…", kk: "AI эссені тексеріп жатыр…" },
   yazmaPendingAuth: {
     ru: "Балл за письмо появится после проверки AI-экзаменатором",

@@ -6,6 +6,7 @@ import { PageShell } from "@/components/PageShell";
 import { ResultView } from "@/components/ResultView";
 import { createClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { submitDiagnosticBatch } from "@/lib/attempts-client";
 import { fetchProfile, saveProfileResult } from "@/lib/profile";
 import { loadResult, saveResult, type QuizResult } from "@/lib/quiz";
 import { seedMasteryFromDiagnostic } from "@/lib/ai/diagnostic-seed";
@@ -74,6 +75,16 @@ export default function QuizResultPage() {
       void awardXp("diagnostic", XP.DIAGNOSTIC, { dedupKey: "diagnostic", metadata: { level: final.level } });
       // seed the error memory so the first voice lesson has a personal focus
       void seedMasteryFromDiagnostic(final);
+      // ответы диагностики → attempts (батч; «Не знаю» уезжает как skipped —
+      // незнание ≠ угадывание). Дедуп по takenAt: повторный визит не дублирует
+      if (final.version === 3 && final.answers?.some((a) => a.id)) {
+        void submitDiagnosticBatch({
+          takenAt: final.takenAt,
+          answers: final.answers
+            .filter((a) => a.id)
+            .map((a) => ({ questionId: a.id!, ...(a.skipped ? { skipped: true } : { selected: a.selected }) })),
+        });
+      }
 
       // v3: onboarding minutes → profile BEFORE the dashboard can generate a
       // route (awaited: the route inputs must see the real minutes, not 30)

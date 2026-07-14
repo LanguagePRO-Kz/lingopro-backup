@@ -17,7 +17,18 @@
  *    ими владеет AI-поток (recordErrors/recordSuccesses).
  */
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * Детерминированный uuid из строкового ключа — client_attempt_id для
+ * серверных вставок (разбор голосового урока, батч диагностики): повторная
+ * обработка того же источника упирается в уникальный индекс, а не дублирует.
+ */
+export function deterministicUuid(key: string): string {
+  const h = createHash("sha256").update(key).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
 
 export const MASTERY_WINDOW_DAYS = 90;
 export const MASTERY_ATTEMPTS_CAP = 100; // свежайших попыток на тему
