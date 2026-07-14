@@ -53,11 +53,22 @@ export async function GET(req: Request) {
   return NextResponse.json(state ?? { busy: false, etaMinutes: 0, active: 0 });
 }
 
-type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking";
+type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking" | "foundation" | "plan";
+
+/**
+ * Режим «Фундамент» (Фаза 7.8): студент A0-A2 не понимает экзаменационный
+ * урок ни слова — лестница поддержки убывает с ростом уровня. Экзамен,
+ * баллы и барем НЕ упоминаются — рано. Молчание студента — норма, не провал.
+ */
+const FOUNDATION_BY_LEVEL: Record<"A0" | "A1" | "A2", string> = {
+  A0: "TEMEL MOD (A0): öğrenci Türkçeyi HİÇ bilmiyor. Öğrencinin arayüz dilinde konuş (feedback_lang), Türkçeyi KELİME KELİME ver: «Söyle: Merhaba. Sadece tekrar et.» Uzun Türkçe cümle KURMA. Sınavdan, puandan, kriterden HİÇ bahsetme. Sustuğunda sabırla bekle — sessizlik normaldir, baskı yapma. Her denemesini kutla; sadece telaffuzu nazikçe düzelt, dil bilgisine HİÇ dokunma.",
+  A1: "TEMEL MOD (A1): çok basit Türkçe cümleler kur ve HER cümleyi hemen öğrencinin diline çevir: «Adın ne? — Как тебя зовут? Cevap ver: Benim adım …». Öğrenci kalıplarla cevap verir — bu normaldir ve ilerlemedir. Sınav/puan konuşma. Sustuğunda bekle, tekrar iste, yavaşla. Cesaretlendir; dil bilgisi eleştirisi yok.",
+  A2: "TEMEL MOD (A2): Türkçe konuş, öğrenci TAKILDIĞINDA çevir ve yavaşla. Basit günlük konular. Sınav formatı yok — amaç konuşma cesareti. Sustuğunda bekle; hataları ders bitmeden nazikçe, tek tek düzelt.",
+};
 
 // Injected into the agent prompt as {{mode_instructions}} (Turkish — the
 // agent thinks in Turkish; per-part framing mirrors TÖMER Konuşma).
-const MODE_INSTRUCTIONS: Record<Mode, string> = {
+const MODE_INSTRUCTIONS: Record<Exclude<Mode, "foundation" | "plan">, string> = {
   free: "Serbest sohbet: öğrencinin günlük hayatına dair doğal bir konuşma yürüt.",
   diagnostic_speaking:
     "2 dakikalık KONUŞMA SEVİYE TESPİTİ: kısa tanışma (ad, nereden), 2-3 basit günlük soru, sonra kısa bir konu (ailen veya şehrin). Cevaplar çok kısa olabilir — sabırlı ol, sustuğunda bekle, düzeltme yapma; amaç ders değil, seviyeyi duymak.",
@@ -89,7 +100,10 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
-  const mode: Mode = body.mode && body.mode in MODE_INSTRUCTIONS ? body.mode : "free";
+  const requestedMode: Mode =
+    body.mode === "foundation" || body.mode === "plan" || (body.mode && body.mode in MODE_INSTRUCTIONS)
+      ? (body.mode as Mode)
+      : "free";
 
   const supabase = await createClient();
   const {
@@ -102,7 +116,7 @@ export async function POST(req: Request) {
   // Исключение — diagnostic_speaking (Фаза 4): бесплатная 2-минутная проба
   // уровня говорения, СТРОГО одна на юзера — говорение обычно слабейший
   // навык, и без него план строится вслепую (диагностика бесплатна by design)
-  if (mode === "diagnostic_speaking") {
+  if (requestedMode === "diagnostic_speaking") {
     const adminForDiag = createAdminClient();
     if (!adminForDiag) return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
     const { count } = await adminForDiag
@@ -200,6 +214,28 @@ export async function POST(req: Request) {
 
   const quiz = (profile?.quiz_result as { level?: string } | null) ?? null;
   const level = (profile?.current_level as string | null) ?? quiz?.level ?? "A2";
+
+  // Режим урока (7.7-7.8): «plan» (урок из плана дня) решается СЕРВЕРОМ по
+  // уровню — A0-A2 получают «Фундамент» (экзамен не упоминается), B1+ —
+  // полный экзаменационный формат. Явный foundation тоже штампуется уровнем.
+  const foundationLevel = (["A0", "A1", "A2"].includes(level) ? level : null) as "A0" | "A1" | "A2" | null;
+  const mode: string =
+    requestedMode === "plan"
+      ? foundationLevel
+        ? "foundation"
+        : "full"
+      : requestedMode === "foundation" && !foundationLevel
+        ? "free" // B1+ явного фундамента не получает — он ему вреден
+        : requestedMode;
+  const modeInstructions =
+    mode === "foundation"
+      ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
+      : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">];
+  // подсказки-заготовки на экран (A0-A1): студент может ПРОЧИТАТЬ ответ
+  const foundationHints =
+    mode === "foundation" && (foundationLevel === "A0" || foundationLevel === "A1")
+      ? ["Benim adım …", "Ben … yaşındayım", "… şehrinde yaşıyorum", "Evet · Hayır · Biraz", "Anlamadım, tekrar eder misiniz?"]
+      : [];
   const weakTr =
     (weak ?? [])
       .map((w) => topicById(w.topic as string)?.label.tr)
@@ -256,7 +292,7 @@ export async function POST(req: Request) {
   const creditsLeft = a.credits_left ?? 0;
   // проба уровня — жёсткий потолок ~2 минуты (+ запас на прощание агента)
   const maxSeconds =
-    mode === "diagnostic_speaking"
+    requestedMode === "diagnostic_speaking"
       ? Math.min(180, (baseLeft + creditsLeft) * 60)
       : Math.min(900, (baseLeft + creditsLeft) * 60);
 
@@ -270,6 +306,9 @@ export async function POST(req: Request) {
     lessonFocus: focus.map((t) => ({ id: t.id, label: t.label })),
     // «почему эта тема» на языке интерфейса (null = фокус не от ядра)
     lessonFocusReason: focusReasonLocalized,
+    // фундамент (7.8): режим после серверного резолва + фразы-заготовки
+    resolvedMode: mode,
+    foundationHints,
     dynamicVariables: {
       user_id: user.id, // ownership check at settlement
       student_name: (profile?.full_name as string | null) ?? (profile?.handle as string | null) ?? "öğrenci",
@@ -284,7 +323,7 @@ export async function POST(req: Request) {
       feedback_lang: FEEDBACK_LANG_TR[feedbackLangCode],
       feedback_lang_code: feedbackLangCode,
       mode: mode,
-      mode_instructions: MODE_INSTRUCTIONS[mode],
+      mode_instructions: modeInstructions,
     },
   });
 }

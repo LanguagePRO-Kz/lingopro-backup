@@ -391,7 +391,7 @@ export default function DashboardHome() {
                   <span className="shrink-0 text-xs font-semibold text-[#16a34a]">✓ {c.doneLabel}</span>
                 ) : task.kind === "voice_lesson" ? (
                   <Link
-                    href={`/dashboard/speaking/live?mode=${task.voiceMode ?? "bolum1"}${task.focusTopics?.length ? `&focus=${task.focusTopics.join(",")}` : ""}`}
+                    href={`/dashboard/speaking/live?mode=${task.voiceMode ?? "plan"}${task.focusTopics?.length ? `&focus=${task.focusTopics.join(",")}` : ""}`}
                     className="shrink-0 rounded-full bg-[var(--color-brand)]/10 px-4 py-2 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
                   >
                     {c.start}

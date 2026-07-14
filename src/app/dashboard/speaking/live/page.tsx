@@ -12,11 +12,14 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import { awardXp, XP } from "@/lib/xp";
 
-type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full";
+/** plan — режим урока из плана дня: СЕРВЕР решает по уровню (A0-A2 →
+ *  «Фундамент» без экзамена и баллов, B1+ → полный экзаменационный). */
+type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "plan" | "foundation";
 type Line = { source: "user" | "ai"; text: string };
 type Phase = "idle" | "starting" | "live" | "wrapping" | "ended";
 
-const MODES: Mode[] = ["bolum1", "bolum2", "bolum3", "full", "free"];
+// чипы ручного выбора; plan/foundation приходят только deep-link'ом из плана
+const MODES: Exclude<Mode, "plan" | "foundation">[] = ["bolum1", "bolum2", "bolum3", "full", "free"];
 
 // oral wrap-up instruction sent as a user message (a message, unlike a
 // contextual update, always triggers a reply turn) when the student ends the
@@ -45,6 +48,8 @@ const T = {
     topicsWorked: "Проработанные темы", nextSteps: "Что дальше", reportNone: "Разговор был слишком коротким для разбора.",
     reportPendingT: "Транскрипт урока ещё готовится на стороне провайдера. Нажми «Получить разбор» через минуту — он никуда не денется.",
     reportFailedT: "Разбор не построился — транскрипт цел. Попробуй ещё раз.",
+    hintsTitle: "Можно ответить так", dontUnderstand: "Не понял — помедленнее",
+    foundationScores: "Урок-фундамент: без экзаменационных баллов — учимся говорить. Разбор фраз ниже.",
     again: "Ещё урок",
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errNoMinutes: "На сегодня минуты закончились. База обновится в полночь — или докупи пакет минут.", buyMinutes: "Докупить минуты",
@@ -69,6 +74,8 @@ const T = {
     topicsWorked: "Topics worked on", nextSteps: "Next steps", reportNone: "The conversation was too short for a review.",
     reportPendingT: "The lesson transcript is still being prepared by the provider. Press “Get the review” in a minute — it isn't going anywhere.",
     reportFailedT: "The review could not be built — your transcript is safe. Try again.",
+    hintsTitle: "You can answer like this", dontUnderstand: "Didn't get it — slower please",
+    foundationScores: "Foundation lesson: no exam scores — we're learning to speak. Phrase review below.",
     again: "Another lesson",
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
     errNoMinutes: "You're out of minutes for today. The base quota resets at midnight — or top up with a minute pack.", buyMinutes: "Buy minutes",
@@ -93,6 +100,8 @@ const T = {
     topicsWorked: "Çalışılan konular", nextSteps: "Sonraki adımlar", reportNone: "Konuşma değerlendirme için çok kısaydı.",
     reportPendingT: "Ders dökümü sağlayıcı tarafında hâlâ hazırlanıyor. Bir dakika sonra «Değerlendirmeyi al»a bas — kaybolmaz.",
     reportFailedT: "Değerlendirme oluşturulamadı — dökümün yerinde. Tekrar dene.",
+    hintsTitle: "Şöyle cevap verebilirsin", dontUnderstand: "Anlamadım — daha yavaş",
+    foundationScores: "Temel ders: sınav puanı yok — konuşmayı öğreniyoruz. Cümle incelemesi aşağıda.",
     again: "Yeni ders",
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir — ya da dakika paketi al.", buyMinutes: "Dakika al",
@@ -117,6 +126,8 @@ const T = {
     topicsWorked: "Өтілген тақырыптар", nextSteps: "Келесі қадамдар", reportNone: "Әңгіме талдау үшін тым қысқа болды.",
     reportPendingT: "Сабақ транскрипті провайдер жағында әлі дайындалуда. Бір минуттан кейін «Талдауды алу» батырмасын бас — ол жоғалмайды.",
     reportFailedT: "Талдау құрылмады — транскрипт сақтаулы. Қайта көр.",
+    hintsTitle: "Былай жауап беруге болады", dontUnderstand: "Түсінбедім — баяуырақ",
+    foundationScores: "Іргетас сабағы: емтихан баллы жоқ — сөйлеуді үйренеміз. Сөйлем талдауы төменде.",
     again: "Тағы бір сабақ",
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады — немесе минут пакетін ал.", buyMinutes: "Минут алу",
@@ -183,7 +194,7 @@ function LiveLesson() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    if (m && (MODES as string[]).includes(m)) setMode(m as Mode);
+    if (m && ((MODES as string[]).includes(m) || m === "plan" || m === "foundation")) setMode(m as Mode);
     const focus = (params.get("focus") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     if (focus.length) focusOverrideRef.current = focus.slice(0, 3); // server re-validates against the registry
   }, []);
@@ -227,6 +238,9 @@ function LiveLesson() {
   } | null>(null);
   const [reportPending, setReportPending] = useState(false);
   const [reportRetrying, setReportRetrying] = useState(false);
+  // фундамент (7.8): режим после серверного резолва + фразы-заготовки на экран
+  const [resolvedMode, setResolvedMode] = useState<string | null>(null);
+  const [foundationHints, setFoundationHints] = useState<string[]>([]);
   const [settleFailed, setSettleFailed] = useState(false);
   // billing cutoff confirmed server-side: everything after the press is free
   const [wrapFree, setWrapFree] = useState(false);
@@ -513,6 +527,8 @@ function LiveLesson() {
     setAllowance(data.allowance);
     setLessonFocus(data.lessonFocus ?? []);
     setFocusReason(data.lessonFocusReason ?? null);
+    setResolvedMode((data as { resolvedMode?: string }).resolvedMode ?? mode);
+    setFoundationHints((data as { foundationHints?: string[] }).foundationHints ?? []);
     maxSecondsRef.current = data.maxSeconds;
     setMaxSeconds(data.maxSeconds);
     conversation.startSession({
@@ -708,16 +724,43 @@ function LiveLesson() {
             ))}
           </div>
 
+          {/* фундамент (7.8): фразы-заготовки — ответ можно ПРОЧИТАТЬ */}
+          {phase === "live" && resolvedMode === "foundation" && foundationHints.length > 0 && (
+            <div className="mt-4 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.05] px-3.5 py-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-brand)]">{c.hintsTitle}</div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {foundationHints.map((h) => (
+                  <span key={h} className="rounded-full bg-white px-2.5 py-1 text-xs text-[var(--color-foreground)] shadow-sm">{h}</span>
+                ))}
+              </div>
+            </div>
+          )}
           {phase === "live" && (
             <p className="mt-4 rounded-xl bg-black/[0.03] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--color-muted)]">
               💬 {c.endHint}
             </p>
           )}
           {phase === "live" && (
-            <div className="mt-3 flex items-center gap-4">
+            <div className="mt-3 flex flex-wrap items-center gap-4">
               <button type="button" onClick={requestWrapUp} className="btn-primary rounded-full px-5 py-2.5 text-sm font-medium">
                 🏁 {c.end}
               </button>
+              {/* «Не понял» (7.8): Ahu повторит медленнее и переведёт */}
+              {resolvedMode === "foundation" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      conversation.sendUserMessage("Anlamadım, daha yavaş tekrar eder misiniz?");
+                    } catch {
+                      /* соединение мигнуло */
+                    }
+                  }}
+                  className="rounded-full border border-black/[0.1] px-4 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-black/[0.04]"
+                >
+                  🙋 {c.dontUnderstand}
+                </button>
+              )}
               <button type="button" onClick={endNow} className="text-xs text-[var(--color-muted)] underline-offset-2 hover:underline">
                 {c.endNow}
               </button>
@@ -794,17 +837,24 @@ function LiveLesson() {
               <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.reportTitle}</div>
               {report.summary && <p className="text-sm leading-relaxed text-[var(--color-foreground)]">{report.summary}</p>}
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(["fluency", "grammar", "vocab", "coherence"] as const).map((k) => (
-                  <div key={k} className="rounded-xl bg-black/[0.03] p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-[var(--color-foreground)]">{c.crit[k]}</span>
-                      <span className="text-sm font-bold text-[var(--color-brand)]">{report.criteria[k].score}/5</span>
+              {/* 7.8: экзаменационные баллы — только с B1; фундамент мотивирует, не судит */}
+              {resolvedMode === "foundation" ? (
+                <p className="rounded-xl bg-[var(--color-brand)]/[0.06] px-3.5 py-2.5 text-xs text-[var(--color-foreground)]">
+                  🌱 {c.foundationScores}
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(["fluency", "grammar", "vocab", "coherence"] as const).map((k) => (
+                    <div key={k} className="rounded-xl bg-black/[0.03] p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[var(--color-foreground)]">{c.crit[k]}</span>
+                        <span className="text-sm font-bold text-[var(--color-brand)]">{report.criteria[k].score}/5</span>
+                      </div>
+                      {report.criteria[k].comment && <p className="mt-1 text-xs text-[var(--color-muted)]">{report.criteria[k].comment}</p>}
                     </div>
-                    {report.criteria[k].comment && <p className="mt-1 text-xs text-[var(--color-muted)]">{report.criteria[k].comment}</p>}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-[#d97706]">{c.errors}</div>

@@ -33,6 +33,12 @@ Görev: SADECE öğrencinin söylediklerini değerlendir.${gender ? `\n${GENDER_
 - coherence: tutarlılık ve soruya uygunluk
 ÖNEMLİ: Telaffuz yazılı dökümden DEĞERLENDİRİLEMEZ — telaffuz hakkında hiçbir şey yazma, uydurma.
 
+SEVİYEYE GÖRE TON (öğrencinin seviyesi kullanıcı mesajında): A0-A1 —
+başlangıç dersi, sınav değil: en fazla 2 hata seç, dil bilgisi teorisine
+girme, söylediği SOMUT şeyleri öv, «summary» cesaretlendirici olsun (iki
+kelime söyledi — bu bir zaferdir; öğrenci zaten zorlandığını biliyor).
+A2 — nazik ve kısa. B1 ve üstü — tam TÖMER değerlendirme ciddiyeti.
+
 Kurallar:
 1. "summary" (2-3 cümle), ölçüt yorumları ("comment"), hata açıklamaları ("rule", "explanation") ve "next_steps" ${langName} olacak — ana dili ${langName} olan eğitimli birinin yazdığı gibi DOĞAL, akıcı ve dilbilgisi açısından KUSURSUZ. Makine çevirisi tadı, kalıp ifade, yapay/devrik cümle YASAK. Alıntılar Türkçe kalır.
 2. Hatalar YALNIZCA öğrencinin cümlelerinden: TAM alıntı (quote) → doğru biçim (correction) → kuralın adı (rule) → kısa açıklama (explanation). En önemli 3-7 hatayı seç, hata UYDURMA.
