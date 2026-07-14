@@ -37,15 +37,15 @@ const T = {
     bBody: (tgt: string, days: number) =>
       `Полное владение ${tgt} за ${days} дней не выйдет — это годы, и это нормально. Задача другая: натаскать тебя на формат TÖMER, закрыть слабые темы и выжать максимум баллов на экзамене.`,
     bPlan: (m: number) =>
-      `Интенсив под сдачу: ${m} мин/день · пробники по расписанию · стратегии секций · слабые темы — в свой день.`,
+      `Интенсив под сдачу: ${m} мин/день · пробники по расписанию · слабые темы — в свой день.`,
     bPaceUp: (pace: number) => `Поднять до ${pace} мин/день — успеешь заметно больше к дате.`,
     bPaceTo120: "Включить максимум — 120 мин/день: каждая минута работает и на уровень, и на формат.",
     bPaceMaxed: "Темп уже на максимуме (120 мин/день) — дальше решают дисциплина и пробники.",
     /* -------- scenario A: movable date → calm real choices -------- */
     aLead: "Подготовим к сдаче по максимуму.",
     aBody: (tgt: string) =>
-      `Полное владение ${tgt} к этой дате не успеть — но сдача экзамена это отдельный навык: формат, стратегии и тайминг натаскиваются быстро и повышают шансы сдать выше «чистого» уровня. Как действуем — выбирай:`,
-    aStay: "Остаться на своей дате — интенсив под сдачу: пробники, стратегии, слабые темы.",
+      `Полное владение ${tgt} к этой дате не успеть — но сдача экзамена это отдельный навык: формат и типовые задания натаскиваются быстрее, чем язык, и повышают шансы сдать выше «чистого» уровня. Как действуем — выбирай:`,
+    aStay: "Остаться на своей дате — интенсив под сдачу: пробники и слабые темы.",
     aPace: (pace: number) => `Поднять темп до ${pace} мин/день — успеешь заметно больше.`,
     aTarget: "Цель B2 к этой дате — реально успеть. Для учёбы и работы B2 обычно достаточно.",
     aDate: (d: string) => `Не горит? Можно сдвинуть дату — комфортно к ${d}.`,
@@ -74,14 +74,14 @@ const T = {
     bBody: (tgt: string, days: number) =>
       `Full ${tgt} proficiency won't happen in ${days} days — that takes years, and that's fine. The job is different: train you on the TÖMER format, close the weak topics and squeeze the maximum score out of exam day.`,
     bPlan: (m: number) =>
-      `The passing intensive: ${m} min/day · mocks on schedule · section strategies · weak topics on their day.`,
+      `The passing intensive: ${m} min/day · mocks on schedule · weak topics on their day.`,
     bPaceUp: (pace: number) => `Raise to ${pace} min/day — you'll cover notably more by the date.`,
     bPaceTo120: "Switch to the maximum — 120 min/day: every minute works on both your level and the format.",
     bPaceMaxed: "You're already at the maximum pace (120 min/day) — from here it's discipline and mocks.",
     aLead: "We'll get you exam-ready to the maximum.",
     aBody: (tgt: string) =>
-      `Full ${tgt} proficiency won't fit this date — but passing is a separate skill: format, strategies and timing train fast and raise your odds of scoring above your "pure" level. Your call on how we play it:`,
-    aStay: "Keep your date — the passing intensive: mocks, strategies, weak topics.",
+      `Full ${tgt} proficiency won't fit this date — but passing is a separate skill: the format and typical tasks train faster than the language itself and raise your odds of scoring above your "pure" level. Your call on how we play it:`,
+    aStay: "Keep your date — the passing intensive: mocks and weak topics.",
     aPace: (pace: number) => `Raise the pace to ${pace} min/day — you'll cover notably more.`,
     aTarget: "Target B2 by this date — realistically doable. For study and work, B2 is usually enough.",
     aDate: (d: string) => `No rush? The date can move — comfortable by ${d}.`,
@@ -109,14 +109,14 @@ const T = {
     bBody: (tgt: string, days: number) =>
       `${days} günde tam ${tgt} hâkimiyeti olmaz — o yıllar ister, bu da normal. Görev farklı: seni TÖMER formatına hazırlamak, zayıf konuları kapatmak ve sınav günü maksimum puanı almak.`,
     bPlan: (m: number) =>
-      `Geçiş yoğun programı: günde ${m} dk · programında denemeler · bölüm stratejileri · zayıf konular kendi gününde.`,
+      `Geçiş yoğun programı: günde ${m} dk · programında denemeler · zayıf konular kendi gününde.`,
     bPaceUp: (pace: number) => `Günde ${pace} dakikaya çıkar — tarihe kadar belirgin şekilde fazlasını alırsın.`,
     bPaceTo120: "Maksimuma geç — günde 120 dk: her dakika hem seviyeye hem formata çalışır.",
     bPaceMaxed: "Tempo zaten maksimumda (günde 120 dk) — bundan sonrası disiplin ve denemeler.",
     aLead: "Seni sınava maksimum düzeyde hazırlayacağız.",
     aBody: (tgt: string) =>
-      `Bu tarihe kadar tam ${tgt} hâkimiyeti yetişmez — ama sınavı geçmek ayrı bir beceridir: format, strateji ve zamanlama hızla öğrenilir ve "saf" seviyenin üstünde puan alma şansını artırır. Nasıl oynayacağımız senin kararın:`,
-    aStay: "Tarihinde kal — geçiş yoğun programı: denemeler, stratejiler, zayıf konular.",
+      `Bu tarihe kadar tam ${tgt} hâkimiyeti yetişmez — ama sınavı geçmek ayrı bir beceridir: format ve tipik görevler dilin kendisinden hızlı öğrenilir ve "saf" seviyenin üstünde puan alma şansını artırır. Nasıl oynayacağımız senin kararın:`,
+    aStay: "Tarihinde kal — geçiş yoğun programı: denemeler ve zayıf konular.",
     aPace: (pace: number) => `Tempoyu günde ${pace} dakikaya çıkar — belirgin şekilde fazlasını alırsın.`,
     aTarget: "Bu tarihe kadar B2 hedefi — gerçekçi. Eğitim ve iş için B2 genelde yeterli.",
     aDate: (d: string) => `Acelesi yok mu? Tarih kayabilir — ${d} rahat olur.`,
@@ -144,14 +144,14 @@ const T = {
     bBody: (tgt: string, days: number) =>
       `${days} күнде ${tgt} деңгейін толық меңгеру мүмкін емес — оған жылдар керек, бұл қалыпты. Міндет басқа: сені TÖMER форматына баулу, әлсіз тақырыптарды жабу және емтихан күні максимум балл жинау.`,
     bPlan: (m: number) =>
-      `Тапсыруға арналған интенсив: күніне ${m} минут · кесте бойынша сынамалар · бөлім стратегиялары · әлсіз тақырыптар өз күнінде.`,
+      `Тапсыруға арналған интенсив: күніне ${m} минут · кесте бойынша сынамалар · әлсіз тақырыптар өз күнінде.`,
     bPaceUp: (pace: number) => `Күніне ${pace} минутқа көтер — күнге дейін едәуір көп үлгересің.`,
     bPaceTo120: "Максимумды қос — күніне 120 минут: әр минут деңгейге де, форматқа да жұмыс істейді.",
     bPaceMaxed: "Қарқын онсыз да максимумда (күніне 120 минут) — әрі қарай тәртіп пен сынамалар шешеді.",
     aLead: "Тапсыруға максимум дайындаймыз.",
     aBody: (tgt: string) =>
-      `Бұл күнге дейін ${tgt} деңгейін толық меңгеру үлгермейді — бірақ емтихан тапсыру бөлек дағды: формат, стратегия мен тайминг тез үйреніледі және «таза» деңгейден жоғары балл алу мүмкіндігін арттырады. Қалай жүреміз — таңдау сенікі:`,
-    aStay: "Өз күніңде қал — тапсыруға интенсив: сынамалар, стратегиялар, әлсіз тақырыптар.",
+      `Бұл күнге дейін ${tgt} деңгейін толық меңгеру үлгермейді — бірақ емтихан тапсыру бөлек дағды: формат пен типтік тапсырмалар тілдің өзінен тезірек үйреніледі және «таза» деңгейден жоғары балл алу мүмкіндігін арттырады. Қалай жүреміз — таңдау сенікі:`,
+    aStay: "Өз күніңде қал — тапсыруға интенсив: сынамалар мен әлсіз тақырыптар.",
     aPace: (pace: number) => `Қарқынды күніне ${pace} минутқа көтер — едәуір көп үлгересің.`,
     aTarget: "Бұл күнге дейін B2 мақсаты — нақты үлгеруге болады. Оқу мен жұмысқа әдетте B2 жеткілікті.",
     aDate: (d: string) => `Асығыс емес пе? Күнді жылжытуға болады — ${d} қолайлы.`,

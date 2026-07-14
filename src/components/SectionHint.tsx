@@ -32,10 +32,10 @@ const HINTS: Record<HintId, Record<"ru" | "en" | "tr" | "kk", string>> = {
     kk: "TÖMER Okuma үлгісіндегі сұрақты мәтіндер. Сөздіксіз оқы — алдымен жалпы мағына, сосын детальдар.",
   },
   listening: {
-    ru: "Аудирование: диалоги с вопросами. На экзамене запись играет дважды — здесь так же, привыкай к формату.",
-    en: "Listening: dialogues with questions. On the exam the audio plays twice — same here, get used to the format.",
-    tr: "Dinleme: sorulu diyaloglar. Sınavda kayıt iki kez çalar — burada da öyle, formata alış.",
-    kk: "Тыңдалым: сұрақты диалогтар. Емтиханда жазба екі рет ойналады — мұнда да солай, форматқа үйрен.",
+    ru: "Аудирование: диалоги с вопросами. Здесь тренировка — слушай сколько нужно; экзаменационный лимит двух прослушиваний действует в пробных тестах.",
+    en: "Listening: dialogues with questions. This is practice — listen as much as you need; the exam's two-play limit applies in mock tests.",
+    tr: "Dinleme: sorulu diyaloglar. Burası pratik — istediğin kadar dinle; sınavdaki iki dinleme sınırı deneme sınavlarında geçerli.",
+    kk: "Тыңдалым: сұрақты диалогтар. Бұл жаттығу — қанша керек болса, сонша тыңда; емтихандағы екі рет тыңдау шегі сынақ тесттерінде қолданылады.",
   },
   writing: {
     ru: "Пиши сочинение — AI-экзаменатор разберёт каждую ошибку по критериям TÖMER Yazma. Начни с любого посильного задания.",

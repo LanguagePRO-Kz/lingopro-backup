@@ -29,7 +29,7 @@ import {
 
 const T = {
   ru: {
-    title: "Пробный TÖMER", sub: "Формат экзамена: 4 секции, каждая оценивается из 25. Оригинальные материалы в официальном формате.",
+    title: "Пробный TÖMER", sub: "Формат экзамена: 4 секции, каждая оценивается из 25. Задания оригинальные — создаются AI и постоянно улучшаются.",
     sections: { dinleme: "Dinleme · Аудирование", okuma: "Okuma · Чтение", yazma: "Yazma · Письмо", konusma: "Konuşma · Говорение" },
     start: "Начать", redo: "Пройти ещё раз", scoreOf: "из 25", total: "Итог", totalHint: "Итог /100 появится, когда будут оценены все 4 секции.",
     listenHint: "Запись играет дважды — как на экзамене.", playsLeft: (n: number) => `осталось прослушиваний: ${n}`,
@@ -40,10 +40,10 @@ const T = {
     yazmaErr: "Не получилось проверить — текст на месте, попробуй отправить ещё раз.",
     konusmaBody: "Говорение проходит живым уроком с AI-преподавателем: 3 части, как на TÖMER. Оценка по критериям придёт после урока.",
     konusmaGo: "Начать голосовой экзамен",
-    sourceOriginal: "Оригинальные материалы в формате TÖMER",
+    sourceOriginal: "Задания созданы AI в формате TÖMER и постоянно улучшаются",
   },
   en: {
-    title: "TÖMER mock exam", sub: "Exam format: 4 sections, each scored out of 25. Original materials in the official format.",
+    title: "TÖMER mock exam", sub: "Exam format: 4 sections, each scored out of 25. Original tasks — AI-generated and continuously improved.",
     sections: { dinleme: "Dinleme · Listening", okuma: "Okuma · Reading", yazma: "Yazma · Writing", konusma: "Konuşma · Speaking" },
     start: "Start", redo: "Retake", scoreOf: "of 25", total: "Total", totalHint: "The /100 total appears once all 4 sections are scored.",
     listenHint: "The recording plays twice — like the real exam.", playsLeft: (n: number) => `plays left: ${n}`,
@@ -54,10 +54,10 @@ const T = {
     yazmaErr: "Review failed — your text is safe, try submitting again.",
     konusmaBody: "Speaking runs as a live lesson with the AI teacher: 3 parts, TÖMER-style. The criteria-based score arrives after the lesson.",
     konusmaGo: "Start the speaking exam",
-    sourceOriginal: "Original materials in the TÖMER format",
+    sourceOriginal: "AI-generated tasks in the TÖMER format, continuously improved",
   },
   tr: {
-    title: "TÖMER Deneme Sınavı", sub: "Sınav formatı: 4 bölüm, her biri 25 üzerinden. Resmî formatta özgün materyaller.",
+    title: "TÖMER Deneme Sınavı", sub: "Sınav formatı: 4 bölüm, her biri 25 üzerinden. Özgün görevler — yapay zekâ üretir, sürekli iyileştirilir.",
     sections: { dinleme: "Dinleme", okuma: "Okuma", yazma: "Yazma", konusma: "Konuşma" },
     start: "Başla", redo: "Tekrar çöz", scoreOf: "/ 25", total: "Toplam", totalHint: "4 bölümün tamamı puanlanınca /100 toplam görünür.",
     listenHint: "Kayıt iki kez çalar — gerçek sınavdaki gibi.", playsLeft: (n: number) => `kalan dinleme: ${n}`,
@@ -68,10 +68,10 @@ const T = {
     yazmaErr: "İnceleme başarısız — metnin duruyor, tekrar göndermeyi dene.",
     konusmaBody: "Konuşma, AI öğretmenle canlı derste yapılır: TÖMER tarzı 3 bölüm. Ölçütlere göre puan dersten sonra gelir.",
     konusmaGo: "Konuşma sınavını başlat",
-    sourceOriginal: "TÖMER formatında özgün materyaller",
+    sourceOriginal: "TÖMER formatında yapay zekâ üretimi görevler, sürekli iyileştirilir",
   },
   kk: {
-    title: "Сынақ TÖMER", sub: "Емтихан форматы: 4 бөлім, әрқайсысы 25 ұпайдан. Ресми форматтағы төл материалдар.",
+    title: "Сынақ TÖMER", sub: "Емтихан форматы: 4 бөлім, әрқайсысы 25 ұпайдан. Тапсырмалар төл — AI жасайды және үнемі жетілдіріледі.",
     sections: { dinleme: "Dinleme · Тыңдалым", okuma: "Okuma · Оқылым", yazma: "Yazma · Жазылым", konusma: "Konuşma · Сөйлесім" },
     start: "Бастау", redo: "Қайта өту", scoreOf: "/ 25", total: "Қорытынды", totalHint: "4 бөлім түгел бағаланғанда /100 қорытынды шығады.",
     listenHint: "Жазба екі рет ойналады — нағыз емтихандағыдай.", playsLeft: (n: number) => `қалған тыңдау: ${n}`,
@@ -82,7 +82,7 @@ const T = {
     yazmaErr: "Тексеру сәтсіз — мәтінің сақтаулы, қайта жіберіп көр.",
     konusmaBody: "Сөйлесім AI ұстазбен жанды сабақта өтеді: TÖMER үлгісіндегі 3 бөлім. Өлшемдер бойынша баға сабақтан кейін келеді.",
     konusmaGo: "Сөйлесім емтиханын бастау",
-    sourceOriginal: "TÖMER форматындағы төл материалдар",
+    sourceOriginal: "TÖMER форматындағы AI жасаған тапсырмалар, үнемі жетілдіріледі",
   },
 };
 
