@@ -195,6 +195,14 @@ export default function PlanPage() {
     }
   }
 
+  // реальный прогресс к цели (та же шкала, что на статистике) — не хардкод 40%
+  const CEFR_IDX: Record<string, number> = { A0: 0, A1: 0, A2: 1, B1: 2, B2: 3, C1: 4 };
+  const goalTarget = examPlan?.targetLevel ?? "B2";
+  const goalPct = Math.max(
+    0,
+    Math.min(100, Math.round(((CEFR_IDX[result.level] ?? 0) / (CEFR_IDX[goalTarget] || 1)) * 100)),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -234,7 +242,7 @@ export default function PlanPage() {
           </div>
         </div>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
-          <div className="h-full w-[40%] rounded-full bg-white" />
+          <div className="h-full rounded-full bg-white transition-[width]" style={{ width: `${goalPct}%` }} />
         </div>
         <div className="mt-1.5 flex justify-between text-xs text-white/70">
           <span>{result.level} {c.goalNow}</span>

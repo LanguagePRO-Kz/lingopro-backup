@@ -24,7 +24,7 @@ const T = {
     stepsTitle: "Как это пройдёт",
     start: "Начать пробу", starting: "Подключение…",
     yourTurn: "Сейчас говори — Ahu слушает", ahuTurn: "Ahu говорит — послушай вопрос",
-    left: "осталось", finishing: "Завершаем — считаем оценку…",
+    left: "осталось", finishing: "Анализирую твою речь — обычно 15–30 секунд",
     done: "Готово! Оценка говорения появится на странице результата.", toResult: "К результату",
     errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errUsed: "Проба уже была использована. Оценка говорения обновляется на живых уроках с Ahu.",
@@ -38,7 +38,7 @@ const T = {
     stepsTitle: "How it goes",
     start: "Start the probe", starting: "Connecting…",
     yourTurn: "Speak now — Ahu is listening", ahuTurn: "Ahu is speaking — listen to the question",
-    left: "left", finishing: "Wrapping up — scoring…",
+    left: "left", finishing: "Analyzing your speech — usually 15–30 seconds",
     done: "Done! Your speaking score will appear on the result page.", toResult: "To the result",
     errMic: "Microphone access is required — allow it in your browser and retry.",
     errUsed: "The probe has already been used. Speaking is scored in live lessons with Ahu.",
@@ -52,7 +52,7 @@ const T = {
     stepsTitle: "Nasıl geçecek",
     start: "Denemeyi başlat", starting: "Bağlanıyor…",
     yourTurn: "Şimdi konuş — Ahu dinliyor", ahuTurn: "Ahu konuşuyor — soruyu dinle",
-    left: "kaldı", finishing: "Bitiriliyor — puanlanıyor…",
+    left: "kaldı", finishing: "Konuşman analiz ediliyor — genelde 15–30 saniye",
     done: "Tamam! Konuşma puanın sonuç sayfasında görünecek.", toResult: "Sonuca dön",
     errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errUsed: "Deneme zaten kullanıldı. Konuşma puanı Ahu ile canlı derslerde güncellenir.",
@@ -66,7 +66,7 @@ const T = {
     stepsTitle: "Қалай өтеді",
     start: "Сынаманы бастау", starting: "Қосылуда…",
     yourTurn: "Қазір сөйле — Ahu тыңдап тұр", ahuTurn: "Ahu сөйлеп жатыр — сұрақты тыңда",
-    left: "қалды", finishing: "Аяқталуда — бағалануда…",
+    left: "қалды", finishing: "Сөзің талдануда — әдетте 15–30 секунд",
     done: "Дайын! Сөйлесім бағасы нәтиже бетінде көрінеді.", toResult: "Нәтижеге өту",
     errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errUsed: "Сынама қолданылып қойған. Сөйлесім бағасы Ahu-мен жанды сабақтарда жаңарады.",
@@ -93,6 +93,15 @@ function SpeakingProbe() {
   const [phase, setPhase] = useState<"idle" | "starting" | "live" | "settling" | "done">("idle");
   const [err, setErr] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [settleSec, setSettleSec] = useState(0);
+
+  // счётчик ожидания разбора: студент видит, что процесс идёт, а не завис
+  useEffect(() => {
+    if (phase !== "settling") return;
+    setSettleSec(0);
+    const t = setInterval(() => setSettleSec((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
   const convIdRef = useRef<string | null>(null);
   const settlingRef = useRef(false);
 
@@ -260,8 +269,11 @@ function SpeakingProbe() {
         )}
         {phase === "settling" && (
           <div className="mt-6 flex items-center gap-3 text-sm text-[var(--color-muted)]">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
-            {c.finishing}
+            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--color-brand)] border-t-transparent" />
+            <span>
+              ⏳ {c.finishing}
+              {settleSec > 0 && <span className="tabular-nums"> · {settleSec}s</span>}
+            </span>
           </div>
         )}
         {phase === "done" && (

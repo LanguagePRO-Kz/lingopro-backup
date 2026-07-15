@@ -2,49 +2,50 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  computeStreak,
-  weekCalendar,
-  type DailyTask,
-  type DayRow,
-} from "@/lib/daily-plan";
+import { computeStreak, weekCalendar, type DayRow } from "@/lib/daily-plan";
 import { LEVELS } from "@/data/types";
 
 /**
- * Real stats for the dashboard /stats page. Everything is derived from the
- * tables that actually exist in this project:
- *   - `daily_progress` (date, tasks[], completed/total) → streak, week, per-skill
- *     completed counts and words learned;
- *   - `attempts` (append-only, Фаза 1) → reading/listening accuracy % —
- *     ТОТ ЖЕ источник, куда разделы и план дня пишут ответы (один источник
- *     правды); самооценка (is_self_reported) исключена;
- *   - `task_results` (skill, score, max_score) → writing/speaking score % —
- *     эти навыки ещё не пишут attempts (письмо — AI-ревью, голос — Фаза 2);
- *     после их переезда убрать и этот остаток;
- *   - `profiles.quiz_result.level` → current CEFR level.
- * The goal is the platform's fixed target (C1).
+ * Real stats for the dashboard /stats page — два РАЗНЫХ источника, которые
+ * нельзя смешивать (правило 1.3: отсутствие данных ≠ результат):
  *
- * Note: streak and the week strip are always "current" (period-independent).
- * The period selector filters the per-skill counts / words and the
- * reading/listening accuracy; writing/speaking score % is all-time because
- * `task_results` has no reliable timestamp column.
+ * 1. ОЦЕНКА УРОВНЯ — `profiles.quiz_result.sections` (/25 за секцию):
+ *    диагностика + голосовая проба (+ мок через attachKonusmaScore).
+ *    Это снимок уровня, НЕ активность — показывается отдельной карточкой.
+ * 2. РЕАЛЬНАЯ РАБОТА после диагностики:
+ *    - `attempts` (source != 'diagnostic') → счётчики решённых заданий и
+ *      точность reading/listening за период — ТОТ ЖЕ источник, куда пишут
+ *      разделы, план дня и голосовой разбор; самооценка (is_self_reported)
+ *      в точность не входит, в счётчик слов — входит (реальное повторение);
+ *    - `ai_usage` feature='writing' → сколько эссе проверено AI;
+ *    - `voice_sessions` (seconds > 0) → сколько голосовых уроков;
+ *    - `daily_progress` → стрик и неделя (только реальные выполненные дни).
+ *
+ * Цель: target_level из профиля; NULL → B2 (порог вуза), НИКОГДА не C1.
  */
 
 export type Skill = "reading" | "listening" | "writing" | "speaking";
 export type Period = "week" | "month" | "3mo" | "6mo" | "all";
+
+export type SectionScores = { dinleme: number | null; okuma: number | null; yazma: number | null; konusma: number | null };
 
 export type StatsData = {
   loading: boolean;
   streakDays: number;
   weekDone: boolean[]; // Пн..Вс
   currentLevel: string | null;
-  targetLevel: string | null;
+  targetLevel: "B2" | "C1";
   goalProgressPct: number;
-  scores: Record<Skill, number | null>;
+  /** оценка уровня по секциям (/25) из диагностики/пробы/мока; null = данных нет */
+  levelEstimate: SectionScores | null;
+  /** точность за период по РЕАЛЬНЫМ заданиям (без диагностики и самооценки) */
+  accuracy: { reading: number | null; listening: number | null };
+  /** решённое за период: задания/эссе/уроки/слова — реальная работа */
   counts: { reading: number; listening: number; writing: number; speaking: number; vocab: number };
+  /** задания по дням за период (для блока «Активность»); пусто = честный 0 */
+  activityByDay: { date: string; n: number }[];
 };
 
-const TARGET_LEVEL = "C1";
 const CEFR: Record<string, number> = { A0: 0, A1: 0, A2: 1, B1: 2, B2: 3, C1: 4 };
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -65,15 +66,16 @@ const INITIAL: StatsData = {
   streakDays: 0,
   weekDone: [false, false, false, false, false, false, false],
   currentLevel: null,
-  targetLevel: TARGET_LEVEL,
+  targetLevel: "B2",
   goalProgressPct: 0,
-  scores: { reading: null, listening: null, writing: null, speaking: null },
+  levelEstimate: null,
+  accuracy: { reading: null, listening: null },
   counts: { reading: 0, listening: 0, writing: 0, speaking: 0, vocab: 0 },
+  activityByDay: [],
 };
 
-type DbDay = { date: string; tasks: DailyTask[] | null; completed_count: number; total_count: number };
-type DbResult = { skill: string; score: number; max_score: number };
-type QuizResult = { level?: string } | null;
+type DbDay = { date: string; tasks: { completed?: boolean }[] | null; completed_count: number; total_count: number };
+type QuizResult = { level?: string; sections?: Partial<SectionScores> } | null;
 
 export function useStats(period: Period): StatsData {
   const [state, setState] = useState<StatsData>(INITIAL);
@@ -92,89 +94,72 @@ export function useStats(period: Period): StatsData {
         return;
       }
 
-      const [profileRes, daysRes, resultsRes, attemptsRes] = await Promise.all([
+      const from = periodStartISO(period);
+      const [profileRes, daysRes, attemptsRes, essaysRes, voiceRes] = await Promise.all([
         supabase.from("profiles").select("quiz_result, target_level").eq("id", user.id).maybeSingle(),
         supabase
           .from("daily_progress")
           .select("date, tasks, completed_count, total_count")
           .eq("user_id", user.id)
           .order("date"),
-        supabase.from("task_results").select("skill, score, max_score").eq("user_id", user.id),
         supabase
           .from("attempts")
-          .select("skill, is_correct, answered_at")
+          .select("skill, is_correct, is_self_reported, source, answered_at")
           .eq("user_id", user.id)
-          .in("skill", ["reading", "listening", "speaking"])
-          .eq("is_self_reported", false)
+          .in("skill", ["reading", "listening", "vocabulary"])
+          .neq("source", "diagnostic")
+          .gte("answered_at", `${from}T00:00:00Z`)
           .order("answered_at", { ascending: false })
           .limit(5000),
+        supabase.from("ai_usage").select("day, used").eq("user_id", user.id).eq("feature", "writing").gte("day", from),
+        supabase.from("voice_sessions").select("started_at, seconds").eq("user_id", user.id).gte("started_at", `${from}T00:00:00Z`),
       ]);
 
       if (cancelled) return;
 
-      // --- daily_progress → streak / week / period counts ---
+      // --- daily_progress → стрик/неделя (не зависят от периода) ---
       const days = (daysRes.data as DbDay[] | null) ?? [];
       const history: DayRow[] = days.map((d) => ({
         date: d.date,
-        tasks: d.tasks ?? [],
+        tasks: (d.tasks ?? []) as DayRow["tasks"],
         completedCount: d.completed_count,
         total: d.total_count,
       }));
-
       const streakDays = computeStreak(history);
       const weekDone = weekCalendar(history).map((w) => w.done);
 
-      const from = periodStartISO(period);
+      // --- attempts (без диагностики) → счётчики + точность + активность ---
       const counts = { reading: 0, listening: 0, writing: 0, speaking: 0, vocab: 0 };
-      for (const day of history) {
-        if (day.date < from) continue;
-        for (const t of day.tasks) {
-          if (!t.completed) continue;
-          if (t.skill === "vocabulary") counts.vocab += t.count || 0;
-          else if (t.skill in counts) counts[t.skill as Skill] += 1;
+      const acc = { reading: { correct: 0, n: 0 }, listening: { correct: 0, n: 0 } };
+      const byDay = new Map<string, number>();
+      for (const r of (attemptsRes.data as { skill: string; is_correct: boolean; is_self_reported: boolean; answered_at: string }[] | null) ?? []) {
+        const day = (r.answered_at ?? "").slice(0, 10);
+        byDay.set(day, (byDay.get(day) ?? 0) + 1);
+        if (r.skill === "vocabulary") counts.vocab += 1;
+        else if (r.skill === "reading" || r.skill === "listening") {
+          counts[r.skill] += 1;
+          if (!r.is_self_reported) {
+            acc[r.skill].n += 1;
+            if (r.is_correct) acc[r.skill].correct += 1;
+          }
         }
       }
-
-      // --- attempts → reading/listening/speaking accuracy % за период ---
-      // тот же источник, куда пишут разделы, план дня и разбор голосового
-      // урока (source='voice_lesson'); нет данных → null («—»)
-      const attemptAcc: Record<"reading" | "listening" | "speaking", { correct: number; n: number }> = {
-        reading: { correct: 0, n: 0 },
-        listening: { correct: 0, n: 0 },
-        speaking: { correct: 0, n: 0 },
-      };
-      for (const r of (attemptsRes.data as { skill: string; is_correct: boolean; answered_at: string }[] | null) ?? []) {
-        if ((r.answered_at ?? "") < from) continue;
-        const bucket = attemptAcc[r.skill as "reading" | "listening" | "speaking"];
-        if (!bucket) continue;
-        bucket.n += 1;
-        if (r.is_correct) bucket.correct += 1;
-      }
-
-      // --- task_results → writing score % (all-time) ---
-      // письмо ещё не пишет attempts (AI-ревью); speaking берёт task_results
-      // только как миграционный фолбэк — до первого разобранного урока
-      const acc: Record<Skill, { sum: number; n: number }> = {
-        reading: { sum: 0, n: 0 }, listening: { sum: 0, n: 0 }, writing: { sum: 0, n: 0 }, speaking: { sum: 0, n: 0 },
-      };
-      for (const r of (resultsRes.data as DbResult[] | null) ?? []) {
-        if (!(r.skill in acc) || !r.max_score) continue;
-        acc[r.skill as Skill].sum += (r.score / r.max_score) * 100;
-        acc[r.skill as Skill].n += 1;
-      }
-      const avg = (a: { sum: number; n: number }) => (a.n ? Math.round(a.sum / a.n) : null);
+      counts.writing = ((essaysRes.data as { used: number }[] | null) ?? []).reduce((s, r) => s + (r.used || 0), 0);
+      counts.speaking = ((voiceRes.data as { seconds: number }[] | null) ?? []).filter((v) => (v.seconds ?? 0) > 0).length;
       const pct = (a: { correct: number; n: number }) => (a.n ? Math.round((100 * a.correct) / a.n) : null);
-      const scores = {
-        reading: pct(attemptAcc.reading),
-        listening: pct(attemptAcc.listening),
-        writing: avg(acc.writing),
-        speaking: pct(attemptAcc.speaking) ?? avg(acc.speaking),
-      };
+      const activityByDay = [...byDay.entries()].map(([date, n]) => ({ date, n })).sort((a, b) => (a.date < b.date ? -1 : 1));
 
-      // --- profile → level + goal progress (goal is the student's B2/C1 choice) ---
+      // --- quiz_result → оценка уровня (/25) + текущий уровень ---
       const quiz = (profileRes.data?.quiz_result as QuizResult) ?? null;
-      const targetLevel = profileRes.data?.target_level === "B2" ? "B2" : TARGET_LEVEL;
+      const s = quiz?.sections;
+      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+      const levelEstimate: SectionScores | null = s
+        ? { dinleme: num(s.dinleme), okuma: num(s.okuma), yazma: num(s.yazma), konusma: num(s.konusma) }
+        : null;
       const currentLevel = quiz?.level && LEVELS.includes(quiz.level as (typeof LEVELS)[number]) ? quiz.level : null;
+
+      // --- цель: B2 по умолчанию (порог вуза); C1 только если выбран явно ---
+      const targetLevel: "B2" | "C1" = profileRes.data?.target_level === "C1" ? "C1" : "B2";
       const goalProgressPct = currentLevel
         ? Math.max(0, Math.min(100, Math.round(((CEFR[currentLevel] ?? 0) / CEFR[targetLevel]) * 100)))
         : 0;
@@ -186,8 +171,10 @@ export function useStats(period: Period): StatsData {
         currentLevel,
         targetLevel,
         goalProgressPct,
-        scores,
+        levelEstimate,
+        accuracy: { reading: pct(acc.reading), listening: pct(acc.listening) },
         counts,
+        activityByDay,
       });
     })().catch((err) => {
       console.error("[useStats]", err);

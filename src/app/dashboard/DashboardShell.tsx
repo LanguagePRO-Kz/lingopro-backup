@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
 import { FeedbackButton } from "@/components/FeedbackButton";
@@ -15,15 +15,14 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, syncProfileTimezone } from "@/lib/profile";
 import { saveResult } from "@/lib/quiz";
 import { saveProgress } from "@/lib/studyplan";
-import { peekToday } from "@/lib/daily-plan";
+import { computeStreak, peekToday, type DayRow } from "@/lib/daily-plan";
+import { daysToExam, fetchExamPlan } from "@/lib/exam-plan";
 
-const NOTIF_META = [
-  { emoji: "🟣", read: false },
-  { emoji: "📖", read: false },
-  { emoji: "📚", read: false },
-  { emoji: "🎯", read: true },
-  { emoji: "🔥", read: true },
-];
+/** Уведомление, собранное из РЕАЛЬНОГО события (правило 1.3: нет события —
+ * нет уведомления; выдуманные «серия 3 дня» у свежего юзера — враньё). */
+type Notif = { id: string; emoji: string; text: string; href?: string };
+
+const NOTIF_READ_KEY = "lingopro:notif-read";
 
 const ENROLL_MAILTO = `mailto:lingopro2026@gmail.com?subject=${encodeURIComponent(
   "Запись на экзамен TÖMER",
@@ -46,55 +45,68 @@ export default function DashboardShell({
   trialMsLeft: number | null;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { locale } = useI18n();
   const tx = pick(locale, {
     ru: {
       plan: "Персональный план", enroll: "Записаться на TÖMER", logout: "Выйти", new: "NEW", soon: "Скоро",
-      planMy: "Мой план", planGoal: "Цель: C1", planDays: "30 дней до экзамена", planToday: "Сегодня: 3/5 задач",
+      planMy: "Мой план",
+      planGoal: (tgt: string) => `Цель: ${tgt}`,
+      planDays: (d: number) => `${d} дн. до экзамена`,
+      planNoDate: "Дата экзамена не задана",
+      planToday: (done: number, total: number) => `Сегодня: ${done}/${total} задач`,
       notifTitle: "Уведомления", markAll: "Отметить все как прочитанные",
-      notifs: [
-        { t: "Добро пожаловать в LingoPRO!", time: "1 мин назад" },
-        { t: "Новый тест по чтению доступен", time: "2 часа назад" },
-        { t: "Пора повторить 5 слов", time: "5 часов назад" },
-        { t: "Поставьте цель подготовки к TÖMER", time: "1 день назад" },
-        { t: "Ваша серия: 3 дня подряд!", time: "2 дня назад" },
-      ],
+      nToday: (n: number) => `В плане на сегодня осталось ${n} задач`,
+      nDone: "План на сегодня выполнен — отличная работа!",
+      nStreak: (n: number) => `Серия: ${n} дн. подряд — не прерывай сегодня`,
+      nProbe: "Оценка говорения пуста — пройди пробу (2 мин)",
+      nTrial: (h: number) => `Триал заканчивается через ~${h} ч`,
+      nEmpty: "Пока нет уведомлений",
     },
     en: {
       plan: "Personal plan", enroll: "Register for TÖMER", logout: "Log out", new: "NEW", soon: "Soon",
-      planMy: "My plan", planGoal: "Goal: C1", planDays: "30 days to the exam", planToday: "Today: 3/5 tasks",
+      planMy: "My plan",
+      planGoal: (tgt: string) => `Goal: ${tgt}`,
+      planDays: (d: number) => `${d} days to the exam`,
+      planNoDate: "Exam date not set",
+      planToday: (done: number, total: number) => `Today: ${done}/${total} tasks`,
       notifTitle: "Notifications", markAll: "Mark all as read",
-      notifs: [
-        { t: "Welcome to LingoPRO!", time: "1 min ago" },
-        { t: "A new reading test is available", time: "2 hours ago" },
-        { t: "Time to review 5 words", time: "5 hours ago" },
-        { t: "Set your TÖMER prep goal", time: "1 day ago" },
-        { t: "Your streak: 3 days in a row!", time: "2 days ago" },
-      ],
+      nToday: (n: number) => `${n} tasks left in today's plan`,
+      nDone: "Today's plan is done — great work!",
+      nStreak: (n: number) => `Streak: ${n} days in a row — keep it alive today`,
+      nProbe: "Your speaking score is empty — take the 2-min probe",
+      nTrial: (h: number) => `Your trial ends in ~${h} h`,
+      nEmpty: "No notifications yet",
     },
     tr: {
       plan: "Kişisel plan", enroll: "TÖMER'e kayıt ol", logout: "Çıkış", new: "NEW", soon: "Yakında",
-      planMy: "Planım", planGoal: "Hedef: C1", planDays: "Sınava 30 gün", planToday: "Bugün: 3/5 görev",
+      planMy: "Planım",
+      planGoal: (tgt: string) => `Hedef: ${tgt}`,
+      planDays: (d: number) => `Sınava ${d} gün`,
+      planNoDate: "Sınav tarihi belirlenmedi",
+      planToday: (done: number, total: number) => `Bugün: ${done}/${total} görev`,
       notifTitle: "Bildirimler", markAll: "Tümünü okundu işaretle",
-      notifs: [
-        { t: "LingoPRO'ya hoş geldin!", time: "1 dk önce" },
-        { t: "Yeni okuma testi hazır", time: "2 saat önce" },
-        { t: "5 kelimeyi tekrar etme zamanı", time: "5 saat önce" },
-        { t: "TÖMER hazırlık hedefini belirle", time: "1 gün önce" },
-        { t: "Serin: 3 gün üst üste!", time: "2 gün önce" },
-      ],
+      nToday: (n: number) => `Bugünkü planda ${n} görev kaldı`,
+      nDone: "Bugünkü plan tamam — harika iş!",
+      nStreak: (n: number) => `Seri: üst üste ${n} gün — bugün de koru`,
+      nProbe: "Konuşma puanın boş — 2 dakikalık denemeyi yap",
+      nTrial: (h: number) => `Deneme süren ~${h} saat içinde bitiyor`,
+      nEmpty: "Henüz bildirim yok",
     },
     kk: {
       plan: "Жеке жоспар", enroll: "TÖMER-ге тіркелу", logout: "Шығу", new: "NEW", soon: "Жақында",
-      planMy: "Менің жоспарым", planGoal: "Мақсат: C1", planDays: "Емтиханға 30 күн", planToday: "Бүгін: 3/5 тапсырма",
+      planMy: "Менің жоспарым",
+      planGoal: (tgt: string) => `Мақсат: ${tgt}`,
+      planDays: (d: number) => `Емтиханға ${d} күн`,
+      planNoDate: "Емтихан күні қойылмаған",
+      planToday: (done: number, total: number) => `Бүгін: ${done}/${total} тапсырма`,
       notifTitle: "Хабарламалар", markAll: "Барлығын оқылды деп белгілеу",
-      notifs: [
-        { t: "LingoPRO-ға қош келдің!", time: "1 мин бұрын" },
-        { t: "Жаңа оқу тесті қолжетімді", time: "2 сағат бұрын" },
-        { t: "5 сөзді қайталау уақыты", time: "5 сағат бұрын" },
-        { t: "TÖMER дайындық мақсатын қой", time: "1 күн бұрын" },
-        { t: "Сериясың: қатарынан 3 күн!", time: "2 күн бұрын" },
-      ],
+      nToday: (n: number) => `Бүгінгі жоспарда ${n} тапсырма қалды`,
+      nDone: "Бүгінгі жоспар орындалды — керемет!",
+      nStreak: (n: number) => `Серия: қатарынан ${n} күн — бүгін де жалғастыр`,
+      nProbe: "Сөйлесім бағасы бос — 2 минуттық сынамадан өт",
+      nTrial: (h: number) => `Триал ~${h} сағаттан кейін бітеді`,
+      nEmpty: "Әзірге хабарлама жоқ",
     },
   });
 
@@ -103,9 +115,32 @@ export default function DashboardShell({
   const [drawer, setDrawer] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [reads, setReads] = useState<boolean[]>(NOTIF_META.map((n) => n.read));
   const notifRef = useRef<HTMLDivElement>(null);
-  const unread = reads.filter((r) => !r).length;
+  // реальные факты для уведомлений и «Моего плана» (грузятся одним заходом)
+  const [notifFacts, setNotifFacts] = useState<{ streak: number; konusmaMissing: boolean } | null>(null);
+  const [examInfo, setExamInfo] = useState<{ target: "B2" | "C1"; days: number | null } | null>(null);
+  // прочитанность — по стабильным id в localStorage (переживает перезагрузку)
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      return new Set(JSON.parse(window.localStorage.getItem(NOTIF_READ_KEY) ?? "[]") as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+
+  function markRead(ids: string[]) {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      try {
+        window.localStorage.setItem(NOTIF_READ_KEY, JSON.stringify([...next].slice(-100)));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   // today's daily-plan progress → sidebar "Home" indicator
   const [daily, setDaily] = useState<{ completed: number; total: number } | null>(null);
@@ -144,11 +179,56 @@ export default function DashboardShell({
       if (!active) return;
       if (profile?.quiz_result) saveResult(profile.quiz_result);
       if (profile?.plan_progress && Object.keys(profile.plan_progress).length) saveProgress(profile.plan_progress);
+
+      // реальные факты для уведомлений: стрик из daily_progress, пустая
+      // оценка говорения из quiz_result — ничего выдуманного
+      const konusmaMissing = !!profile?.quiz_result && profile.quiz_result.sections?.konusma == null;
+      const { data: days } = await supabase
+        .from("daily_progress")
+        .select("date, tasks, completed_count, total_count")
+        .eq("user_id", u.id)
+        .order("date");
+      if (!active) return;
+      const streak = computeStreak(
+        ((days as { date: string; tasks: unknown; completed_count: number; total_count: number }[] | null) ?? []).map((d) => ({
+          date: d.date,
+          tasks: (d.tasks ?? []) as DayRow["tasks"],
+          completedCount: d.completed_count,
+          total: d.total_count,
+        })),
+      );
+      setNotifFacts({ streak, konusmaMissing });
+
+      // «Мой план» в сайдбаре: реальная цель и дни до экзамена
+      const ep = await fetchExamPlan();
+      if (!active) return;
+      setExamInfo({ target: ep?.targetLevel ?? "B2", days: daysToExam(ep) });
     })();
     return () => {
       active = false;
     };
   }, []);
+
+  // уведомления — только из реальных событий; нет событий → честная пустота
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const notifs: Notif[] = [];
+  if (plan === "trial" && trialMsLeft != null && trialMsLeft > 0 && trialMsLeft <= 24 * 3600_000) {
+    notifs.push({ id: `trial-${todayKey}`, emoji: "⏳", text: tx.nTrial(Math.max(1, Math.floor(trialMsLeft / 3600_000))), href: "/pricing" });
+  }
+  if (daily && daily.total > 0) {
+    if (daily.completed < daily.total) {
+      notifs.push({ id: `today-${todayKey}`, emoji: "📋", text: tx.nToday(daily.total - daily.completed), href: "/dashboard" });
+    } else {
+      notifs.push({ id: `done-${todayKey}`, emoji: "✅", text: tx.nDone });
+    }
+  }
+  if (notifFacts && notifFacts.streak >= 2) {
+    notifs.push({ id: `streak-${todayKey}`, emoji: "🔥", text: tx.nStreak(notifFacts.streak) });
+  }
+  if (notifFacts?.konusmaMissing) {
+    notifs.push({ id: "probe", emoji: "🎤", text: tx.nProbe, href: "/quiz/speaking" });
+  }
+  const unread = notifs.filter((n) => !readIds.has(n.id)).length;
 
   useEffect(() => {
     setDrawer(false);
@@ -251,20 +331,28 @@ export default function DashboardShell({
                   <span>📋</span>
                   <span className="flex-1">{tx.planMy}</span>
                 </Link>
+                {/* реальные цель/дата/прогресс дня — не хардкод «C1 · 30 дней · 3/5» */}
                 <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--color-muted)]">
-                  <span>🎯</span> {tx.planGoal}
+                  <span>🎯</span> {tx.planGoal(examInfo?.target ?? "B2")}
                 </div>
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--color-muted)]">
-                  <span>📅</span> {tx.planDays}
-                </div>
-                <div className="px-2 py-1.5">
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
-                    <span>⚡</span> {tx.planToday}
+                {examInfo?.days != null && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--color-muted)]">
+                    <span>📅</span> {tx.planDays(examInfo.days)}
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
-                    <div className="h-full w-[60%] rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]" />
+                )}
+                {daily && daily.total > 0 && (
+                  <div className="px-2 py-1.5">
+                    <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                      <span>⚡</span> {tx.planToday(daily.completed, daily.total)}
+                    </div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)] transition-[width]"
+                        style={{ width: `${Math.round((100 * daily.completed) / daily.total)}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -404,39 +492,50 @@ export default function DashboardShell({
                   </div>
 
                   <div className="max-h-80 overflow-y-auto">
-                    {tx.notifs.map((n, i) => {
-                      const read = reads[i];
+                    {notifs.length === 0 && (
+                      <div className="px-4 py-6 text-center text-sm text-[var(--color-muted)]">{tx.nEmpty}</div>
+                    )}
+                    {notifs.map((n) => {
+                      const read = readIds.has(n.id);
                       return (
                         <button
-                          key={i}
+                          key={n.id}
                           type="button"
-                          onClick={() => setReads((prev) => prev.map((r, j) => (j === i ? true : r)))}
+                          onClick={() => {
+                            markRead([n.id]);
+                            if (n.href) {
+                              setNotifOpen(false);
+                              router.push(n.href);
+                            }
+                          }}
                           className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-black/[0.03] ${
                             read ? "" : "bg-[#3b82f6]/[0.05]"
                           }`}
                         >
                           <span className="relative mt-0.5 text-base">
                             {!read && <span className="absolute -left-2 top-1.5 h-2 w-2 rounded-full bg-[#3b82f6]" />}
-                            {NOTIF_META[i].emoji}
+                            {n.emoji}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className={`block text-sm ${read ? "text-[var(--color-muted)]" : "font-medium text-[var(--color-foreground)]"}`}>
-                              {n.t}
+                              {n.text}
                             </span>
-                            <span className="text-xs text-[var(--color-muted)]">{n.time}</span>
+                            {n.href && <span className="text-xs text-[var(--color-brand)]">→</span>}
                           </span>
                         </button>
                       );
                     })}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setReads((prev) => prev.map(() => true))}
-                    className="w-full border-t border-black/[0.06] px-4 py-3 text-center text-xs font-medium text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[0.05]"
-                  >
-                    {tx.markAll}
-                  </button>
+                  {notifs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => markRead(notifs.map((n) => n.id))}
+                      className="w-full border-t border-black/[0.06] px-4 py-3 text-center text-xs font-medium text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[0.05]"
+                    >
+                      {tx.markAll}
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

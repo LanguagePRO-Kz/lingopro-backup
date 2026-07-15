@@ -177,7 +177,7 @@ export async function generateVoiceReport(
           transcriptLines: lines,
           lessonFocusTr,
           level: String(dynVars.level ?? "A2"),
-          targetLevel: String(dynVars.target_level ?? "C1"),
+          targetLevel: String(dynVars.target_level ?? "B2"),
         }),
       },
     ],

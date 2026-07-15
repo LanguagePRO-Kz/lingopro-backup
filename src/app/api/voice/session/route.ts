@@ -313,7 +313,8 @@ export async function POST(req: Request) {
       user_id: user.id, // ownership check at settlement
       student_name: (profile?.full_name as string | null) ?? (profile?.handle as string | null) ?? "öğrenci",
       level,
-      target_level: (profile?.target_level as string | null) ?? "C1",
+      // B2 — цель по умолчанию (порог вуза); C1 только если выбран явно
+      target_level: (profile?.target_level as string | null) ?? "B2",
       weak_topics: weakTr,
       lesson_focus: lessonFocusTr,
       // почему эти темы — одна TR-строка от ядра агента ({{focus_reason}} в
