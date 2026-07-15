@@ -19,15 +19,17 @@ import {
  * Founder methodology (07.2026): OWNING a level ≠ PASSING the exam, and the
  * PRESENTATION leads with the real, motivating goal — passing. The big first
  * line mobilizes ("срок сжатый, но для подготовки к сдаче реальный");
- * proficiency math (~780 h / ~41 мес) lives in a small "почему так"
- * expander, never in the student's face. Scenario B (locked date) never
- * offers "postpone"; scenario A offers calm alternatives.
+ * proficiency math lives in a small "почему так" expander, never in the
+ * student's face. Timelines are «ориентировочно», never a promise — the
+ * school-empirics model in plan/feasibility.ts (0→B2 ≈ 5-6 мес, A2→B2 ≈
+ * 2-3 мес) is the single source. Scenario B (locked date) never offers
+ * "postpone"; scenario A offers calm alternatives.
  */
 
 const T = {
   ru: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
-      `При ${m} мин/день путь ${lvl} → ${tgt} — примерно ${months} мес честной работы (~${need} ч). Поставь дату экзамена — посчитаю точно.`,
+      `Ориентировочно: при ${m} мин/день путь ${lvl} → ${tgt} — около ${months} мес (~${need} ч). Поставь дату экзамена — посчитаю точно.`,
     ok: (need: number, have: number) =>
       `Успеваешь. Нужно ~${need} ч работы, твой ресурс до экзамена ~${have} ч. Запас есть — главное, держи темп.`,
     tight: (need: number, have: number) =>
@@ -65,7 +67,7 @@ const T = {
   },
   en: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
-      `At ${m} min/day, ${lvl} → ${tgt} is roughly ${months} months of honest work (~${need} h). Set an exam date and I'll do the exact math.`,
+      `Rough estimate: at ${m} min/day, ${lvl} → ${tgt} is about ${months} months (~${need} h). Set an exam date and I'll do the exact math.`,
     ok: (need: number, have: number) =>
       `You're on track. ~${need} h of work needed, ~${have} h of realistic resource before the exam. There's margin — just keep the pace.`,
     tight: (need: number, have: number) =>
@@ -100,7 +102,7 @@ const T = {
   },
   tr: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
-      `Günde ${m} dk ile ${lvl} → ${tgt} yolu yaklaşık ${months} ay dürüst çalışma demek (~${need} saat). Sınav tarihini belirle, kesin hesabı yapayım.`,
+      `Yaklaşık tahmin: günde ${m} dk ile ${lvl} → ${tgt} yolu ~${months} ay (~${need} saat). Sınav tarihini belirle, kesin hesabı yapayım.`,
     ok: (need: number, have: number) =>
       `Yetişiyorsun. ~${need} saatlik iş var, sınava kadar gerçekçi kaynağın ~${have} saat. Pay var — yeter ki tempoyu koru.`,
     tight: (need: number, have: number) =>
@@ -135,7 +137,7 @@ const T = {
   },
   kk: {
     unknown: (m: number, lvl: string, tgt: string, months: number, need: number) =>
-      `Күніне ${m} минутпен ${lvl} → ${tgt} жолы — шамамен ${months} ай адал жұмыс (~${need} сағат). Емтихан күнін қой — нақтысын есептеп беремін.`,
+      `Шамамен: күніне ${m} минутпен ${lvl} → ${tgt} жолы — ${months} айдай (~${need} сағат). Емтихан күнін қой — нақтысын есептеп беремін.`,
     ok: (need: number, have: number) =>
       `Үлгересің. ~${need} сағат жұмыс керек, емтиханға дейінгі нақты қорың ~${have} сағат. Қор бар — бастысы, қарқынды ұста.`,
     tight: (need: number, have: number) =>

@@ -27,16 +27,28 @@ const VERDICT_RU: Record<Readiness["verdict"], { label: string; cls: string; ran
 type Tab = "students" | "payments" | "broken" | "feedback";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) notFound();
+  // причина каждого 404 — в серверный лог: три ветки снаружи неразличимы,
+  // и «у основателя 404» иначе не диагностируется
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!adminEmail) {
+    console.warn("[admin] 404: ADMIN_EMAIL не задан в окружении (dev перезапускался после правки .env.local?)");
+    notFound();
+  }
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email || user.email.toLowerCase() !== adminEmail!.toLowerCase()) notFound();
+  const userEmail = user?.email?.trim().toLowerCase();
+  if (!userEmail || userEmail !== adminEmail) {
+    console.warn(`[admin] 404: вошедший email не совпадает с ADMIN_EMAIL (вошёл: ${userEmail ?? "аноним"})`);
+    notFound();
+  }
 
   const admin = createAdminClient();
-  if (!admin) notFound();
+  if (!admin) {
+    console.warn("[admin] 404: нет SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY");
+    notFound();
+  }
 
   const tab: Tab = (["students", "payments", "broken", "feedback"] as Tab[]).includes(
     (await searchParams).tab as Tab,

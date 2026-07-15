@@ -19,8 +19,11 @@ import { pick } from "@/lib/localized";
 const T = {
   ru: {
     title: "Проба говорения · ~2 минуты",
-    body: "Ahu задаст пару простых вопросов о тебе. Отвечай как можешь — короткие ответы это нормально, ошибки не страшны: цель — услышать твой уровень, а не устроить экзамен.",
-    start: "Начать пробу", starting: "Подключение…", live: "Идёт разговор — отвечай голосом",
+    body: "Короткие ответы — это нормально, ошибки не страшны: цель — услышать твой уровень, а не устроить экзамен.",
+    steps: ["Нажми «Начать пробу» и разреши микрофон", "Ahu поздоровается и задаст простой вопрос о тебе", "Отвечай голосом — как только Ahu замолчала, говори ты"],
+    stepsTitle: "Как это пройдёт",
+    start: "Начать пробу", starting: "Подключение…",
+    yourTurn: "Сейчас говори — Ahu слушает", ahuTurn: "Ahu говорит — послушай вопрос",
     left: "осталось", finishing: "Завершаем — считаем оценку…",
     done: "Готово! Оценка говорения появится на странице результата.", toResult: "К результату",
     errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
@@ -30,8 +33,11 @@ const T = {
   },
   en: {
     title: "Speaking probe · ~2 minutes",
-    body: "Ahu will ask a couple of simple questions about you. Answer as you can — short answers are fine and mistakes are okay: the goal is to hear your level, not to hold an exam.",
-    start: "Start the probe", starting: "Connecting…", live: "Live — answer with your voice",
+    body: "Short answers are fine and mistakes are okay: the goal is to hear your level, not to hold an exam.",
+    steps: ["Press “Start the probe” and allow the microphone", "Ahu will say hi and ask a simple question about you", "Answer with your voice — as soon as Ahu goes quiet, it's your turn"],
+    stepsTitle: "How it goes",
+    start: "Start the probe", starting: "Connecting…",
+    yourTurn: "Speak now — Ahu is listening", ahuTurn: "Ahu is speaking — listen to the question",
     left: "left", finishing: "Wrapping up — scoring…",
     done: "Done! Your speaking score will appear on the result page.", toResult: "To the result",
     errMic: "Microphone access is required — allow it in your browser and retry.",
@@ -41,8 +47,11 @@ const T = {
   },
   tr: {
     title: "Konuşma denemesi · ~2 dakika",
-    body: "Ahu sana birkaç basit soru soracak. Elinden geldiğince cevapla — kısa cevaplar normal, hata sorun değil: amaç seviyeni duymak, sınav yapmak değil.",
-    start: "Denemeyi başlat", starting: "Bağlanıyor…", live: "Konuşma sürüyor — sesle cevapla",
+    body: "Kısa cevaplar normal, hata sorun değil: amaç seviyeni duymak, sınav yapmak değil.",
+    steps: ["«Denemeyi başlat»a bas ve mikrofona izin ver", "Ahu selam verip senin hakkında basit bir soru soracak", "Sesle cevapla — Ahu susar susmaz sıra sende"],
+    stepsTitle: "Nasıl geçecek",
+    start: "Denemeyi başlat", starting: "Bağlanıyor…",
+    yourTurn: "Şimdi konuş — Ahu dinliyor", ahuTurn: "Ahu konuşuyor — soruyu dinle",
     left: "kaldı", finishing: "Bitiriliyor — puanlanıyor…",
     done: "Tamam! Konuşma puanın sonuç sayfasında görünecek.", toResult: "Sonuca dön",
     errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
@@ -52,8 +61,11 @@ const T = {
   },
   kk: {
     title: "Сөйлесім сынамасы · ~2 минут",
-    body: "Ahu өзің туралы бірнеше қарапайым сұрақ қояды. Қолыңнан келгенше жауап бер — қысқа жауап қалыпты, қателесу қорқынышты емес: мақсат — деңгейіңді есту, емтихан емес.",
-    start: "Сынаманы бастау", starting: "Қосылуда…", live: "Әңгіме жүріп жатыр — дауыспен жауап бер",
+    body: "Қысқа жауап қалыпты, қателесу қорқынышты емес: мақсат — деңгейіңді есту, емтихан емес.",
+    steps: ["«Сынаманы бастау» дегенді бас та микрофонға рұқсат бер", "Ahu сәлемдесіп, өзің туралы қарапайым сұрақ қояды", "Дауыспен жауап бер — Ahu үнсіз қалған бойда кезек сенікі"],
+    stepsTitle: "Қалай өтеді",
+    start: "Сынаманы бастау", starting: "Қосылуда…",
+    yourTurn: "Қазір сөйле — Ahu тыңдап тұр", ahuTurn: "Ahu сөйлеп жатыр — сұрақты тыңда",
     left: "қалды", finishing: "Аяқталуда — бағалануда…",
     done: "Дайын! Сөйлесім бағасы нәтиже бетінде көрінеді.", toResult: "Нәтижеге өту",
     errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
@@ -91,7 +103,7 @@ function SpeakingProbe() {
       setPhase("idle");
     },
   });
-  const { status } = conversation;
+  const { status, isSpeaking } = conversation;
 
   useEffect(() => {
     if (status === "connected") {
@@ -107,18 +119,21 @@ function SpeakingProbe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // жёсткий таймер пробы: 2 минуты — и завершаем (сервер режет на 180с)
+  // жёсткий таймер пробы: тик раз в секунду, пока идёт разговор
   useEffect(() => {
     if (phase !== "live") return;
-    const t = setInterval(() => {
-      setElapsed((s) => {
-        if (s + 1 >= PROBE_SECONDS) void conversation.endSession();
-        return s + 1;
-      });
-    }, 1000);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // 2 минуты вышли — завершаем (сервер режет на 180с). Отдельный эффект:
+  // endSession из setState-updater роняет React («Cannot update
+  // ConversationProvider while rendering SpeakingProbe») и проба не доходит
+  // до оценки — говорение оставалось —/25
+  useEffect(() => {
+    if (phase === "live" && elapsed >= PROBE_SECONDS) void conversation.endSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed, phase]);
 
   async function settle() {
     if (settlingRef.current || !convIdRef.current) return;
@@ -200,6 +215,21 @@ function SpeakingProbe() {
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">🎤 {c.title}</h1>
         <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">{c.body}</p>
 
+        {/* объяснение ДО старта: что произойдёт и когда говорить студенту */}
+        {(phase === "idle" || phase === "starting") && (
+          <div className="mt-4 rounded-2xl bg-black/[0.03] p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.stepsTitle}</div>
+            <ol className="mt-2 flex flex-col gap-1.5 text-sm text-[var(--color-foreground)]">
+              {c.steps.map((s, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="font-bold text-[var(--color-brand)]">{i + 1}.</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         {err && <p className="mt-4 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">{err}</p>}
 
         {phase === "idle" && (
@@ -214,8 +244,17 @@ function SpeakingProbe() {
           </div>
         )}
         {phase === "live" && (
-          <div className="mt-6 flex items-center justify-between rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] px-4 py-3">
-            <span className="text-sm font-medium text-[var(--color-foreground)]">🔴 {c.live}</span>
+          <div
+            className={`mt-6 flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${
+              isSpeaking
+                ? "border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06]"
+                : "border-[#16a34a]/30 bg-[#16a34a]/[0.08]"
+            }`}
+          >
+            {/* явный сигнал очереди: Ahu замолчала → «сейчас говори» */}
+            <span className={`text-sm font-semibold ${isSpeaking ? "text-[var(--color-foreground)]" : "text-[#15803d]"}`}>
+              {isSpeaking ? <>🔊 {c.ahuTurn}</> : <>🎙 {c.yourTurn}</>}
+            </span>
             <span className="text-sm font-bold text-[var(--color-brand)]">{mmss} {c.left}</span>
           </div>
         )}

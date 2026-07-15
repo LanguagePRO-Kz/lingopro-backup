@@ -31,7 +31,10 @@ export default function QuizResultPage() {
   const { locale } = useI18n();
   const [result, setResult] = useState<QuizResult | null>(null);
   const [status, setStatus] = useState<"loading" | "ready">("loading");
-  const [yazmaChecking, setYazmaChecking] = useState(false);
+  // честный статус AI-проверки эссе: quota (2/день исчерпано) и failed
+  // (AI не ответил) показываются студенту, failed — с кнопкой ретрая;
+  // раньше любой сбой молча оставлял вечный прочерк
+  const [yazmaState, setYazmaState] = useState<"idle" | "checking" | "quota" | "failed">("idle");
   // goal/date context for the honest plan verdict (stash on a fresh
   // diagnostic, profile on a retake visit)
   const [examPlan, setExamPlan] = useState<ExamPlan | null>(null);
@@ -125,37 +128,50 @@ export default function QuizResultPage() {
 
       // deferred Yazma review (diagnostic quota 2/day; see DESIGN-DIAGNOSTIC-V2 §4)
       if (final.writingText && !final.yazmaReview) {
-        setYazmaChecking(true);
-        try {
-          const taskPrompt = YAZMA_PROMPTS.find((p) => p.id === final.yazmaPromptId)?.prompt;
-          const res = await fetch("/api/ai/diagnostic-writing", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: final.writingText, taskPrompt, feedbackLang: locale }),
-          });
-          if (res.ok) {
-            const data = (await res.json()) as { review?: unknown };
-            const review = validateWritingReview(data.review);
-            if (review) {
-              const updated = withYazmaReview(final, review);
-              await saveProfileResult(updated);
-              saveResult(updated);
-              if (!cancelled) setResult(updated);
-            }
-          }
-          // non-ok (quota/budget/ai down) → stay pending; the next visit retries
-        } catch {
-          /* network error → stay pending */
-        } finally {
-          if (!cancelled) setYazmaChecking(false);
-        }
+        await runYazmaReview(final, () => cancelled);
       }
     })();
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, locale]);
+
+  /** AI-проверка эссе с честным исходом: балл / квота / сбой (ретраится). */
+  async function runYazmaReview(base: QuizResult, isCancelled: () => boolean = () => false) {
+    if (!base.writingText || base.yazmaReview) return;
+    setYazmaState("checking");
+    try {
+      const taskPrompt = YAZMA_PROMPTS.find((p) => p.id === base.yazmaPromptId)?.prompt;
+      const res = await fetch("/api/ai/diagnostic-writing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: base.writingText, taskPrompt, feedbackLang: locale }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { review?: unknown };
+        const review = validateWritingReview(data.review);
+        if (review) {
+          const updated = withYazmaReview(base, review);
+          await saveProfileResult(updated);
+          saveResult(updated);
+          if (!isCancelled()) {
+            setResult(updated);
+            setYazmaState("idle");
+          }
+          return;
+        }
+        // AI ответил, но мусором — «не прошло», не вечное «проверяем»
+        if (!isCancelled()) setYazmaState("failed");
+        return;
+      }
+      // 429 = квота диагностики (2/день) или rate limit; остальное — сбой
+      if (!isCancelled()) setYazmaState(res.status === 429 ? "quota" : "failed");
+    } catch {
+      if (!isCancelled()) setYazmaState("failed");
+    }
+  }
 
   // while loading OR while the effect redirects (no result) — just a spinner;
   // navigation happens in the effect, never during render
@@ -206,7 +222,7 @@ export default function QuizResultPage() {
 
   return (
     <PageShell>
-      <ResultView result={result} yazmaChecking={yazmaChecking} planVerdict={verdict} />
+      <ResultView result={result} yazmaState={yazmaState} onRetryYazma={() => void runYazmaReview(result)} planVerdict={verdict} />
     </PageShell>
   );
 }

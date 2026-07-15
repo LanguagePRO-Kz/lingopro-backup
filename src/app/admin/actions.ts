@@ -13,13 +13,14 @@ import { createClient } from "@/lib/supabase/server";
 const ACCESS_DAYS: Record<string, number> = { "1m": 30, "3m": 90, "6m": 180, trial: 3 };
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false }> {
-  const adminEmail = process.env.ADMIN_EMAIL;
+  // trim: хвостовой пробел в env (частое на Vercel) не должен ломать доступ
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   if (!adminEmail) return { ok: false };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user?.email && user.email.toLowerCase() === adminEmail.toLowerCase() ? { ok: true } : { ok: false };
+  return user?.email?.trim().toLowerCase() === adminEmail ? { ok: true } : { ok: false };
 }
 
 /** Выдать/продлить план (стакинг как в вебхуке: платный остаток не сгорает). */

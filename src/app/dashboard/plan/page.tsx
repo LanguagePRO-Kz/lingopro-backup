@@ -206,7 +206,7 @@ export default function PlanPage() {
       <div className="rounded-3xl bg-gradient-to-br from-[#5b4bd6] to-[#3a1d9c] p-6 text-white">
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-4xl font-bold">{result.level} → {examPlan?.targetLevel ?? "C1"}</div>
+            <div className="text-4xl font-bold">{result.level} → {examPlan?.targetLevel ?? "B2"}</div>
             <div className="mt-1 text-sm text-white/70">{plan.title[locale]}</div>
           </div>
           <div className="text-right text-sm text-white/80">
@@ -238,7 +238,7 @@ export default function PlanPage() {
         </div>
         <div className="mt-1.5 flex justify-between text-xs text-white/70">
           <span>{result.level} {c.goalNow}</span>
-          <span>{examPlan?.targetLevel ?? "C1"} {c.goalTarget}</span>
+          <span>{examPlan?.targetLevel ?? "B2"} {c.goalTarget}</span>
         </div>
       </div>
 

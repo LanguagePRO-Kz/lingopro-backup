@@ -95,13 +95,17 @@ console.log("— needsRegen —");
   check("no route → true", needsRegen(null, baseInputs));
 }
 
-console.log("— honest plan: CEFR hours ladder —");
+console.log("— honest plan: школьная эмпирика (07.2026), не CEFR-780 —");
 {
-  check("A0→C1 = 860 h", hoursNeeded({ level: "A0", targetLevel: "C1" }) === 860, String(hoursNeeded({ level: "A0", targetLevel: "C1" })));
-  check("A1→C1 = 780 h", hoursNeeded({ level: "A1", targetLevel: "C1" }) === 780);
+  check("A0→C1 = 210 h", hoursNeeded({ level: "A0", targetLevel: "C1" }) === 210, String(hoursNeeded({ level: "A0", targetLevel: "C1" })));
+  check("A1→C1 = 170 h (было 780 — «20 мес» убито)", hoursNeeded({ level: "A1", targetLevel: "C1" }) === 170);
   check("B1→B2 = step config", hoursNeeded({ level: "B1", targetLevel: "B2" }) === STEP_HOURS.B2);
+  // якоря основателя при 60 мин/день
+  const m = (lvl: "A0" | "A2", tgt: "B2") => assessPlan({ level: lvl, targetLevel: tgt, minutesDaily: 60, daysLeft: null }).monthsNeeded;
+  check("якорь: 0→B2 @60мин ≈ 5-6 мес", m("A0", "B2") >= 5 && m("A0", "B2") <= 6, String(m("A0", "B2")));
+  check("якорь: A2→B2 @60мин ≈ 2-3 мес", m("A2", "B2") >= 2 && m("A2", "B2") <= 3, String(m("A2", "B2")));
   const kk = hoursNeeded({ level: "A1", targetLevel: "C1", kkNative: true });
-  check("kk speaker ×0.75", kk === 780 * KK_NATIVE_FACTOR, String(kk));
+  check("kk speaker ×0.75", kk === 170 * KK_NATIVE_FACTOR, String(kk));
   // mastery credit: ALL step topics mastered → step halved (grammar ≈ half the work)
   const b2Topics = TOPICS.filter((t) => t.level === "B2" && t.id !== "other").map((t) => t.id);
   const credited = hoursNeeded({ level: "B1", targetLevel: "B2", masteredTopics: b2Topics });
@@ -115,20 +119,20 @@ console.log("— honest plan: verdicts (founder's case: A1→C1, 3 мес, 45 м
   const not = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 45, daysLeft: 90, todayIso: TODAY });
   check("A1→C1 in 90d @45min → notEnough", not.verdict === "notEnough", not.verdict);
   check("resource ≈ 57 h", not.haveHours === 57, String(not.haveHours));
-  check("needed pace beyond human limits", (not.minutesNeeded ?? 0) > 240, String(not.minutesNeeded));
+  check("needed pace beyond sustainable (120)", (not.minutesNeeded ?? 0) > 120, String(not.minutesNeeded));
   check("…so no pace choice is offered", paceChoiceFor(not.minutesNeeded!) === null);
   check("honest dateNeeded exists & is future", !!not.dateNeeded && Date.parse(not.dateNeeded!) > Date.parse(TODAY));
-  check("months honest (~40)", not.monthsNeeded >= 35 && not.monthsNeeded <= 45, String(not.monthsNeeded));
-  check("forecast: no full level closes", not.reachableLevel === null);
-  check("…but visible progress toward A2", not.nextStepShare > 0.4, String(not.nextStepShare));
+  check("months honest (~9)", not.monthsNeeded >= 8 && not.monthsNeeded <= 10, String(not.monthsNeeded));
+  check("forecast: A2 closes in 90d", not.reachableLevel === "A2", String(not.reachableLevel));
+  check("…and visible progress toward B1", not.nextStepShare > 0.4, String(not.nextStepShare));
 
   const reach = assessPlan({ level: "A1", targetLevel: "C1", minutesDaily: 60, daysLeft: 365, todayIso: TODAY });
-  check("A1→C1 in 1y @60min → notEnough but B1 reachable", reach.verdict === "notEnough" && reach.reachableLevel === "B1", `${reach.verdict}/${reach.reachableLevel}`);
+  check("A1→C1 in 1y @60min → ok (эмпирика: ~7 мес)", reach.verdict === "ok" && reach.reachableLevel === "C1", `${reach.verdict}/${reach.reachableLevel}`);
 
-  const tight = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 90, daysLeft: 365 });
-  check("A2→B2 in 1y @90min → tight (86%)", tight.verdict === "tight", `${tight.verdict}/${tight.loadPct}%`);
-  const ok = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 120, daysLeft: 365 });
-  check("A2→B2 in 1y @120min → ok", ok.verdict === "ok", `${ok.verdict}/${ok.loadPct}%`);
+  const tight = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 30, daysLeft: 160 });
+  check("A2→B2 in 160d @30min → tight (~96%)", tight.verdict === "tight", `${tight.verdict}/${tight.loadPct}%`);
+  const ok = assessPlan({ level: "A2", targetLevel: "B2", minutesDaily: 45, daysLeft: 160 });
+  check("A2→B2 in 160d @45min → ok", ok.verdict === "ok", `${ok.verdict}/${ok.loadPct}%`);
 
   const unk = assessPlan({ level: "A1", targetLevel: "B2", minutesDaily: 30, daysLeft: null });
   check("no date → unknown + months forecast", unk.verdict === "unknown" && unk.monthsNeeded > 0, String(unk.monthsNeeded));

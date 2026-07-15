@@ -92,8 +92,8 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<DailyTask | null>(null);
   const [celebrate, setCelebrate] = useState(false);
-  // real goal for the progress card — "→ C1" was hardcoded for everyone
-  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
+  // real goal for the progress card; B2 (порог вуза) — цель по умолчанию
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("B2");
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lingopro:name");

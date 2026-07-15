@@ -18,17 +18,19 @@ import { LEVELS, type Level } from "@/data/types";
 import { TOPICS } from "@/lib/ai/topics";
 
 /**
- * Guided-learning hours to CLOSE the step ending at each level, tuned to
- * the platform (adaptive plan + 1:1 feedback ≈ lower bound of classroom
- * estimates). CONFIG, not physics — the methodologist / native reviewer
- * adjusts these for Turkish/TÖMER as real pace data accumulates.
+ * Hours to CLOSE the step ending at each level — anchored to the founder's
+ * school empirics (07.2026), NOT the generic CEFR classroom ladder (which
+ * gave "A1→C1 ≈ 780 h / 20 мес" and undersold the product's whole point):
+ *   A2 → B2 ≈ 2-3 months, from zero → B2 ≈ 5-6 months at ~60 min/day.
+ * The estimate is an ориентир, never a promise. CONFIG — the methodologist
+ * adjusts as real pace data accumulates.
  */
 export const STEP_HOURS: Record<Level, number> = {
-  A1: 80, // 0 → A1
-  A2: 120, // A1 → A2
-  B1: 180, // A2 → B1
-  B2: 220, // B1 → B2
-  C1: 260, // B2 → C1
+  A1: 40, // 0 → A1
+  A2: 40, // A1 → A2   (0 → A2 ≈ 3 мес при 60 мин/день)
+  B1: 30, // A2 → B1
+  B2: 35, // B1 → B2   (A2 → B2 = 65 ч ≈ 2.5 мес; 0 → B2 = 145 ч ≈ 5.7 мес)
+  C1: 65, // B2 → C1   (честно дольше — но цель по умолчанию B2, порог вуза)
 };
 
 /** Kazakh speakers: shared grammar concepts cut the work substantially. */

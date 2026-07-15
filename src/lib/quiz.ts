@@ -511,6 +511,20 @@ const T = {
     tr: "Yazma puanı yapay zekâ incelemesinden sonra görünecek",
     kk: "Жазылым баллы AI тексерісінен кейін шығады",
   },
+  // честные исходы проверки: молчаливый вечный прочерк — враньё (правило 1.3)
+  yazmaQuota: {
+    ru: "Лимит AI-проверок диагностики на сегодня исчерпан. Эссе сохранено — проверим при следующем заходе.",
+    en: "Today's diagnostic AI-review limit is used up. Your essay is saved — we'll review it on your next visit.",
+    tr: "Bugünkü tanılama AI inceleme limiti doldu. Kompozisyonun kayıtlı — bir sonraki girişte inceleyeceğiz.",
+    kk: "Бүгінгі диагностикалық AI тексеру лимиті бітті. Эссең сақтаулы — келесі кіргенде тексереміз.",
+  },
+  yazmaFailed: {
+    ru: "Проверка не прошла — AI-сервис не ответил. Эссе сохранено, попробуй ещё раз.",
+    en: "The review didn't go through — the AI service didn't respond. Your essay is saved, try again.",
+    tr: "İnceleme tamamlanamadı — AI servisi yanıt vermedi. Kompozisyonun kayıtlı, tekrar dene.",
+    kk: "Тексеру өтпеді — AI қызметі жауап бермеді. Эссең сақтаулы, қайта көр.",
+  },
+  yazmaRetry: { ru: "Проверить ещё раз", en: "Retry the review", tr: "Tekrar dene", kk: "Қайта тексеру" },
   cefrCapNote: {
     ru: "Уровень C1 подтверждается только пробным экзаменом — диагностика показывает до B2+.",
     en: "C1 is confirmed only by a mock exam — the diagnostic measures up to B2+.",

@@ -104,8 +104,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
 
-  // exam plan (block D): real values from the profile, editable
-  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("C1");
+  // exam plan (block D): real values from the profile, editable;
+  // B2 (порог вуза) — цель по умолчанию
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("B2");
   const [dateMode, setDateMode] = useState<ExamDateMode>("unknown");
   const [examDate, setExamDate] = useState("");
   const [dateFlexible, setDateFlexible] = useState<boolean | null>(null);

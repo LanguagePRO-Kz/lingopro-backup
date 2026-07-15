@@ -14,6 +14,7 @@ import { type PackageId } from "@/lib/billing";
 import { PRICING, currencyFor, fmtMoney, savingsPct, type Currency } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
+import { fetchExamPlan, loadStashedExamPlan } from "@/lib/exam-plan";
 import { CheckoutModal } from "@/components/CheckoutModal";
 
 const T = {
@@ -29,7 +30,7 @@ const T = {
     perDayLabel: " в день",
     back: "На главную",
     levelWord: "Ваш уровень",
-    toGoal: "До цели C1 —",
+    toGoal: (tgt: string) => `До цели ${tgt} —`,
     levels: (n: number) => pluralize(n, "уровень", "уровня", "уровней"),
     choosePlan: "Выберите план подготовки",
     discountBanner: "🎯 Вы прошли диагностику! Ваша персональная скидка 30%",
@@ -62,7 +63,7 @@ const T = {
     perDayLabel: "/day",
     back: "Home",
     levelWord: "Your level",
-    toGoal: "To the C1 goal —",
+    toGoal: (tgt: string) => `To the ${tgt} goal —`,
     levels: (n: number) => (n === 1 ? "level" : "levels"),
     choosePlan: "Choose a prep plan",
     discountBanner: "🎯 You completed the diagnostic! Your personal 30% discount",
@@ -95,7 +96,7 @@ const T = {
     perDayLabel: "/gün",
     back: "Ana sayfa",
     levelWord: "Seviyen",
-    toGoal: "C1 hedefine —",
+    toGoal: (tgt: string) => `${tgt} hedefine —`,
     levels: () => "seviye",
     choosePlan: "Bir hazırlık planı seç",
     discountBanner: "🎯 Teşhisi tamamladın! Kişisel %30 indirimin",
@@ -128,7 +129,7 @@ const T = {
     perDayLabel: "/күніне",
     back: "Басты бетке",
     levelWord: "Сенің деңгейің",
-    toGoal: "C1 мақсатына дейін —",
+    toGoal: (tgt: string) => `${tgt} мақсатына дейін —`,
     levels: () => "деңгей",
     choosePlan: "Дайындық жоспарын таңда",
     discountBanner: "🎯 Диагностикадан өттің! Сенің жеке 30% жеңілдігің",
@@ -168,15 +169,26 @@ export default function PricingPage() {
   const [authed, setAuthed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [modalPkg, setModalPkg] = useState<PackageId | null>(null);
+  // цель воронки: из выбора студента (стэш онбординга), по умолчанию B2 —
+  // порог вуза; «До цели C1» для всех было враньём о нашей цели
+  const [targetLevel, setTargetLevel] = useState<"B2" | "C1">("B2");
 
   useEffect(() => {
     const local = loadResult();
     if (local) setResult(local);
+    const stashedTarget = loadStashedExamPlan()?.targetLevel;
+    if (stashedTarget === "C1") setTargetLevel("C1");
     setName(window.localStorage.getItem("lingopro:name") || "");
     createClient()
       .auth.getUser()
       .then(async ({ data }) => {
         setAuthed(!!data.user);
+        if (data.user) {
+          // сохранённая цель из профиля (стэш чистится на /quiz/result)
+          void fetchExamPlan().then((p) => {
+            if (p?.targetLevel === "C1") setTargetLevel("C1");
+          });
+        }
         // result may live only in Supabase after the sign-up hop cleared the
         // local cache — hydrate from the profile so personalization works
         if (!local && data.user) {
@@ -271,8 +283,18 @@ export default function PricingPage() {
         {authed && result && (
           <div className="mt-5 rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[0.06] px-5 py-4 text-sm sm:text-base">
             <span className="text-[var(--color-foreground)]">
-              {c.levelWord}: <span className="font-bold text-[var(--color-brand)]">{result.level}</span>. {c.toGoal}{" "}
-              <span className="font-semibold">{(() => { const n = LEVEL_ORDER.length - 1 - levelIndex(result.level); return `${n} ${c.levels(n)}`; })()}</span>. {c.choosePlan}:
+              {c.levelWord}: <span className="font-bold text-[var(--color-brand)]">{result.level}</span>.{" "}
+              {(() => {
+                const n = LEVEL_ORDER.indexOf(targetLevel) - levelIndex(result.level);
+                // уровень уже на цели/выше — не выдумываем «0 уровней»
+                if (n < 1) return null;
+                return (
+                  <>
+                    {c.toGoal(targetLevel)} <span className="font-semibold">{n} {c.levels(n)}</span>.{" "}
+                  </>
+                );
+              })()}
+              {c.choosePlan}:
             </span>
           </div>
         )}

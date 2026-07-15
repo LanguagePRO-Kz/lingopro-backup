@@ -420,15 +420,56 @@ function V3SectionAccordion({
   );
 }
 
+/** Честный статус AI-проверки эссе: проверяем / квота / сбой (+ретрай). */
+function YazmaStatus({
+  state,
+  locale,
+  onRetry,
+}: {
+  state?: "idle" | "checking" | "quota" | "failed";
+  locale: Parameters<typeof qt>[0];
+  onRetry?: () => void;
+}) {
+  if (state === "checking") {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <span className="h-3 w-3 animate-spin rounded-full border border-[var(--color-brand)] border-t-transparent" />
+        {qt(locale, "yazmaChecking")}
+      </span>
+    );
+  }
+  if (state === "quota") return <>{qt(locale, "yazmaQuota")}</>;
+  if (state === "failed") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        {qt(locale, "yazmaFailed")}
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
+          >
+            {qt(locale, "yazmaRetry")}
+          </button>
+        )}
+      </span>
+    );
+  }
+  return <>{qt(locale, "yazmaPendingAuth")}</>;
+}
+
 /* ------------------------------ Result view ------------------------------ */
 /** The full diagnostic result UI. Shared by /results and /quiz/result. */
 export function ResultView({
   result,
-  yazmaChecking,
+  yazmaState,
+  onRetryYazma,
   planVerdict,
 }: {
   result: QuizResult;
-  yazmaChecking?: boolean;
+  /** честный статус AI-проверки эссе; failed показывает кнопку ретрая */
+  yazmaState?: "idle" | "checking" | "quota" | "failed";
+  onRetryYazma?: () => void;
   /** honest plan verdict card — right after the level, before everything else */
   planVerdict?: React.ReactNode;
 }) {
@@ -566,16 +607,7 @@ export function ResultView({
             emoji="✍️"
             score={sections.yazma}
             delay={0.24}
-            pendingNode={
-              yazmaChecking ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--color-brand)] border-t-transparent" />
-                  {qt(locale, "yazmaChecking")}
-                </span>
-              ) : (
-                qt(locale, "yazmaPendingAuth")
-              )
-            }
+            pendingNode={<YazmaStatus state={yazmaState} locale={locale} onRetry={onRetryYazma} />}
           />
           <SectionRow
             label={qt(locale, "stKonusma")}
@@ -658,7 +690,7 @@ export function ResultView({
               >
                 {sections!.yazma == null && (
                   <p className="rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-[var(--color-muted)]">
-                    {yazmaChecking ? qt(locale, "yazmaChecking") : qt(locale, "yazmaPendingAuth")}
+                    <YazmaStatus state={yazmaState} locale={locale} onRetry={onRetryYazma} />
                   </p>
                 )}
                 {review?.valid && (

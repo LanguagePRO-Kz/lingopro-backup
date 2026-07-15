@@ -99,7 +99,8 @@ export async function fetchExamPlan(): Promise<
       hasProfile: true,
       examDateFlexible: flexErr ? undefined : ((flex?.exam_date_flexible as boolean | null) ?? undefined),
       level: (data.level as string | null) ?? null,
-      targetLevel: data.target_level === "B2" ? "B2" : "C1",
+      // B2 — цель по умолчанию (порог вуза); C1 только если выбран явно
+      targetLevel: data.target_level === "C1" ? "C1" : "B2",
       examDateMode: (["exact", "approx", "unknown"].includes(data.exam_date_mode as string)
         ? data.exam_date_mode
         : "unknown") as ExamDateMode,
