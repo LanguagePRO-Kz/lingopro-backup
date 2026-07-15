@@ -105,8 +105,10 @@ export function FeedbackButton() {
           setState("idle");
         }}
         aria-label={c.fab}
-        className="fixed bottom-5 left-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-black/[0.08] bg-white/90 text-lg shadow-lg backdrop-blur transition-transform hover:scale-105"
+        className="fixed bottom-5 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-black/[0.08] bg-white/90 text-lg shadow-lg backdrop-blur transition-transform hover:scale-105"
       >
+        {/* правый низ: левый занят Next DevTools-бейджем в dev — кнопку там
+            было физически не нажать (nextjs-portal перехватывал клики) */}
         🛠
       </button>
 
@@ -126,7 +128,7 @@ export function FeedbackButton() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
-              className="fixed bottom-5 left-5 right-5 z-50 mx-auto max-w-md rounded-3xl border border-black/[0.08] bg-white p-5 shadow-2xl sm:left-5 sm:right-auto sm:w-96"
+              className="fixed bottom-5 left-5 right-5 z-50 mx-auto max-w-md rounded-3xl border border-black/[0.08] bg-white p-5 shadow-2xl sm:left-auto sm:right-5 sm:w-96"
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[var(--color-foreground)]">🛠 {c.title}</h3>
