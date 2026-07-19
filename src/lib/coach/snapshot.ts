@@ -80,12 +80,15 @@ export async function buildSnapshot(
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
       .limit(1),
-    // per-skill точность за 30 дней (8.2): слабейший НАВЫК, не среднее
+    // per-skill точность за 30 дней (8.2): слабейший НАВЫК, не среднее;
+    // диагностика исключена — это оценка уровня (агент видит её через
+    // readiness-секции), а не практика
     supabase
       .from("attempts")
       .select("skill, is_correct")
       .eq("user_id", userId)
       .eq("is_self_reported", false)
+      .neq("source", "diagnostic")
       .gte("answered_at", `${isoShift(today, -30)}T00:00:00Z`)
       .limit(2000),
     // единая память (8, п.1): бриф ПОМНИТ, о чём студент спрашивал в чате
@@ -101,7 +104,8 @@ export async function buildSnapshot(
 
   const quiz = (profile?.quiz_result as { level?: string; minutesDaily?: number } | null) ?? null;
   const level = quiz?.level ?? "A2";
-  const targetLevel: "B2" | "C1" = profile?.target_level === "B2" ? "B2" : "C1";
+  // B2 — цель по умолчанию (порог вуза); C1 только если выбран явно
+  const targetLevel: "B2" | "C1" = profile?.target_level === "C1" ? "C1" : "B2";
 
   const daysToExam =
     profile?.exam_date_mode === "exact" && profile?.exam_date
@@ -200,6 +204,9 @@ export async function buildSnapshot(
             report.criteria.vocab.score +
             report.criteria.coherence.score
           : null,
+        // невалидный разбор: Ahu должна ПОМНИТЬ причину («говорил по-русски»)
+        invalidReason:
+          voiceRow.report && !voiceRow.report.valid ? (voiceRow.report.invalid_reason ?? null) : null,
       }
     : null;
 

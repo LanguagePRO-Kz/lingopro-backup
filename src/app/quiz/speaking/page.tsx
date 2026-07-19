@@ -184,7 +184,7 @@ function SpeakingProbe() {
       setPhase("idle");
       return;
     }
-    let data: { conversationToken?: string; voiceId?: string; dynamicVariables?: Record<string, string> } = {};
+    let data: { conversationToken?: string; voiceId?: string; dynamicVariables?: Record<string, string>; firstMessage?: string } = {};
     try {
       const res = await fetch("/api/voice/session", {
         method: "POST",
@@ -208,7 +208,11 @@ function SpeakingProbe() {
         conversationToken: data.conversationToken,
         connectionType: "webrtc",
         dynamicVariables: data.dynamicVariables,
-        overrides: { tts: { voiceId: data.voiceId } },
+        overrides: {
+          tts: { voiceId: data.voiceId },
+          // приветствие пробы — на языке студента (уровень ещё неизвестен)
+          ...(data.firstMessage ? { agent: { firstMessage: data.firstMessage } } : {}),
+        },
       });
     } catch {
       setErr(c.errGeneric);

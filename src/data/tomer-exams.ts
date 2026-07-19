@@ -5,6 +5,9 @@
  * the runner never fabricates questions — everything comes from the bank.
  */
 
+import { READING_TASKS } from "./reading-tasks";
+import { LISTENING_TASKS } from "./listening-tasks";
+import LISTENING_AUDIO from "./listening-audio.json";
 import okumaA1001 from "../../content/tomer/okuma/okuma-a1-001.json";
 import okumaA2001 from "../../content/tomer/okuma/okuma-a2-001.json";
 import okumaB1001 from "../../content/tomer/okuma/okuma-b1-001.json";
@@ -109,12 +112,97 @@ export const TOMER_EXAMS: TomerExam[] = [examA1001, examA2001, examB1001, examB2
 
 const byId = new Map(UNITS.map((u) => [u.id, u]));
 
+const LISTENING_AUDIO_MAP: Record<string, string> = LISTENING_AUDIO as Record<string, string>;
+
 export function tomerUnit(id: string): TomerUnit | null {
   return byId.get(id) ?? null;
 }
 
 export function sectionUnits(exam: TomerExam, section: TomerSection): TomerUnit[] {
   return exam.sections[section].map((id) => byId.get(id)).filter((u): u is TomerUnit => !!u);
+}
+
+/* ---------------- добор секции до объёма формата (19.07.2026) ----------------
+ * Выбор формата (TYS: Okuma 40, Dinleme 30) раньше НИЧЕГО не менял — секция
+ * всегда была банковским объёмом. Теперь okuma/dinleme добираются задачами
+ * того же уровня из банков разделов: чтение — целиком, аудирование — только
+ * задачи с настоящим студийным mp3 (текст вместо записи — не аудирование).
+ * Не хватило — интерфейс честно показывает «N из M». */
+
+function readingUnit(t: (typeof READING_TASKS)[number]): TomerUnit {
+  return {
+    id: `bank:${t.id}`,
+    source: "original",
+    license: null,
+    skill: "okuma",
+    level: t.level,
+    title: t.title,
+    body: t.text,
+    audioSrc: null,
+    questions: t.questions.map((q) => ({
+      id: q.id,
+      type: "detail",
+      prompt: q.question,
+      options: q.options,
+      answer: q.correctAnswer,
+    })),
+  };
+}
+
+function listeningUnit(t: (typeof LISTENING_TASKS)[number]): TomerUnit | null {
+  const audioSrc = LISTENING_AUDIO_MAP[t.id];
+  if (!audioSrc) return null; // без записи это не аудирование
+  return {
+    id: `bank:${t.id}`,
+    source: "original",
+    license: null,
+    skill: "dinleme",
+    level: t.level,
+    title: t.title,
+    body: "", // текст записи студенту не показываем
+    audioSrc,
+    questions: (t.questions ?? []).map((q) => ({
+      id: q.id,
+      type: "detail",
+      prompt: q.question,
+      options: q.options,
+      answer: q.correctAnswer,
+    })),
+  };
+}
+
+export type SectionBuild = {
+  units: TomerUnit[];
+  questionCount: number;
+  /** целевой объём формата; null = формат объём не публикует */
+  target: number | null;
+};
+
+/** Секция под формат: базовые TOMER-юниты + добор банками того же уровня
+ * (+ extraUnits, напр. одобренные generated_tasks) до target вопросов. */
+export function buildSectionUnits(
+  exam: TomerExam,
+  section: TomerSection,
+  target: number | null = null,
+  extraUnits: TomerUnit[] = [],
+): SectionBuild {
+  const base = sectionUnits(exam, section);
+  const count = (us: TomerUnit[]) => us.reduce((n, u) => n + u.questions.length, 0);
+  if ((section !== "okuma" && section !== "dinleme") || target == null || count(base) >= target) {
+    return { units: base, questionCount: count(base), target };
+  }
+  const pool: TomerUnit[] =
+    section === "okuma"
+      ? [...extraUnits, ...READING_TASKS.filter((t) => t.level === exam.level).map(readingUnit)]
+      : LISTENING_TASKS.filter((t) => t.level === exam.level)
+          .map(listeningUnit)
+          .filter((u): u is TomerUnit => !!u);
+  const units = [...base];
+  for (const u of pool) {
+    if (count(units) >= target) break;
+    if (!units.some((x) => x.id === u.id)) units.push(u);
+  }
+  return { units, questionCount: count(units), target };
 }
 
 /** Honest /25: share of correct answers on the official 25-point scale. */

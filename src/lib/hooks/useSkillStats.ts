@@ -2,9 +2,11 @@
 
 /**
  * Статистика раздела из attempts — ТОГО ЖЕ источника, куда раздел пишет
- * (один источник правды). Самооценка отфильтрована. available=false =
- * данных нет (таблица недоступна/не залогинен) — UI обязан показывать «—»,
- * не ноль: отсутствие данных ≠ ноль.
+ * (один источник правды). Самооценка отфильтрована. ДИАГНОСТИКА тоже:
+ * это оценка уровня, не практика раздела — свежий юзер с 30 ответами
+ * диагностики видел «отвечено: 10 · точность 30%» и думал, что это баг
+ * (рецидив 19.07). available=false = данных нет — UI обязан показывать
+ * «—», не ноль: отсутствие данных ≠ ноль.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -56,6 +58,7 @@ export function useSkillStats(skill: "grammar" | "reading" | "listening", weakSt
           .eq("user_id", user.id)
           .eq("skill", skill)
           .eq("is_self_reported", false)
+          .neq("source", "diagnostic")
           .order("answered_at", { ascending: false })
           .limit(5000),
         supabase

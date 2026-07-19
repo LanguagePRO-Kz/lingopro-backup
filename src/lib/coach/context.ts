@@ -184,7 +184,9 @@ export function buildAhuContext(
     const reviewBits =
       s.lastVoice.criteriaTotal != null
         ? `${s.lastVoice.errorCount ? `, ${s.lastVoice.errorCount} hata` : ", hatasız"}, değerlendirme ${s.lastVoice.criteriaTotal}/20`
-        : ", yazılı değerlendirme YOK (hata verisi yok — 'hatasız' DEME)";
+        : s.lastVoice.invalidReason
+          ? `, değerlendirme YAPILAMADI (nedeni: ${s.lastVoice.invalidReason}). Öğrenciye baskı yapma — daha kolay format (temel ders) öner`
+          : ", yazılı değerlendirme YOK (hata verisi yok — 'hatasız' DEME)";
     opt(
       `SON SESLİ DERS (${agoTr(agoDays(s.lastVoice.endedAt, s.today, s.timezone))}, ${s.lastVoice.minutes} dk): ${
         s.lastVoice.topicsWorked.length ? s.lastVoice.topicsWorked.map(trLabel).join(", ") : "konu kaydı yok"

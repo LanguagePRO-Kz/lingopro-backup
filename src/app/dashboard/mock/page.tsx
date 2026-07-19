@@ -12,7 +12,7 @@ import { todayISO } from "@/lib/daily-plan";
 import { loadResult } from "@/lib/quiz";
 import {
   TOMER_EXAMS,
-  sectionUnits,
+  buildSectionUnits,
   scoreOutOf25,
   type TomerExam,
   type TomerSection,
@@ -52,6 +52,7 @@ const T = {
     sourceOriginal: "Задания созданы AI в формате TÖMER и постоянно улучшаются",
     fmtLabel: "Мой экзамен", timeLeft: "осталось", timeUp: "Время вышло — ответы зафиксированы как есть.",
     timeBudget: (m: number) => `⏱ ${m} мин — как на экзамене`,
+    bankShort: (n: number, m: number) => `В банке пока ${n} из ${m} вопросов этого формата — банк пополняется.`,
     vTitle: "Вердикт", vPassedC1: "По формату твоего центра это C1.",
     vPassedB2: "По формату твоего центра это B2.", vC1Gap: (n: number) => `До C1 не хватает ${n} баллов.`,
     vFailedMin: "ЭКЗАМЕН НЕ СДАН: слабое звено топит.", vFailedMinBody: (secs: string, min: number) => `Сумма не спасает — твой центр требует минимум ${min}/25 по каждой секции. Провалено: ${secs}.`,
@@ -76,6 +77,7 @@ const T = {
     sourceOriginal: "AI-generated tasks in the TÖMER format, continuously improved",
     fmtLabel: "My exam", timeLeft: "left", timeUp: "Time's up — answers locked as they are.",
     timeBudget: (m: number) => `⏱ ${m} min — exam pace`,
+    bankShort: (n: number, m: number) => `The bank has ${n} of this format's ${m} questions so far — it keeps growing.`,
     vTitle: "Verdict", vPassedC1: "By your centre's format this is C1.",
     vPassedB2: "By your centre's format this is B2.", vC1Gap: (n: number) => `${n} points short of C1.`,
     vFailedMin: "EXAM NOT PASSED: the weak link sinks it.", vFailedMinBody: (secs: string, min: number) => `The total doesn't save you — your centre requires at least ${min}/25 in every section. Failed: ${secs}.`,
@@ -100,6 +102,7 @@ const T = {
     sourceOriginal: "TÖMER formatında yapay zekâ üretimi görevler, sürekli iyileştirilir",
     fmtLabel: "Sınavım", timeLeft: "kaldı", timeUp: "Süre doldu — cevaplar olduğu gibi kilitlendi.",
     timeBudget: (m: number) => `⏱ ${m} dk — sınav temposu`,
+    bankShort: (n: number, m: number) => `Bankada bu formatın ${m} sorusundan şimdilik ${n} tanesi var — banka büyüyor.`,
     vTitle: "Sonuç", vPassedC1: "Merkezinin formatına göre bu C1.",
     vPassedB2: "Merkezinin formatına göre bu B2.", vC1Gap: (n: number) => `C1 için ${n} puan eksik.`,
     vFailedMin: "SINAV GEÇİLMEDİ: zayıf halka batırıyor.", vFailedMinBody: (secs: string, min: number) => `Toplam kurtarmıyor — merkezin her bölümde en az ${min}/25 istiyor. Kalınan: ${secs}.`,
@@ -124,6 +127,7 @@ const T = {
     sourceOriginal: "TÖMER форматындағы AI жасаған тапсырмалар, үнемі жетілдіріледі",
     fmtLabel: "Менің емтиханым", timeLeft: "қалды", timeUp: "Уақыт бітті — жауаптар сол күйінде бекітілді.",
     timeBudget: (m: number) => `⏱ ${m} мин — емтихан қарқыны`,
+    bankShort: (n: number, m: number) => `Банкте бұл форматтың ${m} сұрағынан әзірге ${n} бар — банк толығуда.`,
     vTitle: "Үкім", vPassedC1: "Орталығыңның форматы бойынша бұл C1.",
     vPassedB2: "Орталығыңның форматы бойынша бұл B2.", vC1Gap: (n: number) => `C1-ге ${n} балл жетпейді.`,
     vFailedMin: "ЕМТИХАН ТАПСЫРЫЛМАДЫ: әлсіз буын құлатады.", vFailedMinBody: (secs: string, min: number) => `Жалпы балл құтқармайды — орталығың әр бөлімнен кемінде ${min}/25 талап етеді. Құлаған: ${secs}.`,
@@ -579,6 +583,62 @@ export default function MockPage() {
     void loadScores(exam.id).then(setScores);
   }, [exam.id]);
 
+  // одобренные AI-задания уровня (0018) → добор Okuma-пула; RLS отдаёт
+  // клиенту только status='approved' — прошедшие «злого экзаменатора»
+  const [genUnit, setGenUnit] = useState<TomerUnit | null>(null);
+  useEffect(() => {
+    let active = true;
+    setGenUnit(null);
+    (async () => {
+      try {
+        const { data } = await createClient()
+          .from("generated_tasks")
+          .select("id, payload")
+          .eq("status", "approved")
+          .eq("level", exam.level)
+          .limit(20);
+        if (!active || !data?.length) return;
+        const qs = data
+          .map((r) => r.payload as { question?: string; options?: string[]; correctAnswer?: number })
+          .filter((p) => typeof p?.question === "string" && Array.isArray(p.options) && typeof p.correctAnswer === "number")
+          .map((p, i) => ({
+            id: `gen:${exam.level}:${i}`,
+            type: "detail",
+            prompt: p.question!,
+            options: p.options!,
+            answer: p.correctAnswer!,
+          }));
+        if (qs.length) {
+          setGenUnit({
+            id: `gen:${exam.level}`,
+            source: "original",
+            license: null,
+            skill: "okuma",
+            level: exam.level,
+            title: "Dil Bilgisi",
+            body: "",
+            audioSrc: null,
+            questions: qs,
+          });
+        }
+      } catch {
+        /* добор — best-effort */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [exam.level]);
+
+  /** Секция под выбранный формат: банковские юниты + добор до объёма центра. */
+  const sectionBuild = (s: TomerSection) =>
+    buildSectionUnits(
+      exam,
+      s,
+      s === "okuma" || s === "dinleme" ? fmt.questionTargets[s] : null,
+      genUnit ? [genUnit] : [],
+    );
+
   function finishSection(section: TomerSection, score: number, correct?: number, total?: number) {
     void saveSectionScore(exam.id, section, score, scores);
     setScores((s) => ({ ...s, [section]: score }));
@@ -589,13 +649,20 @@ export default function MockPage() {
   const total = SECTION_ORDER.reduce((s, k) => s + (scores[k] ?? 0), 0);
 
   if (view.kind === "section") {
-    const units = sectionUnits(exam, view.section);
+    const build = sectionBuild(view.section);
+    const units = build.units;
     return (
       <div>
         <button type="button" onClick={() => setView({ kind: "exam" })} className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-foreground)]">
           ← {c.back}
         </button>
         <h2 className="text-xl font-bold tracking-tight">{SECTION_EMOJI[view.section]} {c.sections[view.section]}</h2>
+        {/* формат хочет больше, чем есть в банке — честно говорим (1.3) */}
+        {build.target != null && build.questionCount < build.target && (
+          <p className="mt-2 rounded-xl bg-[#d97706]/10 px-3.5 py-2 text-xs font-medium text-[#92400e]">
+            {c.bankShort(build.questionCount, build.target)}
+          </p>
+        )}
         {view.section === "yazma" ? (
           <YazmaRunner
             units={units}
@@ -726,8 +793,9 @@ export default function MockPage() {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {SECTION_ORDER.map((s) => {
-            const units = sectionUnits(exam, s);
-            const nQ = units.reduce((n, u) => n + u.questions.length, 0);
+            const build = sectionBuild(s);
+            const units = build.units;
+            const nQ = build.questionCount;
             const done = typeof scores[s] === "number";
             const minPts = fmt.minPerSectionShare != null ? Math.round(fmt.minPerSectionShare * 25) : null;
             const belowMin = done && minPts != null && (scores[s] as number) < minPts;
@@ -749,6 +817,9 @@ export default function MockPage() {
                   {s === "yazma" ? `${units.length} görev` : s === "konusma" ? "3 bölüm · canlı" : `${units.length} ${s === "okuma" ? "metin" : "kayıt"} · ${nQ} soru`}
                   {limit != null && <> · {c.timeBudget(Math.round(limit / 60))}</>}
                 </div>
+                {build.target != null && nQ < build.target && (
+                  <div className="mt-0.5 text-[11px] font-medium text-[#92400e]">{c.bankShort(nQ, build.target)}</div>
+                )}
                 {s === "konusma" ? (
                   <>
                     <p className="mt-2 text-xs leading-relaxed text-[var(--color-muted)]">{c.konusmaBody}</p>

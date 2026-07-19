@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActivePlan } from "@/lib/access";
+import { firstMessageFor } from "@/lib/voice/agent-prompt";
 import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
@@ -227,10 +228,15 @@ export async function POST(req: Request) {
       : requestedMode === "foundation" && !foundationLevel
         ? "free" // B1+ явного фундамента не получает — он ему вреден
         : requestedMode;
+  // Лестница поддержки применяется ПОВЕРХ ЛЮБОГО режима для A0-A2 (живой
+  // баг 19.07: студент сам выбрал Bölüm 2 → Фундамент не применился, Ahu
+  // дала «говори 3 минуты» новичку и продолжала по-турецки под его русский)
   const modeInstructions =
     mode === "foundation"
       ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
-      : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">];
+      : foundationLevel
+        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} Mod çerçevesini koru ama görevleri bu destek seviyesine göre KÜÇÜLT (uzun monolog isteme, tek basit soru sor).`
+        : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">];
   // подсказки-заготовки на экран (A0-A1): студент может ПРОЧИТАТЬ ответ
   const foundationHints =
     mode === "foundation" && (foundationLevel === "A0" || foundationLevel === "A1")
@@ -271,19 +277,43 @@ export async function POST(req: Request) {
       console.error("[voice] coach focus failed, weak-topics fallback:", e instanceof Error ? e.message : e);
     }
   }
-  const focus: Topic[] = requested.length
-    ? requested
-    : coachFocus.length
-      ? coachFocus
-      : (weak ?? [])
-          .map((w) => topicById(w.topic as string))
-          .filter((t): t is Topic => !!t && t.id !== "other")
-          .slice(0, 3);
+  // ротация тем (живой баг: темы повторялись урок за уроком) — темы,
+  // отработанные в ПОСЛЕДНЕМ разобранном уроке, уходят в конец очереди;
+  // если других слабых нет — честно возвращаются (лучше повтор, чем пусто)
+  let lastWorked = new Set<string>();
+  try {
+    const { data: lastSession } = await supabase
+      .from("voice_sessions")
+      .select("report")
+      .eq("user_id", user.id)
+      .not("report", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const worked = (lastSession?.report as { topics_worked?: string[] } | null)?.topics_worked;
+    if (Array.isArray(worked)) lastWorked = new Set(worked);
+  } catch {
+    /* ротация — best-effort */
+  }
+  const rotate = (list: Topic[]): Topic[] =>
+    lastWorked.size ? [...list.filter((t) => !lastWorked.has(t.id)), ...list.filter((t) => lastWorked.has(t.id))] : list;
+
+  const focus: Topic[] = (requested.length
+    ? requested // явный deep-link из плана не ротируем — студент пришёл за этим
+    : rotate(
+        coachFocus.length
+          ? coachFocus
+          : (weak ?? [])
+              .map((w) => topicById(w.topic as string))
+              .filter((t): t is Topic => !!t && t.id !== "other"),
+      )
+  ).slice(0, 3);
   if (focus.length < 3) {
     const levelKey = ["A1", "A2", "B1", "B2", "C1"].includes(level) ? level : "A2";
-    for (const t of TOPICS) {
+    const levelTopics = TOPICS.filter((t) => t.level === levelKey && t.id !== "other" && !focus.some((f) => f.id === t.id));
+    for (const t of rotate(levelTopics)) {
       if (focus.length >= 3) break;
-      if (t.level === levelKey && t.id !== "other" && !focus.some((f) => f.id === t.id)) focus.push(t);
+      focus.push(t);
     }
   }
   const lessonFocusTr = focus.map((t) => t.label.tr).join(", ");
@@ -309,6 +339,14 @@ export async function POST(req: Request) {
     // фундамент (7.8): режим после серверного резолва + фразы-заготовки
     resolvedMode: mode,
     foundationHints,
+    // первое сообщение по лестнице/режиму (A0-A1 — на языке студента);
+    // клиент шлёт его через override (разрешён скриптом sync-voice-agent)
+    firstMessage: firstMessageFor({
+      level,
+      mode,
+      name: (profile?.full_name as string | null)?.split(" ")[0] ?? "öğrenci",
+      locale: feedbackLangCode as "ru" | "en" | "tr" | "kk",
+    }),
     dynamicVariables: {
       user_id: user.id, // ownership check at settlement
       student_name: (profile?.full_name as string | null) ?? (profile?.handle as string | null) ?? "öğrenci",

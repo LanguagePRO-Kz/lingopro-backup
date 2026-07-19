@@ -51,6 +51,9 @@ export type SnapshotVoice = {
   errorCount: number;
   /** сумма 4 критериев Konuşma-ревью, 0–20; null = ревью не было/невалидно */
   criteriaTotal: number | null;
+  /** почему разбор не построился (invalid_reason ревьюера, напр. «говорил
+   * по-русски») — Ahu помнит и предлагает поддержку, а не давит турецким */
+  invalidReason: string | null;
 };
 
 export type StudentSnapshot = {

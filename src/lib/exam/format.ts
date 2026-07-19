@@ -21,6 +21,10 @@ export type ExamFormat = {
   /** Секундный бюджет мока: на MC-вопрос и на письменное задание —
    *  честный масштаб экзаменационного темпа на наш объём заданий. */
   perQuestionSeconds: { dinleme: number; okuma: number };
+  /** Целевое число вопросов секции в моке. Проверенные факты: только TYS
+   * публикует объёмы (Okuma 40, Dinleme 30); null = сколько есть в банке —
+   * непубликуемые объёмы центров НЕ выдумываем (правило 1.3). */
+  questionTargets: { dinleme: number | null; okuma: number | null };
   perWritingTaskSeconds: number;
   /** Порог сертификата по сумме /100; null = центр порог не публикует /
    *  пороги плавающие — вердикт балла НЕ обещаем. */
@@ -47,6 +51,7 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     name: "TÖMER (общий формат)",
     note: NOTE_GENERIC,
     perQuestionSeconds: { dinleme: 90, okuma: 110 },
+    questionTargets: { dinleme: null, okuma: null },
     perWritingTaskSeconds: 25 * 60,
     thresholds: { B2: 60, C1: 75 },
     failBelowTotal: null,
@@ -66,6 +71,7 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     },
     // TYS: Okuma 40 вопросов/60 мин (90с), Dinleme 30/45 (90с), Yazma 2 задания/60 мин
     perQuestionSeconds: { dinleme: 90, okuma: 90 },
+    questionTargets: { dinleme: 30, okuma: 40 },
     perWritingTaskSeconds: 30 * 60,
     thresholds: { B2: null, C1: null },
     failBelowTotal: null,
@@ -83,6 +89,8 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
       kk: "Sakarya: C1 — 85-тен, 50-ден төмен — сәтсіз. B2 шегі жарияланбайды — тіркелгенде нақтыла.",
     },
     perQuestionSeconds: { dinleme: 90, okuma: 110 },
+    // объём вопросов Sakarya не публикует («4×25» — баллы, не вопросы)
+    questionTargets: { dinleme: null, okuma: null },
     perWritingTaskSeconds: 25 * 60,
     thresholds: { B2: null, C1: 85 },
     failBelowTotal: 50,
@@ -100,6 +108,8 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
       kk: "Bayburt/EBYU: ӘР дағдыдан кемінде 60% — бір әлсіз бөлім жалпы балл жоғары болса да емтиханды құлатады.",
     },
     perQuestionSeconds: { dinleme: 90, okuma: 110 },
+    // объём вопросов центр не публикует — не выдумываем
+    questionTargets: { dinleme: null, okuma: null },
     perWritingTaskSeconds: 25 * 60,
     thresholds: { B2: 60, C1: 75 },
     failBelowTotal: null,

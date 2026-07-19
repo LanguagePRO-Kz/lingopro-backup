@@ -48,6 +48,9 @@ const T = {
     topicsWorked: "Проработанные темы", nextSteps: "Что дальше", reportNone: "Разговор был слишком коротким для разбора.",
     reportPendingT: "Транскрипт урока ещё готовится на стороне провайдера. Нажми «Получить разбор» через минуту — он никуда не денется.",
     reportFailedT: "Разбор не построился — транскрипт цел. Попробуй ещё раз.",
+    reportNoneWhy: (t: string) => `Разбор не построен. Ты говорил ${t}.`,
+    reviewMinNote: "Для письменного разбора нужно ответить по-турецки минимум 2-3 развёрнутыми фразами — это примерно 2 минуты разговора.",
+    reviewProgress: (n: number) => `Твоих ответов: ${n} · для разбора — от 3 по-турецки`,
     hintsTitle: "Можно ответить так", dontUnderstand: "Не понял — помедленнее",
     foundationScores: "Урок-фундамент: без экзаменационных баллов — учимся говорить. Разбор фраз ниже.",
     again: "Ещё урок",
@@ -74,6 +77,9 @@ const T = {
     topicsWorked: "Topics worked on", nextSteps: "Next steps", reportNone: "The conversation was too short for a review.",
     reportPendingT: "The lesson transcript is still being prepared by the provider. Press “Get the review” in a minute — it isn't going anywhere.",
     reportFailedT: "The review could not be built — your transcript is safe. Try again.",
+    reportNoneWhy: (t: string) => `No review was built. You spoke for ${t}.`,
+    reviewMinNote: "For a written review, answer in Turkish with at least 2-3 full phrases — that's about 2 minutes of conversation.",
+    reviewProgress: (n: number) => `Your answers: ${n} · a review needs 3+ in Turkish`,
     hintsTitle: "You can answer like this", dontUnderstand: "Didn't get it — slower please",
     foundationScores: "Foundation lesson: no exam scores — we're learning to speak. Phrase review below.",
     again: "Another lesson",
@@ -100,6 +106,9 @@ const T = {
     topicsWorked: "Çalışılan konular", nextSteps: "Sonraki adımlar", reportNone: "Konuşma değerlendirme için çok kısaydı.",
     reportPendingT: "Ders dökümü sağlayıcı tarafında hâlâ hazırlanıyor. Bir dakika sonra «Değerlendirmeyi al»a bas — kaybolmaz.",
     reportFailedT: "Değerlendirme oluşturulamadı — dökümün yerinde. Tekrar dene.",
+    reportNoneWhy: (t: string) => `Değerlendirme oluşturulmadı. ${t} konuştun.`,
+    reviewMinNote: "Yazılı değerlendirme için Türkçe en az 2-3 dolu cümleyle cevap ver — bu yaklaşık 2 dakikalık konuşma demek.",
+    reviewProgress: (n: number) => `Cevapların: ${n} · değerlendirme için Türkçe 3+ gerek`,
     hintsTitle: "Şöyle cevap verebilirsin", dontUnderstand: "Anlamadım — daha yavaş",
     foundationScores: "Temel ders: sınav puanı yok — konuşmayı öğreniyoruz. Cümle incelemesi aşağıda.",
     again: "Yeni ders",
@@ -126,6 +135,9 @@ const T = {
     topicsWorked: "Өтілген тақырыптар", nextSteps: "Келесі қадамдар", reportNone: "Әңгіме талдау үшін тым қысқа болды.",
     reportPendingT: "Сабақ транскрипті провайдер жағында әлі дайындалуда. Бір минуттан кейін «Талдауды алу» батырмасын бас — ол жоғалмайды.",
     reportFailedT: "Талдау құрылмады — транскрипт сақтаулы. Қайта көр.",
+    reportNoneWhy: (t: string) => `Талдау құрылмады. Сен ${t} сөйледің.`,
+    reviewMinNote: "Жазбаша талдау үшін түрікше кемінде 2-3 толық сөйлеммен жауап бер — бұл шамамен 2 минуттық әңгіме.",
+    reviewProgress: (n: number) => `Жауаптарың: ${n} · талдауға түрікше 3+ керек`,
     hintsTitle: "Былай жауап беруге болады", dontUnderstand: "Түсінбедім — баяуырақ",
     foundationScores: "Іргетас сабағы: емтихан баллы жоқ — сөйлеуді үйренеміз. Сөйлем талдауы төменде.",
     again: "Тағы бір сабақ",
@@ -531,12 +543,28 @@ function LiveLesson() {
     setFoundationHints((data as { foundationHints?: string[] }).foundationHints ?? []);
     maxSecondsRef.current = data.maxSeconds;
     setMaxSeconds(data.maxSeconds);
-    conversation.startSession({
-      conversationToken: data.conversationToken,
-      connectionType: "webrtc",
-      dynamicVariables: data.dynamicVariables,
-      overrides: { tts: { voiceId: data.voiceId } },
-    });
+    const firstMessage = (data as { firstMessage?: string }).firstMessage;
+    // WebRTC-коннект мигает с первого раза — авто-ретрай (3 попытки с
+    // бэкофом), студент не должен жать кнопку сам
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await conversation.startSession({
+          conversationToken: data.conversationToken,
+          connectionType: "webrtc",
+          dynamicVariables: data.dynamicVariables,
+          overrides: {
+            tts: { voiceId: data.voiceId },
+            // первое сообщение по лестнице уровня (A0-A1 — на языке студента)
+            ...(firstMessage ? { agent: { firstMessage } } : {}),
+          },
+        });
+        return;
+      } catch {
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+      }
+    }
+    setErr("errGeneric");
+    setPhase("idle");
   }
 
   const inCall = phase === "live" || phase === "wrapping";
@@ -617,6 +645,8 @@ function LiveLesson() {
                   kk: "Сабақ ~10 минут. Соңында Ahu ауызша қорытады, жазбаша талдау экранда шығады.",
                 })}
               </li>
+              {/* минимум для разбора — ДО урока, не сюрприз после (баг 19.07) */}
+              <li className="font-medium text-[var(--color-foreground)]">⚠️ {c.reviewMinNote}</li>
             </ul>
           </div>
 
@@ -735,6 +765,12 @@ function LiveLesson() {
               </div>
             </div>
           )}
+          {/* живой прогресс к разбору: студент видит, хватает ли его ответов */}
+          {phase === "live" && (
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1 text-[11px] font-medium text-[var(--color-muted)]">
+              🎯 {c.reviewProgress(lines.filter((l) => l.source === "user").length)}
+            </div>
+          )}
           {phase === "live" && (
             <p className="mt-4 rounded-xl bg-black/[0.03] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--color-muted)]">
               💬 {c.endHint}
@@ -815,7 +851,20 @@ function LiveLesson() {
               too_short — терминально; pending/failed — рабочая кнопка повтора */}
           {!reportPending && !settleFailed && settle && !report && (settle.minutes == null || settle.minutes > 0) && (
             (settle.reportState ?? "pending_transcript") === "too_short" ? (
-              <p className="mt-3 text-sm text-[var(--color-muted)]">{c.reportNone}</p>
+              // честная причина от ревьюера (локализована AI-ем: «речь была
+              // на русском» ≠ «слишком коротко») + факты + путь дальше
+              <div className="mt-3 rounded-xl bg-[#d97706]/10 px-4 py-3 text-sm text-[#92400e]">
+                <p>
+                  {c.reportNoneWhy(fmt(settle.seconds))}{" "}
+                  {settle.report?.invalid_reason && settle.report.invalid_reason !== "too short"
+                    ? settle.report.invalid_reason
+                    : c.reportNone}
+                </p>
+                <p className="mt-1.5 text-xs">{c.reviewMinNote}</p>
+                <button type="button" onClick={start} className="mt-2 rounded-full bg-[#92400e] px-4 py-1.5 text-xs font-semibold text-white">
+                  🎙️ {c.again}
+                </button>
+              </div>
             ) : (
               <div className="mt-4 rounded-xl bg-[var(--color-brand)]/[0.06] px-4 py-3 text-sm text-[var(--color-foreground)]">
                 <p>{settle.reportState === "failed" ? c.reportFailedT : c.reportPendingT}</p>
