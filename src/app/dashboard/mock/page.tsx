@@ -408,10 +408,13 @@ function YazmaRunner({
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState<number | null>(null);
   const doneRef = useRef(false);
+  // latest-ref для finishByTimeout: таймер читает свежие ответы без ре-подписки
   const textsRef = useRef(texts);
-  textsRef.current = texts;
   const scoresRef = useRef(scores);
-  scoresRef.current = scores;
+  useEffect(() => {
+    textsRef.current = texts;
+    scoresRef.current = scores;
+  }, [texts, scores]);
 
   const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 

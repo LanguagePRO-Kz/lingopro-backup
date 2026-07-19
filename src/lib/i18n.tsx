@@ -145,19 +145,6 @@ const ru = {
     metricFocus: "Фокус недели",
     focusValue: "Грамматика и аудирование",
   },
-  leaderboard: {
-    title: "Рейтинг студентов",
-    subtitle:
-      "Сравнивай прогресс с другими — по личным очкам, городу и стране. Здоровая конкуренция помогает держать темп.",
-    tabs: [
-      { id: "progress", label: "По прогрессу" },
-      { id: "city", label: "По городу" },
-      { id: "country", label: "По стране" },
-    ],
-    you: "Это ты",
-    xp: "XP",
-    note: "Данные на иллюстрации — пример того, как выглядит рейтинг.",
-  },
   gamification: {
     title: "XP, уровни и достижения",
     subtitle:
@@ -490,19 +477,6 @@ const kk: Dict = {
     metricFocus: "Апта фокусы",
     focusValue: "Грамматика мен тыңдалым",
   },
-  leaderboard: {
-    title: "Студенттер рейтингі",
-    subtitle:
-      "Прогресіңді басқалармен салыстыр — жеке ұпай, қала және ел бойынша. Дені сау бәсеке қарқынды ұстауға көмектеседі.",
-    tabs: [
-      { id: "progress", label: "Прогресс бойынша" },
-      { id: "city", label: "Қала бойынша" },
-      { id: "country", label: "Ел бойынша" },
-    ],
-    you: "Бұл сенсің",
-    xp: "XP",
-    note: "Иллюстрациядағы деректер — рейтингтің көрінісінің мысалы.",
-  },
   gamification: {
     title: "XP, деңгейлер және жетістіктер",
     subtitle:
@@ -830,19 +804,6 @@ const en: Dict = {
     metricFocus: "Weekly focus",
     focusValue: "Grammar & listening",
   },
-  leaderboard: {
-    title: "Student leaderboard",
-    subtitle:
-      "Compare progress with others — by personal points, city and country. Healthy competition keeps you going.",
-    tabs: [
-      { id: "progress", label: "By progress" },
-      { id: "city", label: "By city" },
-      { id: "country", label: "By country" },
-    ],
-    you: "This is you",
-    xp: "XP",
-    note: "Numbers shown are an illustration of how the leaderboard looks.",
-  },
   gamification: {
     title: "XP, levels and achievements",
     subtitle:
@@ -1169,19 +1130,6 @@ const tr: Dict = {
     metricLoad: "Günlük yük",
     metricFocus: "Haftanın odağı",
     focusValue: "Dilbilgisi ve dinleme",
-  },
-  leaderboard: {
-    title: "Öğrenci sıralaması",
-    subtitle:
-      "İlerlemeni başkalarıyla karşılaştır — kişisel puan, şehir ve ülkeye göre. Sağlıklı rekabet temponu korur.",
-    tabs: [
-      { id: "progress", label: "İlerlemeye göre" },
-      { id: "city", label: "Şehre göre" },
-      { id: "country", label: "Ülkeye göre" },
-    ],
-    you: "Bu sensin",
-    xp: "XP",
-    note: "Gösterilen sayılar sıralamanın nasıl göründüğüne dair bir örnektir.",
   },
   gamification: {
     title: "XP, seviyeler ve başarılar",

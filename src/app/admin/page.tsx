@@ -26,6 +26,13 @@ const VERDICT_RU: Record<Readiness["verdict"], { label: string; cls: string; ran
 
 type Tab = "students" | "payments" | "broken" | "feedback";
 
+/** Момент запроса: страница force-dynamic, «сейчас» фиксируется один раз на
+ *  рендер. Вынесено из тела компонента — react-hooks/purity запрещает прямой
+ *  Date.now() в рендере (тот же паттерн, что accessState в dashboard/layout). */
+function requestNowMs(): number {
+  return Date.now();
+}
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   // причина каждого 404 — в серверный лог: три ветки снаружи неразличимы,
   // и «у основателя 404» иначе не диагностируется
@@ -57,7 +64,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     : "students";
 
   /* ------------------------- батчевые данные ------------------------- */
-  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const nowMs = requestNowMs();
+  const weekAgo = new Date(nowMs - 7 * 86_400_000).toISOString();
   // exam_format — изолированно: колонка едет миграцией 0017, её отсутствие
   // не должно валить всю панель (все получают дефолтный пресет)
   const fmtRes = await admin.from("profiles").select("id, exam_format");
@@ -87,7 +95,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     act7.set(a.user_id as string, cur);
   }
 
-  const now = Date.now();
+  const now = nowMs;
   const rows = (profilesRes.data ?? []).map((p) => {
     const quiz = p.quiz_result as { sections?: Partial<Record<SectionId, number | null>>; takenAt?: number } | null;
     const fmt = examFormat(fmtByUser.get(p.id as string) ?? null);
@@ -124,7 +132,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           ["Всего", cards.total],
           ["Триал", cards.trial],
           ["Оплатили", cards.paid],
-          ["Активны 7д", cards.active7],
+          ["Активны 7д*", cards.active7],
           ["🔴 Не сдадут", cards.failing],
         ].map(([label, n]) => (
           <div key={label as string} className="rounded-2xl border border-black/10 bg-white p-3 text-center">
@@ -132,6 +140,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <div className="text-xs text-black/50">{label}</div>
           </div>
         ))}
+      </div>
+      <div className="mt-1 text-[11px] text-black/40">
+        * активность = все попытки за 7 дней, ВКЛЮЧАЯ диагностику — это админский агрегат
+        «кто вообще заходил», не счётчик практики (студентам диагностика в счётчики не течёт)
       </div>
 
       <div className="mt-5 flex gap-2">
@@ -158,7 +170,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <table className="w-full min-w-[1080px] text-left text-xs">
             <thead className="bg-black/5 font-semibold">
               <tr>
-                {["Юзер", "Доступ", "Цель", "Готовность", "Слабое звено", "Секции (D/O/Y/K)", "Активность 7д", "Последний вход"].map((h) => (
+                {["Юзер", "Доступ", "Цель", "Готовность", "Слабое звено", "Секции (D/O/Y/K)", "Активность 7д*", "Последний вход"].map((h) => (
                   <th key={h} className="px-3 py-2">{h}</th>
                 ))}
               </tr>
