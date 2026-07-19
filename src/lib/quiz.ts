@@ -672,6 +672,47 @@ export function qt(locale: Locale, key: QuizTKey): string {
   return T[key][locale] ?? T[key].ru;
 }
 
+/** Живой прогноз на экзамен (examReadiness): тексты вердиктов ×4 языка.
+ * Отдельно от T — здесь функции с параметрами, qt отдаёт только строки. */
+export const FORECAST_T = {
+  ru: {
+    noData: (miss: string) => `Полный прогноз появится, когда будут оценки всех 4 секций. Пока нет: ${miss}.`,
+    notReadyMin: (list: string) => `${list} — ниже минимума секции: слабое звено топит экзамен.`,
+    notReady: (t: number, p: number, g: number) => `${t}/100 — ниже порога B2 (${p}): не хватает ${g} баллов.`,
+    borderline: (t: number, p: number) => `${t}/100 — на грани порога (${p}): одна секция может качнуть в обе стороны.`,
+    ready: (t: number, p: number) => `${t}/100 — выше порога B2 (${p}). Задача — удержать уровень до экзамена.`,
+    term: (m: number, min: number) => `ориентировочно ~${m} мес · ${min} мин/день`,
+    goalLabel: "цель",
+  },
+  en: {
+    noData: (miss: string) => `The full forecast appears once all 4 sections are scored. Missing: ${miss}.`,
+    notReadyMin: (list: string) => `${list} — below the section minimum: the weakest link sinks the exam.`,
+    notReady: (t: number, p: number, g: number) => `${t}/100 — below the B2 threshold (${p}): ${g} points short.`,
+    borderline: (t: number, p: number) => `${t}/100 — right at the threshold (${p}): one section can tip it either way.`,
+    ready: (t: number, p: number) => `${t}/100 — above the B2 threshold (${p}). The job now is to hold it until exam day.`,
+    term: (m: number, min: number) => `roughly ~${m} months · ${min} min/day`,
+    goalLabel: "goal",
+  },
+  tr: {
+    noData: (miss: string) => `Tam tahmin, 4 bölümün de puanı olunca görünecek. Eksik: ${miss}.`,
+    notReadyMin: (list: string) => `${list} — bölüm minimumunun altında: en zayıf halka sınavı batırır.`,
+    notReady: (t: number, p: number, g: number) => `${t}/100 — B2 eşiğinin (${p}) altında: ${g} puan eksik.`,
+    borderline: (t: number, p: number) => `${t}/100 — eşiğin (${p}) sınırında: tek bölüm iki yöne de çevirebilir.`,
+    ready: (t: number, p: number) => `${t}/100 — B2 eşiğinin (${p}) üstünde. Şimdi görev: sınava kadar korumak.`,
+    term: (m: number, min: number) => `yaklaşık ~${m} ay · günde ${min} dk`,
+    goalLabel: "hedef",
+  },
+  kk: {
+    noData: (miss: string) => `Толық болжам 4 бөлімнің бағасы шыққанда көрінеді. Әзірге жоқ: ${miss}.`,
+    notReadyMin: (list: string) => `${list} — бөлім минимумынан төмен: әлсіз буын емтиханды құлатады.`,
+    notReady: (t: number, p: number, g: number) => `${t}/100 — B2 табалдырығынан (${p}) төмен: ${g} балл жетпейді.`,
+    borderline: (t: number, p: number) => `${t}/100 — табалдырық (${p}) шегінде: бір бөлім екі жаққа да бұра алады.`,
+    ready: (t: number, p: number) => `${t}/100 — B2 табалдырығынан (${p}) жоғары. Енді міндет — емтиханға дейін ұстап тұру.`,
+    term: (m: number, min: number) => `шамамен ~${m} ай · күніне ${min} мин`,
+    goalLabel: "мақсат",
+  },
+};
+
 /* Strength / weakness phrasing per module */
 const STRENGTH: Record<ModuleId, Localized> = {
   grammar: { ru: "Грамматика — уверенная база времён и падежей", en: "Grammar — solid tenses and cases", tr: "Dil bilgisi — sağlam zaman ve hâl bilgisi", kk: "Грамматика — шақтар мен септіктер мықты" },

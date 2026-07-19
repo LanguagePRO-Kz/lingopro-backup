@@ -8,6 +8,7 @@ import { useExam } from "@/lib/exam-context";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import {
+  FORECAST_T,
   LEVEL_ORDER,
   MODULES,
   PLANS,
@@ -22,6 +23,8 @@ import {
 import { topicById } from "@/lib/ai/topics";
 import { fetchExamPlan, type ExamPlan } from "@/lib/exam-plan";
 import { assessPlan, type StudentLevel } from "@/lib/plan/feasibility";
+import { examReadiness, type SectionEstimate } from "@/lib/coach/readiness";
+import { examFormat, type SectionId } from "@/lib/exam/format";
 
 function barColor(percent: number) {
   if (percent >= 70) return { from: "#16a34a", to: "#22c55e" };
@@ -526,6 +529,36 @@ export function ResultView({
   const youIdx = levelIndex(result.level);
   const pct = (i: number) => (i / (LEVEL_ORDER.length - 1)) * 100;
 
+  // живой прогноз на экзамен: ТОТ ЖЕ examReadiness, что у агента и админки —
+  // «B2/C1 · 6-12 месяцев» шаблоном здесь врал (последний статический блок)
+  const fc = pick(locale, FORECAST_T);
+  const forecastTarget: "B2" | "C1" = examPlan?.targetLevel ?? "B2";
+  const fcFormat = examFormat(null); // generic TÖMER (60/75) до выбора центра
+  const fcSections: Partial<Record<SectionId, SectionEstimate>> = {};
+  if (isV3 && sections) {
+    for (const s of ["dinleme", "okuma", "yazma", "konusma"] as SectionId[]) {
+      const v = sections[s];
+      if (typeof v === "number") fcSections[s] = { score: v, source: "diagnostic", at: null };
+    }
+  }
+  const readiness = isV3 && sections ? examReadiness(fcFormat, fcSections) : null;
+  const fcMissing = readiness
+    ? (["dinleme", "okuma", "yazma", "konusma"] as SectionId[])
+        .filter((s) => !readiness.sections[s])
+        .map((s) => qt(locale, s === "dinleme" ? "stDinleme" : s === "okuma" ? "stOkuma" : s === "yazma" ? "stYazma" : "stKonusma"))
+        .join(", ")
+    : "";
+  const fcPassAt = fcFormat.thresholds.B2 ?? fcFormat.thresholds.C1 ?? 60;
+  const fcMinutes = Math.min(120, examPlan?.minutesDaily ?? result.minutesDaily ?? 30);
+  const fcMonths = assessPlan({
+    level: result.level as StudentLevel,
+    targetLevel: forecastTarget,
+    minutesDaily: fcMinutes,
+    daysLeft: null,
+  }).monthsNeeded;
+  const fcTargetIdx = Math.max(1, LEVEL_ORDER.indexOf(forecastTarget));
+  const pctToTarget = (i: number) => Math.min(100, (i / fcTargetIdx) * 100);
+
   return (
     <div className="w-full max-w-3xl py-4">
       {/* ============ 1. Overall level ============ */}
@@ -791,52 +824,82 @@ export function ResultView({
         </h2>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-[#dc2626]/25 bg-[#dc2626]/[0.05] p-4">
+          {/* «сейчас» — живой examReadiness (тот же расчёт, что у агента) */}
+          <div
+            className={`rounded-2xl border p-4 ${
+              readiness?.verdict === "ready"
+                ? "border-[#16a34a]/25 bg-[#16a34a]/[0.05]"
+                : readiness?.verdict === "borderline" || readiness?.verdict === "no_data"
+                  ? "border-[#d97706]/25 bg-[#d97706]/[0.05]"
+                  : "border-[#dc2626]/25 bg-[#dc2626]/[0.05]"
+            }`}
+          >
             <div className="text-xs font-medium text-[var(--color-muted)]">{qt(locale, "ifNow")}</div>
             <div className="mt-2 flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#dc2626]" />
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  readiness?.verdict === "ready" ? "bg-[#16a34a]" : readiness?.verdict === "borderline" || readiness?.verdict === "no_data" ? "bg-[#d97706]" : "bg-[#dc2626]"
+                }`}
+              />
               <span className="text-sm text-[var(--color-foreground)]">
-                {qt(locale, "likelyResult")}:{" "}
-                <span className="font-bold">{result.level}</span> · {qt(locale, "readinessWord")}{" "}
-                <span className="font-bold">{result.overall}%</span>
+                {qt(locale, "likelyResult")}: <span className="font-bold">{result.level}</span>
+                {!readiness && (
+                  <>
+                    {" "}· {qt(locale, "readinessWord")} <span className="font-bold">{result.overall}%</span>
+                  </>
+                )}
               </span>
             </div>
-            {highRisk && <div className="mt-2 text-xs text-[#b91c1c]">{qt(locale, "riskText")}</div>}
+            {readiness ? (
+              <div className={`mt-2 text-xs ${readiness.verdict === "not_ready" ? "text-[#b91c1c]" : "text-[var(--color-muted)]"}`}>
+                {readiness.verdict === "no_data" && fc.noData(fcMissing)}
+                {readiness.verdict === "not_ready" &&
+                  (readiness.belowMin.length > 0
+                    ? fc.notReadyMin(readiness.belowMin.map((s) => qt(locale, s === "dinleme" ? "stDinleme" : s === "okuma" ? "stOkuma" : s === "yazma" ? "stYazma" : "stKonusma")).join(", "))
+                    : fc.notReady(readiness.total ?? 0, fcPassAt, readiness.gapToPass ?? 0))}
+                {readiness.verdict === "borderline" && fc.borderline(readiness.total ?? 0, fcPassAt)}
+                {readiness.verdict === "ready" && fc.ready(readiness.total ?? 0, fcPassAt)}
+              </div>
+            ) : (
+              highRisk && <div className="mt-2 text-xs text-[#b91c1c]">{qt(locale, "riskText")}</div>
+            )}
           </div>
 
+          {/* «после подготовки» — реальная цель и живой срок, не шаблон */}
           <div className="rounded-2xl border border-[#16a34a]/25 bg-[#16a34a]/[0.05] p-4">
             <div className="text-xs font-medium text-[var(--color-muted)]">{qt(locale, "afterPrep")}</div>
             <div className="mt-2 flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#16a34a]" />
               <span className="text-sm text-[var(--color-foreground)]">
-                {qt(locale, "expectedResult")}: <span className="font-bold">B2 / C1</span>
+                {qt(locale, "expectedResult")}: <span className="font-bold">{forecastTarget}</span>
               </span>
             </div>
+            {/* срок — ВСЕГДА живой расчёт до цели при текущем темпе; горизонт
+                юзера («экзамен через ~1 мес») здесь читался бы как обещание
+                «B2 за месяц» — про дату честно говорит вердикт-карточка выше */}
             <div className="mt-2 text-xs text-[var(--color-muted)]">
-              {qt(locale, "termWord")}: {plan.desc[locale]}
+              {qt(locale, "termWord")}: {fc.term(fcMonths, fcMinutes)}
             </div>
           </div>
         </div>
 
-        {/* progress to C1 */}
+        {/* шкала к ЦЕЛИ студента (B2 по умолчанию), не к C1 для всех */}
         <div className="mt-6">
           <div className="relative h-2.5 w-full rounded-full bg-black/[0.06]">
             <motion.div
               className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[var(--color-brand)] to-[var(--color-brand-2)]"
               initial={{ width: 0 }}
-              animate={{ width: `${Math.max(8, pct(youIdx))}%` }}
+              animate={{ width: `${Math.max(8, pctToTarget(youIdx))}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
             />
             <div
               className="absolute -top-1 -translate-x-1/2 rounded-full border-2 border-white bg-[var(--color-brand)] shadow"
-              style={{ left: `${Math.max(4, pct(youIdx))}%`, height: 18, width: 18 }}
+              style={{ left: `${Math.max(4, Math.min(96, pctToTarget(youIdx)))}%`, height: 18, width: 18 }}
             />
           </div>
           <div className="mt-2 flex justify-between text-[11px] text-[var(--color-muted)]">
             <span>{result.level} · {qt(locale, "nowLabel")}</span>
-            <span>{qt(locale, "m1")}</span>
-            <span>{qt(locale, "m3")}</span>
-            <span className="font-semibold text-[var(--color-brand)]">C1</span>
+            <span className="font-semibold text-[var(--color-brand)]">{forecastTarget} · {fc.goalLabel}</span>
           </div>
         </div>
       </div>

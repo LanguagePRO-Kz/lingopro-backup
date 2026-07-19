@@ -71,9 +71,12 @@ console.log("\nКлиент (live-страница) и статистика:");
   check("три честных состояния вместо одной заглушки", live.includes("reportPendingT") && live.includes("reportFailedT") && live.includes("reportNone"));
   check("too_short — единственный путь к «слишком коротким»", live.includes('=== "too_short"'));
 
+  // useStats переписан (заход честности 07.2026): спикинг = реальные уроки
+  // из voice_sessions (seconds>0), оценка /25 — из quiz_result.sections;
+  // инвариант «нет данных → null, не ноль» живёт в pct-хелпере
   const stats = src("src/lib/hooks/useStats.ts");
-  check("useStats: speaking считается из attempts", stats.includes('["reading", "listening", "speaking"]'));
-  check("useStats: нет попыток → null («—»), не ноль", stats.includes("pct(attemptAcc.speaking) ?? avg(acc.speaking)"));
+  check("useStats: speaking-уроки считаются из voice_sessions (seconds>0)", stats.includes('from("voice_sessions")') && stats.includes("(v.seconds ?? 0) > 0"));
+  check("useStats: нет попыток → null («—»), не ноль", stats.includes(": null)") && stats.includes("const pct = (a: { correct: number; n: number }) => (a.n ?"));
 }
 
 console.log("\nБэкфилл:");

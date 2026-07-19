@@ -217,8 +217,10 @@ console.log("\nСамооценка (is_self_reported):");
   );
   const hook = readFileSync("src/lib/hooks/useSkillStats.ts", "utf8");
   check("счётчик разделов (useSkillStats) фильтрует is_self_reported", hook.includes('.eq("is_self_reported", false)'));
+  // useStats переписан (07.2026): самооценка исключается из ТОЧНОСТИ в
+  // JS-агрегации (в счётчик слов входит намеренно — реальное повторение)
   const stats = readFileSync("src/lib/hooks/useStats.ts", "utf8");
-  check("страница статистики (useStats) фильтрует is_self_reported", stats.includes('.eq("is_self_reported", false)'));
+  check("страница статистики (useStats) не пускает самооценку в точность", stats.includes("if (!r.is_self_reported)"));
   for (const page of ["grammar", "reading", "listening"] as const) {
     const src2 = readFileSync(`src/app/dashboard/${page}/page.tsx`, "utf8");
     check(`${page} читает счётчик через useSkillStats`, src2.includes("useSkillStats"));
