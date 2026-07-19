@@ -53,6 +53,9 @@ const T = {
     reviewProgress: (n: number) => `Твоих ответов: ${n} · для разбора — от 3 по-турецки`,
     hintsTitle: "Можно ответить так", dontUnderstand: "Не понял — помедленнее",
     foundationScores: "Урок-фундамент: без экзаменационных баллов — учимся говорить. Разбор фраз ниже.",
+    preB1Scores: "Баллы по критериям появятся с уровня B1 — сейчас смотрим на прогресс, не на оценки.",
+    wentWell: "Что получилось", vocabTitle: "Словарный запас", vocabUsedWell: "Хорошо использовал",
+    vocabUpgrades: "Можно точнее", vocabNew: "Новые слова на следующий раз",
     again: "Ещё урок",
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errNoMinutes: "На сегодня минуты закончились. База обновится в полночь — или докупи пакет минут.", buyMinutes: "Докупить минуты",
@@ -82,6 +85,9 @@ const T = {
     reviewProgress: (n: number) => `Your answers: ${n} · a review needs 3+ in Turkish`,
     hintsTitle: "You can answer like this", dontUnderstand: "Didn't get it — slower please",
     foundationScores: "Foundation lesson: no exam scores — we're learning to speak. Phrase review below.",
+    preB1Scores: "Criteria scores appear from level B1 — for now we track progress, not grades.",
+    wentWell: "What went well", vocabTitle: "Vocabulary", vocabUsedWell: "Used well",
+    vocabUpgrades: "Could be more precise", vocabNew: "New words for next time",
     again: "Another lesson",
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
     errNoMinutes: "You're out of minutes for today. The base quota resets at midnight — or top up with a minute pack.", buyMinutes: "Buy minutes",
@@ -111,6 +117,9 @@ const T = {
     reviewProgress: (n: number) => `Cevapların: ${n} · değerlendirme için Türkçe 3+ gerek`,
     hintsTitle: "Şöyle cevap verebilirsin", dontUnderstand: "Anlamadım — daha yavaş",
     foundationScores: "Temel ders: sınav puanı yok — konuşmayı öğreniyoruz. Cümle incelemesi aşağıda.",
+    preB1Scores: "Ölçüt puanları B1 seviyesinden itibaren görünür — şimdilik nota değil ilerlemeye bakıyoruz.",
+    wentWell: "Neler iyi gitti", vocabTitle: "Kelime dağarcığı", vocabUsedWell: "Yerinde kullandın",
+    vocabUpgrades: "Daha isabetli olabilirdi", vocabNew: "Bir dahaki sefere yeni kelimeler",
     again: "Yeni ders",
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir — ya da dakika paketi al.", buyMinutes: "Dakika al",
@@ -140,6 +149,9 @@ const T = {
     reviewProgress: (n: number) => `Жауаптарың: ${n} · талдауға түрікше 3+ керек`,
     hintsTitle: "Былай жауап беруге болады", dontUnderstand: "Түсінбедім — баяуырақ",
     foundationScores: "Іргетас сабағы: емтихан баллы жоқ — сөйлеуді үйренеміз. Сөйлем талдауы төменде.",
+    preB1Scores: "Өлшемдер бойынша баллдар B1 деңгейінен бастап көрінеді — әзірге бағаға емес, прогреске қараймыз.",
+    wentWell: "Не жақсы шықты", vocabTitle: "Сөздік қор", vocabUsedWell: "Орынды қолдандың",
+    vocabUpgrades: "Дәлірек айтуға болатын", vocabNew: "Келесі жолға жаңа сөздер",
     again: "Тағы бір сабақ",
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады — немесе минут пакетін ал.", buyMinutes: "Минут алу",
@@ -252,6 +264,8 @@ function LiveLesson() {
   const [reportRetrying, setReportRetrying] = useState(false);
   // фундамент (7.8): режим после серверного резолва + фразы-заготовки на экран
   const [resolvedMode, setResolvedMode] = useState<string | null>(null);
+  // уровень из сессии: баллы разбора показываются только с B1 (Блок 4)
+  const [lessonLevel, setLessonLevel] = useState<string | null>(null);
   const [foundationHints, setFoundationHints] = useState<string[]>([]);
   const [settleFailed, setSettleFailed] = useState(false);
   // billing cutoff confirmed server-side: everything after the press is free
@@ -540,6 +554,7 @@ function LiveLesson() {
     setLessonFocus(data.lessonFocus ?? []);
     setFocusReason(data.lessonFocusReason ?? null);
     setResolvedMode((data as { resolvedMode?: string }).resolvedMode ?? mode);
+    setLessonLevel((data as { level?: string }).level ?? null);
     setFoundationHints((data as { foundationHints?: string[] }).foundationHints ?? []);
     maxSecondsRef.current = data.maxSeconds;
     setMaxSeconds(data.maxSeconds);
@@ -886,10 +901,23 @@ function LiveLesson() {
               <div className="text-sm font-semibold text-[var(--color-foreground)]">{c.reportTitle}</div>
               {report.summary && <p className="text-sm leading-relaxed text-[var(--color-foreground)]">{report.summary}</p>}
 
-              {/* 7.8: экзаменационные баллы — только с B1; фундамент мотивирует, не судит */}
+              {/* что получилось — ВСЕГДА первым и конкретно (Блок 4) */}
+              {report.went_well && (
+                <div className="rounded-xl bg-[#16a34a]/[0.07] p-3.5">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[#15803d]">✅ {c.wentWell}</div>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--color-foreground)]">{report.went_well}</p>
+                </div>
+              )}
+
+              {/* Блок 4: экзаменационные баллы — только с B1 (A0-A2 видят
+                  прогресс, не оценки; фундамент — свой текст) */}
               {resolvedMode === "foundation" ? (
                 <p className="rounded-xl bg-[var(--color-brand)]/[0.06] px-3.5 py-2.5 text-xs text-[var(--color-foreground)]">
                   🌱 {c.foundationScores}
+                </p>
+              ) : ["A0", "A1", "A2"].includes(lessonLevel ?? "") ? (
+                <p className="rounded-xl bg-[var(--color-brand)]/[0.06] px-3.5 py-2.5 text-xs text-[var(--color-foreground)]">
+                  🌱 {c.preB1Scores}
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -925,6 +953,39 @@ function LiveLesson() {
                   </ul>
                 )}
               </div>
+
+              {/* словарный запас (Блок 4): хорошо использовал / точнее / новое */}
+              {(report.vocab_notes?.used_well.length > 0 || report.vocab_notes?.upgrades.length > 0 || report.vocab_notes?.new_words.length > 0) && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">{c.vocabTitle}</div>
+                  <div className="mt-2 flex flex-col gap-2 text-sm">
+                    {report.vocab_notes.used_well.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-[var(--color-muted)]">{c.vocabUsedWell}:</span>
+                        {report.vocab_notes.used_well.map((w, i) => (
+                          <span key={i} className="rounded-full bg-[#16a34a]/10 px-2.5 py-0.5 text-xs font-medium text-[#15803d]">{w}</span>
+                        ))}
+                      </div>
+                    )}
+                    {report.vocab_notes.upgrades.map((u, i) => (
+                      <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-2">
+                        <span className="text-xs text-[var(--color-muted)]">{c.vocabUpgrades}:</span>
+                        <span className="text-[var(--color-muted)]">{u.said}</span>
+                        <span aria-hidden>→</span>
+                        <span className="font-medium text-[var(--color-foreground)]">{u.better}</span>
+                      </div>
+                    ))}
+                    {report.vocab_notes.new_words.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-[var(--color-muted)]">{c.vocabNew}:</span>
+                        {report.vocab_notes.new_words.map((w, i) => (
+                          <span key={i} className="rounded-full bg-[var(--color-brand)]/[0.08] px-2.5 py-0.5 text-xs font-medium text-[var(--color-brand)]">{w}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {report.topics_worked.length > 0 && (
                 <div>

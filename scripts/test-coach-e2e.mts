@@ -326,8 +326,9 @@ async function main() {
       const report: VoiceReport = {
         valid: true, invalid_reason: null,
         summary: "Урок по изафету: хорошо строишь простые цепочки, дважды потерялось смягчение p→b. Продолжай с притяжательными парами.",
+        went_well: "Хорошо строишь простые изафетные цепочки: kitabın kapağı, annemin evi.",
         criteria: { fluency: { score: 3, comment: "" }, grammar: { score: 3, comment: "" }, vocab: { score: 4, comment: "" }, coherence: { score: 4, comment: "" } },
-        errors: [], topics_worked: ["izafet"], next_steps: [],
+        errors: [], vocab_notes: { used_well: [], upgrades: [], new_words: [] }, topics_worked: ["izafet"], next_steps: [],
       };
       await admin.from("voice_sessions").insert({
         user_id: uid, mode: "free", seconds: 480,

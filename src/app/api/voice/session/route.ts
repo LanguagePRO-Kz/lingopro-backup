@@ -345,6 +345,9 @@ export async function POST(req: Request) {
     // фундамент (7.8): режим после серверного резолва + фразы-заготовки
     resolvedMode: mode,
     foundationHints,
+    // уровень — клиенту: баллы разбора показываются только с B1 (Блок 4);
+    // resolvedMode недостаточно — A2 мог сам выбрать Bölüm 1
+    level,
     // первое сообщение по лестнице/режиму (A0-A1 — на языке студента);
     // клиент шлёт его через override (разрешён скриптом sync-voice-agent)
     firstMessage: firstMessageFor({
