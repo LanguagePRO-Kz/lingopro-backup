@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActivePlan } from "@/lib/access";
-import { firstMessageFor } from "@/lib/voice/agent-prompt";
+import { firstMessageFor, langBridgeFor, supportStepFor } from "@/lib/voice/agent-prompt";
 import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
@@ -57,14 +57,16 @@ export async function GET(req: Request) {
 type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking" | "foundation" | "plan";
 
 /**
- * Режим «Фундамент» (Фаза 7.8): студент A0-A2 не понимает экзаменационный
- * урок ни слова — лестница поддержки убывает с ростом уровня. Экзамен,
- * баллы и барем НЕ упоминаются — рано. Молчание студента — норма, не провал.
+ * Режим «Фундамент» (Фаза 7.8, языковой протокол v2): для A0-A2 задачи
+ * ужимаются до микро-размера, экзамен/баллы НЕ упоминаются — рано.
+ * ЯЗЫКОВЫХ указаний здесь больше нет: какой язык звучит — решает лестница
+ * поддержки в промпте агента (DESTEK MERDİVENİ), иначе режим и лестница
+ * противоречили друг другу (баг «Ahu ушла в русский насовсем»).
  */
 const FOUNDATION_BY_LEVEL: Record<"A0" | "A1" | "A2", string> = {
-  A0: "TEMEL MOD (A0): öğrenci Türkçeyi HİÇ bilmiyor. Öğrencinin arayüz dilinde konuş (feedback_lang), Türkçeyi KELİME KELİME ver: «Söyle: Merhaba. Sadece tekrar et.» Uzun Türkçe cümle KURMA. Sınavdan, puandan, kriterden HİÇ bahsetme. Sustuğunda sabırla bekle — sessizlik normaldir, baskı yapma. Her denemesini kutla; sadece telaffuzu nazikçe düzelt, dil bilgisine HİÇ dokunma.",
-  A1: "TEMEL MOD (A1): çok basit Türkçe cümleler kur ve HER cümleyi hemen öğrencinin diline çevir: «Adın ne? — Как тебя зовут? Cevap ver: Benim adım …». Öğrenci kalıplarla cevap verir — bu normaldir ve ilerlemedir. Sınav/puan konuşma. Sustuğunda bekle, tekrar iste, yavaşla. Cesaretlendir; dil bilgisi eleştirisi yok.",
-  A2: "TEMEL MOD (A2): Türkçe konuş, öğrenci TAKILDIĞINDA çevir ve yavaşla. Basit günlük konular. Sınav formatı yok — amaç konuşma cesareti. Sustuğunda bekle; hataları ders bitmeden nazikçe, tek tek düzelt.",
+  A0: "TEMEL MOD (A0): görevler MİKRO boyutta — tek kelime veya 2-3 kelimelik kalıp tekrarı («Söyle: Merhaba»). Sınavdan, puandan, kriterden HİÇ bahsetme. Sustuğunda sabırla bekle — sessizlik normaldir. Her denemesini kutla; sadece telaffuzu nazikçe düzelt, dil bilgisine dokunma.",
+  A1: "TEMEL MOD (A1): kısa kalıp cevaplar hedefle («Benim adım …», «Ben … yaşındayım»). Kalıpla cevap vermesi normaldir ve ilerlemedir. Sınav/puan konuşma. Sustuğunda bekle, tekrar iste, yavaşla. Cesaretlendir; dil bilgisi eleştirisi yok.",
+  A2: "TEMEL MOD (A2): basit günlük konular, kısa sorular. Sınav formatı yok — amaç konuşma cesareti. Sustuğunda bekle; hataları ders bitmeden nazikçe, tek tek düzelt.",
 };
 
 // Injected into the agent prompt as {{mode_instructions}} (Turkish — the
@@ -361,6 +363,10 @@ export async function POST(req: Request) {
       lesson_focus_ids: focus.map((t) => t.id).join(","), // read back at settlement for the report
       feedback_lang: FEEDBACK_LANG_TR[feedbackLangCode],
       feedback_lang_code: feedbackLangCode,
+      // языковой протокол v2: стартовая ступень лестницы поддержки (агент
+      // двигается от неё в обе стороны) + казахский мост (пусто для не-kk)
+      support_step: supportStepFor(level, mode),
+      lang_bridge: langBridgeFor(feedbackLangCode),
       mode: mode,
       mode_instructions: modeInstructions,
     },
