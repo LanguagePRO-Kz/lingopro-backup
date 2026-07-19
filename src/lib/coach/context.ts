@@ -153,9 +153,22 @@ export function buildAhuContext(
       }${r.weakestSection ? `; en zayıf bölüm: ${r.weakestSection}` : ""}${r.gapToPass ? `; geçmeye ${r.gapToPass} puan eksik` : ""}.`,
     );
   }
+  // полный расклад по навыкам (Ahu видит ВСЕ модули, не только слабейший);
+  // строки только для навыков с данными (≥5 попыток — фильтр снапшота)
+  const skills = Object.entries(s.skillAccuracy);
+  if (skills.length > 1) {
+    opt(
+      `BECERİLER (son 30 gün, doğruluk): ${skills.map(([k, v]) => `${k} %${v.pct} (${v.n})`).join(", ")}.`,
+      2,
+    );
+  }
   if (s.weakestSkill && s.skillAccuracy[s.weakestSkill]) {
     const sk = s.skillAccuracy[s.weakestSkill];
     opt(`EN ZAYIF BECERİ (son 30 gün): ${s.weakestSkill} — doğruluk %${sk.pct} (${sk.n} deneme).`, 2);
+  }
+  // закрытые за неделю — повод для КОНКРЕТНОЙ похвалы и устной тренировки
+  if (s.recentClosedTopics.length) {
+    opt(`BU HAFTA KAPANAN KONULAR: ${s.recentClosedTopics.map(trLabel).join(", ")} — somut övgüyü hak etti; konuşmada kullandır.`, 2);
   }
   // единая память: бриф помнит, о чём студент спрашивал в чате
   if (s.lastChatQuestion) {
@@ -193,6 +206,10 @@ export function buildAhuContext(
       }${reviewBits}.`,
       5,
     );
+    // обещание прошлого разбора — новый урок обязан его вспомнить
+    if (s.lastVoice.nextSteps.length) {
+      opt(`GEÇEN DERSİN SÖZÜ (değerlendirmede söylenen sonraki adım): ${s.lastVoice.nextSteps.join("; ")}.`, 4);
+    }
   }
   if (s.lastMock?.total != null) {
     const delta =

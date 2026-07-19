@@ -54,6 +54,9 @@ export type SnapshotVoice = {
   /** почему разбор не построился (invalid_reason ревьюера, напр. «говорил
    * по-русски») — Ahu помнит и предлагает поддержку, а не давит турецким */
   invalidReason: string | null;
+  /** «что дальше» из разбора прошлого урока (report.next_steps) — обещание
+   * Ahu, которое следующий урок обязан вспомнить (непрерывность) */
+  nextSteps: string[];
 };
 
 export type StudentSnapshot = {
@@ -95,6 +98,9 @@ export type StudentSnapshot = {
   lastVoice: SnapshotVoice | null;
   /** закрытые темы (strength ≥ 60) внутри пролёта уровень→цель */
   topicsClosed: number;
+  /** id тем, закрытых за ПОСЛЕДНИЕ 7 дней (strength ≥ 60, свежий апдейт) —
+   * повод для конкретной похвалы, не общей */
+  recentClosedTopics: string[];
 };
 
 /* ------------------------- активность (производное) ---------------------- */

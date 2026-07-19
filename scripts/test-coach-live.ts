@@ -60,6 +60,7 @@ async function main() {
     prevMock: null,
     lastVoice: null,
     topicsClosed: 0,
+    recentClosedTopics: [],
   };
 
   const day = (date: string, done: number, total = 5) => ({ date, done, total });

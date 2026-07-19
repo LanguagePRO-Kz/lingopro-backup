@@ -5,7 +5,7 @@ import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
 import { buildSnapshot, decide } from "@/lib/coach";
-import { stateLineTr } from "@/lib/coach/context";
+import { buildAhuContext, stateLineTr } from "@/lib/coach/context";
 import { focusReasonText } from "@/lib/coach/templates";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -262,11 +262,15 @@ export async function POST(req: Request) {
   let coachFocus: Topic[] = [];
   let focusReason = "";
   let focusReasonLocalized: string | null = null;
-  if (requested.length === 0) {
-    // best-effort: сбой ядра не имеет права сорвать урок (биллинг/слоты уже пройдены)
-    try {
-      const snapshot = await buildSnapshot(supabase, user.id, { kkNative: body.feedbackLang === "kk" });
-      const decision = decide(snapshot);
+  // полное досье студента для агента (Блок 2): тот же контекст, что видят
+  // чат и бриф — единая память Ahu; снапшот строится ВСЕГДА (не только для
+  // фокуса), сбой ядра не срывает урок — досье честно пустеет
+  let dossier = "";
+  try {
+    const snapshot = await buildSnapshot(supabase, user.id, { kkNative: body.feedbackLang === "kk" });
+    const decision = decide(snapshot);
+    dossier = buildAhuContext(snapshot, decision, "voice");
+    if (requested.length === 0) {
       coachFocus = decision.focusTopics
         .map((id) => topicById(id))
         .filter((t): t is Topic => !!t && t.id !== "other")
@@ -275,9 +279,9 @@ export async function POST(req: Request) {
       const loc = (["ru", "en", "tr", "kk"].includes(body.feedbackLang ?? "") ? body.feedbackLang : "en") as
         | "ru" | "en" | "tr" | "kk";
       focusReasonLocalized = focusReasonText(snapshot, decision, loc);
-    } catch (e) {
-      console.error("[voice] coach focus failed, weak-topics fallback:", e instanceof Error ? e.message : e);
     }
+  } catch (e) {
+    console.error("[voice] coach snapshot failed, weak-topics fallback:", e instanceof Error ? e.message : e);
   }
   // ротация тем (живой баг: темы повторялись урок за уроком) — темы,
   // отработанные в ПОСЛЕДНЕМ разобранном уроке, уходят в конец очереди;
@@ -367,6 +371,9 @@ export async function POST(req: Request) {
       // двигается от неё в обе стороны) + казахский мост (пусто для не-kk)
       support_step: supportStepFor(level, mode),
       lang_bridge: langBridgeFor(feedbackLangCode),
+      // полное досье (Блок 2): пустая строка при пустом/упавшем снапшоте —
+      // промпт велит агенту молчать о том, чего в досье нет (правило 1.3)
+      student_dossier: dossier || "(henüz veri yok — öğrencinin ilk adımları; geçmişe atıfta bulunma)",
       mode: mode,
       mode_instructions: modeInstructions,
     },

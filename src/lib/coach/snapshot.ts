@@ -207,6 +207,8 @@ export async function buildSnapshot(
         // невалидный разбор: Ahu должна ПОМНИТЬ причину («говорил по-русски»)
         invalidReason:
           voiceRow.report && !voiceRow.report.valid ? (voiceRow.report.invalid_reason ?? null) : null,
+        // обещание прошлого урока — следующий обязан его вспомнить
+        nextSteps: (report?.next_steps ?? []).slice(0, 2),
       }
     : null;
 
@@ -244,6 +246,13 @@ export async function buildSnapshot(
 
   const span = new Set(topicsForSpan(contentLevel(level), targetLevel));
   const topicsClosed = topics.filter((t) => t.strength >= 60 && span.has(t.topic)).length;
+  // закрытые ЗА НЕДЕЛЮ (для конкретной похвалы): сильная тема со свежим
+  // апдейтом mastery — приближение «закрылась недавно» без отдельной таблицы
+  const weekAgoIso = `${isoShift(today, -7)}T00:00:00Z`;
+  const recentClosedTopics = topics
+    .filter((t) => t.strength >= 60 && t.topic !== "other" && (t.updatedAt ?? "") >= weekAgoIso)
+    .map((t) => t.topic)
+    .slice(0, 3);
 
   return {
     today,
@@ -270,5 +279,6 @@ export async function buildSnapshot(
     prevMock: mocks[1] ?? null,
     lastVoice,
     topicsClosed,
+    recentClosedTopics,
   };
 }
