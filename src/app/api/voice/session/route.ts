@@ -71,17 +71,20 @@ const FOUNDATION_BY_LEVEL: Record<"A0" | "A1" | "A2", string> = {
 
 // Injected into the agent prompt as {{mode_instructions}} (Turkish — the
 // agent thinks in Turkish; per-part framing mirrors TÖMER Konuşma).
+// Блок 6 (20.07.2026): режимы РЕАЛЬНО разные — у монолога время на
+// подготовку и запрет перебивать, у мнения обязательный контраргумент,
+// у полного экзамена тайминг и тон экзаменатора.
 const MODE_INSTRUCTIONS: Record<Exclude<Mode, "foundation" | "plan">, string> = {
-  free: "Serbest sohbet: öğrencinin günlük hayatına dair doğal bir konuşma yürüt.",
+  free: "Serbest sohbet, yapı YOK: öğrencinin ilgi alanlarına ve günlük hayatına dair DOĞAL bir konuşma yürüt (dosyadaki bilgilerden yararlan). Ders odağındaki yapıları sohbete GİZLİCE işle — sınav havası yaratma.",
   diagnostic_speaking:
     "2 dakikalık KONUŞMA SEVİYE TESPİTİ: kısa tanışma (ad, nereden), 2-3 basit günlük soru, sonra kısa bir konu (ailen veya şehrin). Cevaplar çok kısa olabilir — sabırlı ol, sustuğunda bekle, düzeltme yapma; amaç ders değil, seviyeyi duymak.",
   bolum1:
-    "TÖMER Konuşma Bölüm 1 (karşılıklı konuşma, ~2 dakika): kişisel sorular sor — kendini tanıtma, aile, günlük rutin, hobiler.",
+    "TÖMER Konuşma Bölüm 1 (karşılıklı konuşma, ~2 dakika): SEN sorarsın, öğrenci cevaplar — kendini tanıtma, aile, günlük rutin, hobiler. Kısa, net sorular; monolog isteme, tartışma açma — bu bölüm diyalog bölümüdür.",
   bolum2:
-    "TÖMER Konuşma Bölüm 2 (sözlü anlatım, ~3 dakika): öğrenciye bir konu ver (ör. 'şehrini anlat', 'bir anını anlat'), kesintisiz konuşmasını iste, sonra 1-2 takip sorusu sor.",
+    "TÖMER Konuşma Bölüm 2 (sözlü anlatım, ~3 dakika): öğrenciye SOMUT bir konu ver (ör. 'şehrini anlat', 'unutamadığın bir anını anlat') ve HAZIRLIK SÜRESİ tanı: «30 saniye düşün, hazır olunca başla» de ve SUS. Anlatmaya başlayınca SÖZÜNÜ KESME — bu bölümün özü kesintisiz konuşmadır: duraklarsa sadece kısa cesaretlendirme ver («devam et, dinliyorum») ve tekrar sus; düzeltmeleri anlatım BİTENE KADAR sakla. Bittiğinde 1-2 takip sorusu sor, sonra kısa geri bildirim ver.",
   bolum3:
-    "TÖMER Konuşma Bölüm 3 (görüş bildirme, ~3 dakika): tartışmalı bir konu ver (teknoloji, şehir/köy, eğitim), görüşünü gerekçelendirmesini iste, karşı argüman sun.",
-  full: "Tam TÖMER Konuşma simülasyonu: sırasıyla Bölüm 1 (tanışma), Bölüm 2 (sözlü anlatım) ve Bölüm 3 (görüş bildirme). Bölümler arasında kısa geçiş yap.",
+    "TÖMER Konuşma Bölüm 3 (görüş bildirme, ~3 dakika): TARTIŞMALI bir soru sor (teknoloji, şehir/köy, eğitim, gelenek/modernlik) ve görüşünü gerekçelendirmesini iste. Görüş bildirdikten sonra HER SEFERİNDE bir KARŞI ARGÜMAN sun ve cevaplamasını iste — nazik ama ısrarcı: sınavda ölçülen şey görüşünü SAVUNABİLMEKTİR. Kolayca hemfikir olma.",
+  full: "Tam TÖMER Konuşma simülasyonu — SINAV DEĞERLENDİRİCİSİ tonu: resmî ama destekleyici. Sırasıyla ve SÜREYE UYARAK: Bölüm 1 karşılıklı konuşma ~2 dk; Bölüm 2 sözlü anlatım ~3 dk (30 sn hazırlık ver, anlatımı KESME); Bölüm 3 görüş bildirme ~3 dk (karşı argüman sun). Her bölüm geçişini duyur («Şimdi Bölüm 2'ye geçiyoruz»). Ders sohbetine sapma — bu bir sınav provasıdır.",
 };
 
 const FEEDBACK_LANG_TR: Record<string, string> = { ru: "RUSÇA", en: "İNGİLİZCE", tr: "TÜRKÇE", kk: "KAZAKÇA" };
