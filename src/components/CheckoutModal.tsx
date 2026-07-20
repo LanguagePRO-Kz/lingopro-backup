@@ -257,24 +257,34 @@ export function CheckoutModal({
   const [promo, setPromo] = useState<PromoStatus>({ kind: "idle" });
 
   async function applyPromo() {
-    const trimmed = code.trim();
-    if (!trimmed || promo.kind === "checking") return;
+    // нормализация ДО отправки: мобильная клавиатура добавляет пробелы
+    // (в т.ч. неразрывные) и регистр — SQL trim() их не убирает, поэтому
+    // чистим на клиенте: все пробельные прочь, верхний регистр
+    const normalized = code.replace(/\s+/g, "").toUpperCase();
+    if (!normalized || promo.kind === "checking") return;
     setPromo({ kind: "checking" });
 
-    const res = await redeemPromo(trimmed, pkgId);
-    if (!res.ok) {
-      setPromo({ kind: "error", msg: c.reasons[res.reason] });
-      return;
+    try {
+      const res = await redeemPromo(normalized, pkgId);
+      if (!res.ok) {
+        setPromo({ kind: "error", msg: c.reasons[res.reason] });
+        return;
+      }
+      // триал: доступ уже выдан СЕРВЕРОМ (redeem_promo, security definer) —
+      // клиент план не пишет никогда, просто идёт в дашборд
+      if (res.kind === "trial") {
+        setPromo({ kind: "trial", days: res.trialDays });
+        router.push("/dashboard");
+        return;
+      }
+      // скидка сохранена на сервере и применится к оплате
+      setPromo({ kind: "saved", discount: res.discountPercent });
+    } catch (e) {
+      // без catch «Проверяем…» висел бы вечно при сетевом сбое (молчаливый
+      // сбой на мобиле) — честный текст ошибки, кнопка снова активна
+      console.error("[promo] redeem threw:", e);
+      setPromo({ kind: "error", msg: c.reasons.error });
     }
-    // триал: доступ уже выдан СЕРВЕРОМ (redeem_promo, security definer) —
-    // клиент план не пишет никогда, просто идёт в дашборд
-    if (res.kind === "trial") {
-      setPromo({ kind: "trial", days: res.trialDays });
-      router.push("/dashboard");
-      return;
-    }
-    // скидка сохранена на сервере и применится к оплате
-    setPromo({ kind: "saved", discount: res.discountPercent });
   }
 
   const promoBusy = promo.kind === "checking" || promo.kind === "trial";
@@ -368,14 +378,23 @@ export function CheckoutModal({
           <input
             value={code}
             onChange={(e) => {
-              setCode(e.target.value);
+              // нормализуем прямо при вводе: студент видит ровно то, что уйдёт
+              // на сервер (без хвостовых пробелов автокоррекции и регистра)
+              setCode(e.target.value.replace(/\s+/g, "").toUpperCase());
               if (promo.kind === "error") setPromo({ kind: "idle" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") applyPromo();
             }}
             placeholder={c.promoPlaceholder}
-            autoCapitalize="characters"
+            // мобильная клавиатура: без этих атрибутов iOS/Android
+            // капитализируют, автокорректируют и добавляют пробел в конце
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            inputMode="text"
+            enterKeyHint="done"
             className={`min-w-0 flex-1 rounded-xl border bg-white px-4 py-2.5 text-sm uppercase tracking-wider outline-none transition-all ${
               promo.kind === "error"
                 ? "border-[#dc2626] ring-2 ring-[#dc2626]/20"
