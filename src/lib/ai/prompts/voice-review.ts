@@ -48,10 +48,11 @@ Kurallar:
 6. "vocab_notes": kelime dağarcığı — "used_well": yerinde kullandığı 1-3 kelime/ifade (Türkçe); "upgrades": daha iyi söylenebilecek en fazla 2 şey {"said": dökümden, "better": daha doğal Türkçesi}; "new_words": bir dahaki sefere 1-2 yeni kelime, «türkçe — ${langName} çevirisi» biçiminde. Dökümde temel yoksa alanı boş bırak, uydurma.
 7. "fluency" yorumu SADECE dökümden görünene dayanır: cevap uzunluğu, cümle geliştirme. Duraklama/tereddüt döküme YANSIMAZ — onlardan bahsetme.
 8. "next_steps": en fazla 3 SOMUT adım — platform modülü + konu + miktar («Dil bilgisi bölümünde gereklilik kipinden 5 alıştırma yap» gibi), «pratik yapmaya devam et» gibi boş tavsiye YASAK. Son adım her zaman: bir sonraki sesli derste neyle başlayacağınız. Öğretmen kapanışta somut bir söz verdiyse son madde O SÖZLE uyumlu olsun — sözlü söz ile yazılı plan aynı olmalı.
+8b. "promise": sözün MAKİNE OKUNUR hâli — platform içi, sayılabilir bir görevse doldur: {"skill": "grammar"|"reading"|"listening"|"writing", "topic": kural 4'teki listeden id, "count": 1-20}. Kod bu sözün yapılıp yapılmadığını attempts'ten SAYACAK ve bir sonraki ders öğretmen sormadan bilecek. Söz platform dışıysa («biriyle Türkçe konuş» gibi) veya sayılamıyorsa: null.
 9. Döküm çok kısaysa (öğrenci 2'den az anlamlı cümle kurduysa): {"valid": false, "invalid_reason": "..."} döndür (${langName}), puan ve hata üretme.
 10. Metin alanlarında markdown KULLANMA — yıldız, başlık, madde imi yok; sadece düz metin.
 11. YALNIZCA geçerli JSON döndür. Şema:
-{"valid": boolean, "invalid_reason": string|null, "summary": string, "went_well": string, "pronunciation_note": string, "criteria": {"fluency": {"score": number, "comment": string}, "grammar": {"score": number, "comment": string}, "vocab": {"score": number, "comment": string}, "coherence": {"score": number, "comment": string}}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"}], "vocab_notes": {"used_well": [string], "upgrades": [{"said": string, "better": string}], "new_words": [string]}, "topics_worked": [string], "next_steps": [string]}`;
+{"valid": boolean, "invalid_reason": string|null, "summary": string, "went_well": string, "pronunciation_note": string, "criteria": {"fluency": {"score": number, "comment": string}, "grammar": {"score": number, "comment": string}, "vocab": {"score": number, "comment": string}, "coherence": {"score": number, "comment": string}}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"}], "vocab_notes": {"used_well": [string], "upgrades": [{"said": string, "better": string}], "new_words": [string]}, "topics_worked": [string], "next_steps": [string], "promise": {"skill": string, "topic": string, "count": number} | null}`;
 }
 
 export function buildVoiceReviewUserMessage(input: {
@@ -69,6 +70,14 @@ export function buildVoiceReviewUserMessage(input: {
 // ---------------------------------------------------------------------------
 
 export type VoiceCriterion = { score: number; comment: string };
+
+/** Машиночитаемое обещание урока: код проверяет его по attempts —
+ * Ahu на следующем уроке НЕ спрашивает «сделал?», а знает. */
+export type VoicePromise = {
+  skill: "grammar" | "reading" | "listening" | "writing";
+  topic: string;
+  count: number;
+};
 
 export type VoiceVocabNotes = {
   /** слова/фразы, использованные хорошо (турецкий) */
@@ -93,6 +102,8 @@ export type VoiceReport = {
   vocab_notes: VoiceVocabNotes;
   topics_worked: string[];
   next_steps: string[];
+  /** null = обещание не машиночитаемо (вне платформы) — тогда честно спросить */
+  promise: VoicePromise | null;
 };
 
 const score5 = (n: unknown) =>
@@ -120,6 +131,7 @@ export function validateVoiceReport(raw: unknown): VoiceReport | null {
       vocab_notes: { used_well: [], upgrades: [], new_words: [] },
       topics_worked: [],
       next_steps: [],
+      promise: null,
     };
   }
 
@@ -163,5 +175,18 @@ export function validateVoiceReport(raw: unknown): VoiceReport | null {
       .map(normalizeTopicId)
       .filter((t) => t !== "other"),
     next_steps: (Array.isArray(r.next_steps) ? r.next_steps : []).filter((s): s is string => typeof s === "string").slice(0, 3),
+    promise: parsePromise(r.promise),
   };
+}
+
+const PROMISE_SKILLS = new Set(["grammar", "reading", "listening", "writing"]);
+
+function parsePromise(raw: unknown): VoicePromise | null {
+  if (!raw || typeof raw !== "object") return null;
+  const p = raw as Record<string, unknown>;
+  const skill = typeof p.skill === "string" ? p.skill : "";
+  const topic = normalizeTopicId(p.topic);
+  const count = typeof p.count === "number" && Number.isFinite(p.count) ? Math.round(p.count) : 0;
+  if (!PROMISE_SKILLS.has(skill) || topic === "other" || count < 1) return null;
+  return { skill: skill as VoicePromise["skill"], topic, count: Math.min(20, count) };
 }

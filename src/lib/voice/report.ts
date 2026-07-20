@@ -96,6 +96,7 @@ export function tooShortReport(): VoiceReport {
     vocab_notes: { used_well: [], upgrades: [], new_words: [] },
     topics_worked: [],
     next_steps: [],
+    promise: null,
   };
 }
 

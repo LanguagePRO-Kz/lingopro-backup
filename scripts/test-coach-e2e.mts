@@ -329,7 +329,7 @@ async function main() {
         went_well: "Хорошо строишь простые изафетные цепочки: kitabın kapağı, annemin evi.",
         pronunciation_note: "",
         criteria: { fluency: { score: 3, comment: "" }, grammar: { score: 3, comment: "" }, vocab: { score: 4, comment: "" }, coherence: { score: 4, comment: "" } },
-        errors: [], vocab_notes: { used_well: [], upgrades: [], new_words: [] }, topics_worked: ["izafet"], next_steps: [],
+        errors: [], vocab_notes: { used_well: [], upgrades: [], new_words: [] }, topics_worked: ["izafet"], next_steps: [], promise: null,
       };
       await admin.from("voice_sessions").insert({
         user_id: uid, mode: "free", seconds: 480,

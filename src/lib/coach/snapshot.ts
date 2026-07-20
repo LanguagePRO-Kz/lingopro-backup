@@ -192,7 +192,7 @@ export async function buildSnapshot(
     | { ended_at: string | null; seconds: number | null; report: VoiceReport | null }
     | undefined;
   const report = voiceRow?.report && voiceRow.report.valid ? voiceRow.report : null;
-  const lastVoice = voiceRow
+  const lastVoice: StudentSnapshot["lastVoice"] = voiceRow
     ? {
         endedAt: voiceRow.ended_at ?? null,
         minutes: Math.ceil(Math.max(0, voiceRow.seconds ?? 0) / 60),
@@ -210,8 +210,32 @@ export async function buildSnapshot(
         // обещание прошлого урока — следующий обязан его вспомнить
         nextSteps: (report?.next_steps ?? []).slice(0, 2),
         pronunciationNote: report?.pronunciation_note || null,
+        promise: report?.promise ?? null,
+        promiseDone: null, // считается ниже по attempts (кодом, не опросом)
       }
     : null;
+
+  // ФАКТ выполнения обещания — код считает по attempts ПОСЛЕ урока
+  // (заказ 20.07: Ahu не спрашивает «сделал?» про то, что видит платформа —
+  // спрашивать можно только про непроверяемое). 0 сделанных — тоже факт.
+  if (lastVoice?.promise && lastVoice.endedAt) {
+    const p = lastVoice.promise;
+    const { data: pa } = await supabase
+      .from("attempts")
+      .select("is_correct")
+      .eq("user_id", userId)
+      .eq("topic", p.topic)
+      .eq("skill", p.skill)
+      .eq("is_self_reported", false)
+      .neq("source", "diagnostic")
+      .gt("answered_at", lastVoice.endedAt)
+      .limit(100);
+    const rows = pa ?? [];
+    lastVoice.promiseDone = {
+      done: rows.length,
+      correct: rows.filter((r) => r.is_correct).length,
+    };
+  }
 
   // маршрут: та же валидация формы, что в daily-plan.ts
   const routeRaw = profile?.study_route as StudyRoute | null | undefined;

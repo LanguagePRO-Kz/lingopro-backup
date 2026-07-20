@@ -60,6 +60,11 @@ export type SnapshotVoice = {
   /** наблюдение о произношении, прозвучавшее голосом в закрытии прошлого
    * урока (report.pronunciation_note) — следующий урок проверяет ушами */
   pronunciationNote: string | null;
+  /** машиночитаемое обещание прошлого урока (report.promise) */
+  promise: { skill: string; topic: string; count: number } | null;
+  /** ФАКТ выполнения обещания — посчитан КОДОМ по attempts после урока;
+   * null = обещание отсутствует или непроверяемо (тогда Ahu спрашивает) */
+  promiseDone: { done: number; correct: number } | null;
 };
 
 export type StudentSnapshot = {

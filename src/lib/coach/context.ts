@@ -206,9 +206,21 @@ export function buildAhuContext(
       }${reviewBits}.`,
       5,
     );
-    // обещание прошлого разбора — новый урок обязан его вспомнить
-    if (s.lastVoice.nextSteps.length) {
-      opt(`GEÇEN DERSİN SÖZÜ (değerlendirmede söylenen sonraki adım): ${s.lastVoice.nextSteps.join("; ")}.`, 4);
+    // обещание прошлого разбора — новый урок обязан его вспомнить.
+    // Проверяемое обещание код УЖЕ посчитал по attempts (FAKTİK) — агент
+    // констатирует, не опрашивает; непроверяемое — честно спросить.
+    if (s.lastVoice.promise && s.lastVoice.promiseDone) {
+      const p = s.lastVoice.promise;
+      const f = s.lastVoice.promiseDone;
+      opt(
+        `GEÇEN DERSİN SÖZÜ: ${p.skill} modülünde «${trLabel(p.topic)}» konusundan ${p.count} alıştırma. FAKTİK (kodun attempts'ten saydığı): ${f.done}/${p.count} yapıldı${f.done > 0 ? ` (${f.correct} doğru, ${f.done - f.correct} yanlış)` : ""}. Bu sayıları OLDUĞU GİBİ söyle — SORMA, abartma, eksiltme.`,
+        3,
+      );
+    } else if (s.lastVoice.nextSteps.length) {
+      opt(
+        `GEÇEN DERSİN SÖZÜ (platform dışı / sayılamaz): ${s.lastVoice.nextSteps.join("; ")}. Bunu göremezsin — yapıp yapmadığını SORMAK dürüst olandır.`,
+        4,
+      );
     }
     // наблюдение о произношении прошлого урока — проверить ушами, исправился ли
     if (s.lastVoice.pronunciationNote) {
