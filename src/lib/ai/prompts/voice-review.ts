@@ -31,7 +31,7 @@ Görev: SADECE öğrencinin söylediklerini değerlendir.${gender ? `\n${GENDER_
 - grammar: dil bilgisi doğruluğu
 - vocab: kelime zenginliği ve yerinde kullanım
 - coherence: tutarlılık ve soruya uygunluk
-ÖNEMLİ: Telaffuz yazılı dökümden DEĞERLENDİRİLEMEZ — telaffuz hakkında hiçbir şey yazma, uydurma.
+ÖNEMLİ — TELAFFUZ: yazılı dökümden telaffuz DEĞERLENDİRİLEMEZ, kendin telaffuz yorumu ÜRETME. Tek istisna: ÖĞRETMEN dersin kapanış konuşmasında telaffuz gözlemi SÖYLEDİYSE (sesi duyan tek kişi odur), bu gözlemi "pronunciation_note" alanına ${langName} dilinde KISACA aktar — kaynak yalnızca öğretmenin sözleri. Öğretmen telaffuzdan bahsetmediyse alan BOŞ string kalır.
 
 SEVİYEYE GÖRE TON (öğrencinin seviyesi kullanıcı mesajında): A0-A1 —
 başlangıç dersi, sınav değil: en fazla 2 hata seç, dil bilgisi teorisine
@@ -47,11 +47,11 @@ Kurallar:
 5. "topics_worked": derste gerçekten çalışılan konular (aynı listeden, hedef konuları ve dökümü dikkate al).
 6. "vocab_notes": kelime dağarcığı — "used_well": yerinde kullandığı 1-3 kelime/ifade (Türkçe); "upgrades": daha iyi söylenebilecek en fazla 2 şey {"said": dökümden, "better": daha doğal Türkçesi}; "new_words": bir dahaki sefere 1-2 yeni kelime, «türkçe — ${langName} çevirisi» biçiminde. Dökümde temel yoksa alanı boş bırak, uydurma.
 7. "fluency" yorumu SADECE dökümden görünene dayanır: cevap uzunluğu, cümle geliştirme. Duraklama/tereddüt döküme YANSIMAZ — onlardan bahsetme.
-8. "next_steps": en fazla 3 SOMUT adım — platform modülü + konu + miktar («Dil bilgisi bölümünde gereklilik kipinden 5 alıştırma yap» gibi), «pratik yapmaya devam et» gibi boş tavsiye YASAK. Son adım her zaman: bir sonraki sesli derste neyle başlayacağınız.
+8. "next_steps": en fazla 3 SOMUT adım — platform modülü + konu + miktar («Dil bilgisi bölümünde gereklilik kipinden 5 alıştırma yap» gibi), «pratik yapmaya devam et» gibi boş tavsiye YASAK. Son adım her zaman: bir sonraki sesli derste neyle başlayacağınız. Öğretmen kapanışta somut bir söz verdiyse son madde O SÖZLE uyumlu olsun — sözlü söz ile yazılı plan aynı olmalı.
 9. Döküm çok kısaysa (öğrenci 2'den az anlamlı cümle kurduysa): {"valid": false, "invalid_reason": "..."} döndür (${langName}), puan ve hata üretme.
 10. Metin alanlarında markdown KULLANMA — yıldız, başlık, madde imi yok; sadece düz metin.
 11. YALNIZCA geçerli JSON döndür. Şema:
-{"valid": boolean, "invalid_reason": string|null, "summary": string, "went_well": string, "criteria": {"fluency": {"score": number, "comment": string}, "grammar": {"score": number, "comment": string}, "vocab": {"score": number, "comment": string}, "coherence": {"score": number, "comment": string}}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"}], "vocab_notes": {"used_well": [string], "upgrades": [{"said": string, "better": string}], "new_words": [string]}, "topics_worked": [string], "next_steps": [string]}`;
+{"valid": boolean, "invalid_reason": string|null, "summary": string, "went_well": string, "pronunciation_note": string, "criteria": {"fluency": {"score": number, "comment": string}, "grammar": {"score": number, "comment": string}, "vocab": {"score": number, "comment": string}, "coherence": {"score": number, "comment": string}}, "errors": [{"quote": string, "correction": string, "rule": string, "explanation": string, "topic": string, "severity": "major"|"minor"}], "vocab_notes": {"used_well": [string], "upgrades": [{"said": string, "better": string}], "new_words": [string]}, "topics_worked": [string], "next_steps": [string]}`;
 }
 
 export function buildVoiceReviewUserMessage(input: {
@@ -85,6 +85,9 @@ export type VoiceReport = {
   summary: string;
   /** что получилось — всегда первым, всегда конкретно (Блок 4) */
   went_well: string;
+  /** наблюдение о произношении, ПРОЗВУЧАВШЕЕ голосом в закрытии урока —
+   * ревьюер только переносит его из реплик учителя; "" = не звучало */
+  pronunciation_note: string;
   criteria: { fluency: VoiceCriterion; grammar: VoiceCriterion; vocab: VoiceCriterion; coherence: VoiceCriterion };
   errors: { quote: string; correction: string; rule: string; explanation: string; topic: string; severity: "major" | "minor" }[];
   vocab_notes: VoiceVocabNotes;
@@ -111,6 +114,7 @@ export function validateVoiceReport(raw: unknown): VoiceReport | null {
       invalid_reason: typeof r.invalid_reason === "string" ? r.invalid_reason : "too short",
       summary: "",
       went_well: "",
+      pronunciation_note: "",
       criteria: { fluency: criterion(null), grammar: criterion(null), vocab: criterion(null), coherence: criterion(null) },
       errors: [],
       vocab_notes: { used_well: [], upgrades: [], new_words: [] },
@@ -128,6 +132,7 @@ export function validateVoiceReport(raw: unknown): VoiceReport | null {
     invalid_reason: null,
     summary: typeof r.summary === "string" ? r.summary : "",
     went_well: typeof r.went_well === "string" ? r.went_well : "",
+    pronunciation_note: typeof r.pronunciation_note === "string" ? r.pronunciation_note.slice(0, 300) : "",
     vocab_notes: {
       used_well: strArr(vnRaw.used_well, 3),
       upgrades: (Array.isArray(vnRaw.upgrades) ? vnRaw.upgrades : [])

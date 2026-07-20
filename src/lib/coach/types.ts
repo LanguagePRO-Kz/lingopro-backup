@@ -57,6 +57,9 @@ export type SnapshotVoice = {
   /** «что дальше» из разбора прошлого урока (report.next_steps) — обещание
    * Ahu, которое следующий урок обязан вспомнить (непрерывность) */
   nextSteps: string[];
+  /** наблюдение о произношении, прозвучавшее голосом в закрытии прошлого
+   * урока (report.pronunciation_note) — следующий урок проверяет ушами */
+  pronunciationNote: string | null;
 };
 
 export type StudentSnapshot = {

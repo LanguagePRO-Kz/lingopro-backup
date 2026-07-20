@@ -304,7 +304,7 @@ console.log("— контекст: потолок и честные секции
     })),
     lastMock: { total: 55, createdAt: `${d(-2)}T09:00:00Z` },
     prevMock: { total: 48, createdAt: `${d(-9)}T09:00:00Z` },
-    lastVoice: { endedAt: `${d(-1)}T18:00:00Z`, minutes: 9, topicsWorked: ["izafet", "conditionals"], errorCount: 3, criteriaTotal: 12, invalidReason: null, nextSteps: [] },
+    lastVoice: { endedAt: `${d(-1)}T18:00:00Z`, minutes: 9, topicsWorked: ["izafet", "conditionals"], errorCount: 3, criteriaTotal: 12, invalidReason: null, nextSteps: [], pronunciationNote: null },
     topicsClosed: 4,
   });
   const dec = decide(fat);
@@ -491,12 +491,12 @@ console.log("— таймзона: «вчера» в сутках студент
 
   // context: пустое ревью урока НЕ превращается в «hatasız»
   const sNoReview = snap({
-    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 3, topicsWorked: [], errorCount: 0, criteriaTotal: null, invalidReason: null, nextSteps: [] },
+    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 3, topicsWorked: [], errorCount: 0, criteriaTotal: null, invalidReason: null, nextSteps: [], pronunciationNote: null },
   });
   const ctxNoReview = buildAhuContext(sNoReview, decide(sNoReview), "proactive");
   check("урок без ревью: «değerlendirme YOK», не «hatasız»", ctxNoReview.includes("değerlendirme YOK") && !ctxNoReview.includes(", hatasız"));
   const sClean = snap({
-    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 5, topicsWorked: ["present_iyor"], errorCount: 0, criteriaTotal: 15, invalidReason: null, nextSteps: [] },
+    lastVoice: { endedAt: `${TODAY}T05:00:00Z`, minutes: 5, topicsWorked: ["present_iyor"], errorCount: 0, criteriaTotal: 15, invalidReason: null, nextSteps: [], pronunciationNote: null },
   });
   const ctxClean = buildAhuContext(sClean, decide(sClean), "proactive");
   check("урок с чистым ревью: «hatasız» честен", ctxClean.includes("hatasız") && ctxClean.includes("15/20"));

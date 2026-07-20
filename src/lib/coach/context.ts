@@ -210,6 +210,10 @@ export function buildAhuContext(
     if (s.lastVoice.nextSteps.length) {
       opt(`GEÇEN DERSİN SÖZÜ (değerlendirmede söylenen sonraki adım): ${s.lastVoice.nextSteps.join("; ")}.`, 4);
     }
+    // наблюдение о произношении прошлого урока — проверить ушами, исправился ли
+    if (s.lastVoice.pronunciationNote) {
+      opt(`GEÇEN DERSİN TELAFFUZ NOTU: «${s.lastVoice.pronunciationNote}» — bu derste düzelip düzelmediğine kulak ver.`, 4);
+    }
   }
   if (s.lastMock?.total != null) {
     const delta =

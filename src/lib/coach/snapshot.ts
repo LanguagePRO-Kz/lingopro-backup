@@ -209,6 +209,7 @@ export async function buildSnapshot(
           voiceRow.report && !voiceRow.report.valid ? (voiceRow.report.invalid_reason ?? null) : null,
         // обещание прошлого урока — следующий обязан его вспомнить
         nextSteps: (report?.next_steps ?? []).slice(0, 2),
+        pronunciationNote: report?.pronunciation_note || null,
       }
     : null;
 

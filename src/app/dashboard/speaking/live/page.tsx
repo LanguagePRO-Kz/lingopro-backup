@@ -56,6 +56,7 @@ const T = {
     preB1Scores: "Баллы по критериям появятся с уровня B1 — сейчас смотрим на прогресс, не на оценки.",
     wentWell: "Что получилось", vocabTitle: "Словарный запас", vocabUsedWell: "Хорошо использовал",
     vocabUpgrades: "Можно точнее", vocabNew: "Новые слова на следующий раз",
+    pronTitle: "Произношение · сказано голосом на уроке",
     again: "Ещё урок",
     errAuth: "Войди в аккаунт, чтобы начать урок.", errMic: "Нужен доступ к микрофону — разреши его в браузере и попробуй снова.",
     errNoMinutes: "На сегодня минуты закончились. База обновится в полночь — или докупи пакет минут.", buyMinutes: "Докупить минуты",
@@ -88,6 +89,7 @@ const T = {
     preB1Scores: "Criteria scores appear from level B1 — for now we track progress, not grades.",
     wentWell: "What went well", vocabTitle: "Vocabulary", vocabUsedWell: "Used well",
     vocabUpgrades: "Could be more precise", vocabNew: "New words for next time",
+    pronTitle: "Pronunciation · said aloud in the lesson",
     again: "Another lesson",
     errAuth: "Sign in to start a lesson.", errMic: "Microphone access is required — allow it in your browser and retry.",
     errNoMinutes: "You're out of minutes for today. The base quota resets at midnight — or top up with a minute pack.", buyMinutes: "Buy minutes",
@@ -120,6 +122,7 @@ const T = {
     preB1Scores: "Ölçüt puanları B1 seviyesinden itibaren görünür — şimdilik nota değil ilerlemeye bakıyoruz.",
     wentWell: "Neler iyi gitti", vocabTitle: "Kelime dağarcığı", vocabUsedWell: "Yerinde kullandın",
     vocabUpgrades: "Daha isabetli olabilirdi", vocabNew: "Bir dahaki sefere yeni kelimeler",
+    pronTitle: "Telaffuz · derste sesli söylendi",
     again: "Yeni ders",
     errAuth: "Derse başlamak için giriş yap.", errMic: "Mikrofon izni gerekli — tarayıcıda izin ver ve tekrar dene.",
     errNoMinutes: "Bugünkü dakikaların bitti. Taban kota gece yarısı yenilenir — ya da dakika paketi al.", buyMinutes: "Dakika al",
@@ -152,6 +155,7 @@ const T = {
     preB1Scores: "Өлшемдер бойынша баллдар B1 деңгейінен бастап көрінеді — әзірге бағаға емес, прогреске қараймыз.",
     wentWell: "Не жақсы шықты", vocabTitle: "Сөздік қор", vocabUsedWell: "Орынды қолдандың",
     vocabUpgrades: "Дәлірек айтуға болатын", vocabNew: "Келесі жолға жаңа сөздер",
+    pronTitle: "Айтылым · сабақта дауыстап айтылды",
     again: "Тағы бір сабақ",
     errAuth: "Сабақты бастау үшін аккаунтқа кір.", errMic: "Микрофонға рұқсат керек — браузерде рұқсат беріп, қайта көр.",
     errNoMinutes: "Бүгінгі минуттар бітті. Базалық квота түн ортасында жаңарады — немесе минут пакетін ал.", buyMinutes: "Минут алу",
@@ -906,6 +910,15 @@ function LiveLesson() {
                 <div className="rounded-xl bg-[#16a34a]/[0.07] p-3.5">
                   <div className="text-xs font-semibold uppercase tracking-wide text-[#15803d]">✅ {c.wentWell}</div>
                   <p className="mt-1 text-sm leading-relaxed text-[var(--color-foreground)]">{report.went_well}</p>
+                </div>
+              )}
+
+              {/* произношение: только то, что РЕАЛЬНО прозвучало голосом в
+                  закрытии урока (ревьюер переносит из реплик учителя) */}
+              {report.pronunciation_note && (
+                <div className="rounded-xl bg-black/[0.03] p-3.5">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">🎙 {c.pronTitle}</div>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--color-foreground)]">{report.pronunciation_note}</p>
                 </div>
               )}
 

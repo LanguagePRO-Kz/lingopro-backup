@@ -85,6 +85,7 @@ export function tooShortReport(): VoiceReport {
     invalid_reason: "too_short",
     summary: "",
     went_well: "",
+    pronunciation_note: "",
     criteria: {
       fluency: { score: 0, comment: "" },
       grammar: { score: 0, comment: "" },

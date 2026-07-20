@@ -327,6 +327,7 @@ async function main() {
         valid: true, invalid_reason: null,
         summary: "Урок по изафету: хорошо строишь простые цепочки, дважды потерялось смягчение p→b. Продолжай с притяжательными парами.",
         went_well: "Хорошо строишь простые изафетные цепочки: kitabın kapağı, annemin evi.",
+        pronunciation_note: "",
         criteria: { fluency: { score: 3, comment: "" }, grammar: { score: 3, comment: "" }, vocab: { score: 4, comment: "" }, coherence: { score: 4, comment: "" } },
         errors: [], vocab_notes: { used_well: [], upgrades: [], new_words: [] }, topics_worked: ["izafet"], next_steps: [],
       };
