@@ -329,13 +329,21 @@ async function PaymentsTab({ admin, rows }: { admin: NonNullable<ReturnType<type
 
 async function BrokenTab({ admin }: { admin: NonNullable<ReturnType<typeof createAdminClient>> }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [voiceNull, usage, briefs, rejected, attemptsAll] = await Promise.all([
+  const [voiceNull, usage, briefs, rejected, attemptsAll, voiceLlm] = await Promise.all([
     admin.from("voice_sessions").select("user_id, started_at, seconds, transcript").is("report", null).order("started_at", { ascending: false }),
     admin.from("ai_usage").select("user_id, used").eq("day", today).eq("feature", "motivator"),
     admin.from("coach_messages").select("user_id").eq("channel", "proactive").gte("created_at", `${today}T00:00:00Z`),
     admin.from("generated_tasks").select("id, topic, level, qa, created_at").eq("status", "rejected").order("created_at", { ascending: false }).limit(20),
     admin.from("attempts").select("question_id, is_correct").eq("is_self_reported", false).limit(10000),
+    // тихая деградация модели: уроки, где ElevenLabs отвечал не нашей LLM
+    admin.from("voice_sessions").select("user_id, started_at, transcript").not("transcript->llm_mismatch", "is", null).order("started_at", { ascending: false }).limit(50),
   ]);
+
+  const llmDegraded = (voiceLlm.data ?? []).map((v) => ({
+    user: (v.user_id as string)?.slice(0, 8) ?? "?",
+    at: (v.started_at as string)?.slice(0, 16) ?? "",
+    models: ((v.transcript as { llm_mismatch?: string[] })?.llm_mismatch ?? []).join(", "),
+  }));
 
   // брифы: квота сожжена, а заметки за день нет → AI-вызов пропал
   const briefed = new Set((briefs.data ?? []).map((b) => b.user_id as string));
@@ -371,6 +379,19 @@ async function BrokenTab({ admin }: { admin: NonNullable<ReturnType<typeof creat
             {((v.transcript as { conversation_id?: string })?.conversation_id ?? "без id").slice(0, 30)} — дозреет ретраем/вебхуком/бэкфиллом
           </div>
         )),
+      )}
+      {box(
+        `🤖 Уроки не на нашей LLM: ${llmDegraded.length}`,
+        llmDegraded.length === 0,
+        llmDegraded.length === 0 ? (
+          <span>ElevenLabs везде отвечал нашей моделью (canon AGENT_SETTINGS.llm).</span>
+        ) : (
+          llmDegraded.map((d, i) => (
+            <div key={i} className="border-t border-black/5 py-1">
+              {d.at} · {d.user}… — отвечала <b>{d.models}</b> вместо канона: лестница/рекаст могли не отработать (тихая деградация backup_llm)
+            </div>
+          ))
+        ),
       )}
       {box(
         `Потерянные брифы сегодня: ${lostBriefs.length}`,

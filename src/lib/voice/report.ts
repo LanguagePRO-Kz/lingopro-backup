@@ -22,6 +22,7 @@ import {
 import { topicById } from "@/lib/ai/topics";
 import { deterministicUuid, recomputeTopicMastery } from "@/lib/attempts";
 import { recordVoiceSummary } from "@/lib/coach/voice-summary";
+import { AGENT_SETTINGS } from "@/lib/voice/agent-prompt";
 
 /** Снимок разговора из API ElevenLabs (нужные поля). */
 export type ConvSnapshot = {
@@ -31,10 +32,41 @@ export type ConvSnapshot = {
     call_duration_secs?: number;
     start_time_unix_secs?: number;
     dynamic_variables?: Record<string, string>;
+    // фактические LLM, отвечавшие в разговоре — ключи model_usage; при
+    // деградации ElevenLabs на backup-модель здесь всплывёт чужое имя
+    charging?: {
+      llm_usage?: Record<
+        string, // irreversible_generation | initiated_generation
+        { model_usage?: Record<string, unknown> }
+      >;
+    };
   };
   conversation_initiation_client_data?: { dynamic_variables?: Record<string, string> };
   transcript?: { role?: string; message?: string | null }[];
 };
+
+/**
+ * Фактические LLM-модели разговора (ключи charging.llm_usage.*.model_usage).
+ * Пусто = ElevenLabs не отдал (старый разговор/иной тариф) — не путать с
+ * «наша модель»: пустота честно означает «не знаем».
+ */
+export function actualLlmModels(conv: ConvSnapshot): string[] {
+  const usage = conv.metadata?.charging?.llm_usage ?? {};
+  const models = new Set<string>();
+  for (const gen of Object.values(usage)) {
+    for (const m of Object.keys(gen?.model_usage ?? {})) models.add(m);
+  }
+  return [...models];
+}
+
+/**
+ * Тихая деградация: ElevenLabs подставил backup-модель вместо нашей и урок
+ * «поглупел» молча. Возвращает чужие модели (пусто = всё чисто ИЛИ данных
+ * нет). expected — канон AGENT_SETTINGS.llm.
+ */
+export function llmMismatch(conv: ConvSnapshot, expected: string): string[] {
+  return actualLlmModels(conv).filter((m) => m !== expected);
+}
 
 /**
  * Состояние письменного разбора в ответе клиенту:
@@ -220,11 +252,21 @@ export async function maturePendingReport(
   const lines = transcriptLines(conv);
   const dynVars = dynVarsOf(conv);
 
+  // тихая деградация модели: пишем в transcript (без миграции) — админка
+  // «Сломанное» подсветит уроки, где отвечала не наша модель
+  const mismatch = llmMismatch(conv, AGENT_SETTINGS.llm);
+  const transcriptBlob = {
+    conversation_id: input.conversationId,
+    items: conv.transcript ?? [],
+    llm_models: actualLlmModels(conv),
+    ...(mismatch.length ? { llm_mismatch: mismatch } : {}),
+  };
+
   if (studentLineCount(lines) < 2) {
     const report = tooShortReport();
     await admin
       .from("voice_sessions")
-      .update({ transcript: { conversation_id: input.conversationId, items: conv.transcript ?? [] }, report })
+      .update({ transcript: transcriptBlob, report })
       .eq("id", input.sessionId);
     return { state: "too_short", report };
   }
@@ -234,7 +276,7 @@ export async function maturePendingReport(
 
   await admin
     .from("voice_sessions")
-    .update({ transcript: { conversation_id: input.conversationId, items: conv.transcript ?? [] }, report })
+    .update({ transcript: transcriptBlob, report })
     .eq("id", input.sessionId);
 
   if (report.valid) {

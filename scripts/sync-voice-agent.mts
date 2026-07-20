@@ -22,19 +22,21 @@ const apply = process.argv.includes("--apply");
 async function main() {
   const agent = (await fetch(API, { headers }).then((r) => r.json())) as {
     conversation_config?: {
-      agent?: { prompt?: { prompt?: string }; first_message?: string };
+      agent?: { prompt?: { prompt?: string; llm?: string }; first_message?: string };
       turn?: { turn_timeout?: number };
     };
     platform_settings?: { overrides?: { conversation_config_override?: { agent?: { first_message?: boolean } } } };
   };
   const current = agent?.conversation_config?.agent?.prompt?.prompt ?? "";
   const turnTimeout = agent?.conversation_config?.turn?.turn_timeout;
+  const llm = agent?.conversation_config?.agent?.prompt?.llm;
   const fmOverride =
     agent?.platform_settings?.overrides?.conversation_config_override?.agent?.first_message ?? false;
 
   console.log("=== СРАВНЕНИЕ С КАНОНОМ ===");
   console.log("промпт совпадает:", current === AGENT_PROMPT ? "ДА" : `НЕТ (в консоли ${current.length} байт, канон ${AGENT_PROMPT.length})`);
   console.log("turn_timeout:", turnTimeout, "→ канон:", AGENT_SETTINGS.turnTimeoutSeconds);
+  console.log("llm:", llm, "→ канон:", AGENT_SETTINGS.llm, llm === AGENT_SETTINGS.llm ? "" : "⚠️ РАСХОЖДЕНИЕ");
   console.log("first_message override разрешён:", fmOverride, "→ канон:", AGENT_SETTINGS.allowFirstMessageOverride);
 
   if (!apply) {
@@ -44,7 +46,7 @@ async function main() {
 
   const patch = {
     conversation_config: {
-      agent: { prompt: { prompt: AGENT_PROMPT } },
+      agent: { prompt: { prompt: AGENT_PROMPT, llm: AGENT_SETTINGS.llm } },
       turn: { turn_timeout: AGENT_SETTINGS.turnTimeoutSeconds },
     },
     platform_settings: {
@@ -64,7 +66,8 @@ async function main() {
   const after = (await fetch(API, { headers }).then((r) => r.json())) as typeof agent;
   const ok =
     after?.conversation_config?.agent?.prompt?.prompt === AGENT_PROMPT &&
-    after?.conversation_config?.turn?.turn_timeout === AGENT_SETTINGS.turnTimeoutSeconds;
+    after?.conversation_config?.turn?.turn_timeout === AGENT_SETTINGS.turnTimeoutSeconds &&
+    after?.conversation_config?.agent?.prompt?.llm === AGENT_SETTINGS.llm;
   console.log(ok ? "\n✓ агент синхронизирован с каноном" : "\n✗ верификация после PATCH не сошлась");
   process.exit(ok ? 0 : 1);
 }
