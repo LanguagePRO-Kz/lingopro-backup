@@ -140,6 +140,41 @@ console.log("— STREAK_BROKEN только при реальной прошло
 
   const fresh = snap({ days: [day(d(-1), 3), day(TODAY, 0)] });
   check("занимался вчера → не STREAK_BROKEN", detectStates(fresh).every((st) => st.id !== "STREAK_BROKEN"));
+
+  // порог заказа: «пропал» = 3+ дня, 2 дня — ещё выходной, не тревога
+  const gap2 = snap({ days: [day(d(-2), 5), day(d(-1), 0), day(TODAY, 0)] });
+  check("пропуск 2 дня → НЕ STREAK_BROKEN (порог 3)", detectStates(gap2).every((st) => st.id !== "STREAK_BROKEN"));
+  const gap3 = snap({ days: [day(d(-3), 5), day(d(-2), 0), day(d(-1), 0), day(TODAY, 0)] });
+  const b3 = detectStates(gap3).find((st) => st.id === "STREAK_BROKEN");
+  check("пропуск 3 дня → STREAK_BROKEN", b3?.id === "STREAK_BROKEN" && b3.daysSinceActivity === 3, JSON.stringify(b3));
+}
+
+/* --------------------------- BREAKTHROUGH week_streak --------------------- */
+console.log("— BREAKTHROUGH week_streak: неделя плана подряд —");
+{
+  // 7 полных дней подряд, включая сегодня → празднуем «неделю»
+  const wk = snap({ days: Array.from({ length: 7 }, (_, i) => day(d(-(6 - i)), 5)) });
+  const st = detectStates(wk).find((x) => x.id === "BREAKTHROUGH");
+  check("7 полных дней подряд → week_streak(7)", st?.id === "BREAKTHROUGH" && st.kind === "week_streak" && st.streakDays === 7, JSON.stringify(st));
+
+  // 6 подряд — ещё не неделя
+  const wk6 = snap({ days: Array.from({ length: 6 }, (_, i) => day(d(-(5 - i)), 5)) });
+  const st6 = detectStates(wk6).find((x) => x.id === "BREAKTHROUGH" && x.kind === "week_streak");
+  check("6 дней подряд → НЕ week_streak", !st6);
+
+  // 7 подряд, но сегодня ещё не закрыт → не празднуем пока
+  const wkOpen = snap({ days: [...Array.from({ length: 7 }, (_, i) => day(d(-(7 - i)), 5)), day(TODAY, 2)] });
+  const stOpen = detectStates(wkOpen).find((x) => x.id === "BREAKTHROUGH" && x.kind === "week_streak");
+  check("сегодня ещё не закрыт → week_streak ждёт", !stOpen);
+}
+
+/* --------------------------- EXAM_SOON порог месяц ------------------------ */
+console.log("— EXAM_SOON: окно месяца (30 дней) —");
+{
+  const in28 = snap({ daysToExam: 28, days: [day(d(-1), 5)] });
+  check("28 дней до экзамена → EXAM_SOON", detectStates(in28).some((x) => x.id === "EXAM_SOON"));
+  const in40 = snap({ daysToExam: 40, days: [day(d(-1), 5)] });
+  check("40 дней → ещё не EXAM_SOON", detectStates(in40).every((x) => x.id !== "EXAM_SOON"));
 }
 
 /* --------------------------------- BEHIND --------------------------------- */

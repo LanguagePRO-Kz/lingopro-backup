@@ -57,7 +57,9 @@ export function stateLineTr(st: CoachState): string {
     case "BREAKTHROUGH":
       return st.kind === "topic_closed"
         ? `ATILIM — «${trLabel(st.topic ?? "")}» konusu bugün kapandı: güç ${st.strength ?? 60}/100 (eşik 60). Bu bir KONU GÜCÜ puanıdır, soru sayısı değil.`
-        : `ATILIM — deneme sınavı ${st.mockTotal}/100, öncekinden ${st.mockDelta} puan yukarı.`;
+        : st.kind === "week_streak"
+          ? `ATILIM — ${st.streakDays} gün ÜST ÜSTE günlük plan tamamlandı. Somut seriyle kutla, abartma.`
+          : `ATILIM — deneme sınavı ${st.mockTotal}/100, öncekinden ${st.mockDelta} puan yukarı.`;
     case "PLATEAU":
       return `PLATO — düzenli çalışıyor ama «${trLabel(st.topic)}» (${st.strength}/100) ${st.daysSincePracticed} gündür hiç çalışılmadı.`;
     case "ON_TRACK":
@@ -74,8 +76,12 @@ function stateDirective(st: CoachState): string {
       return "Kaybolmayı açık ama sıcak söyle ('пропуск — бывает' ruhunda); suçlama yok, bugün küçük bir adıma çağır.";
     case "BREAKTHROUGH":
       return "Başarıyı SOMUT sayıyla kutla; genel 'aferin' yok, abartma yok.";
-    case "BEHIND":
     case "EXAM_SOON":
+      // заказ 20.07: за месяц до экзамена слабое звено ещё можно усилить —
+      // если SINAV HAZIRLIĞI показывает слабую секцию, назови её и предложи
+      // усилить именно её («konuşma seni batırır — onu güçlendirelim»)
+      return "Durumu dürüstçe söyle, panik yaratma; en zayıf bölüm/beceri varsa (SINAV HAZIRLIĞI satırına bak) ONU adıyla söyle ve bugün onu güçlendirmeyi öner; tek somut sonraki adım ver.";
+    case "BEHIND":
       return "Durumu dürüstçe söyle, panik yaratma; tek somut sonraki adım ver.";
     case "TOPIC_FAILED":
     case "PLATEAU":

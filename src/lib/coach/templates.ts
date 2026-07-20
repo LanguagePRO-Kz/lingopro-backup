@@ -106,6 +106,13 @@ export function coachFallbackText(s: StudentSnapshot, d: CoachDecision, locale: 
             `«${label(st.topic, locale)}» konusu kapandı — 60+. ${s.targetLevel} yolunda gerçek bir adım. Tempoyu koru.`,
             `«${label(st.topic, locale)}» тақырыбы жабылды — 60+. Бұл ${s.targetLevel} жолындағы нақты қадам. Қарқынды ұстайық.`,
           )
+        : st.kind === "week_streak"
+        ? t(
+            `${st.streakDays} дней подряд по плану — отличная неделя. Так и держи.`,
+            `${st.streakDays} days in a row on plan — a great week. Keep it up.`,
+            `${st.streakDays} gün üst üste plan tamam — harika bir hafta. Böyle devam.`,
+            `${st.streakDays} күн қатарынан жоспармен — керемет апта. Осылай жалғастыр.`,
+          )
         : t(
             `Пробный ${st.mockTotal}/100 — на ${st.mockDelta} балл(а) выше прошлого. Рост реальный, продолжаем.`,
             `Mock ${st.mockTotal}/100 — ${st.mockDelta} points above the last one. Real growth, keep going.`,

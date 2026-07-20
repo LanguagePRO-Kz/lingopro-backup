@@ -14,10 +14,13 @@ import type { ActivitySummary, CoachState, CoachStateId, StudentSnapshot } from 
 
 /** Пороги правил — КОНФИГ ядра, не физика; правится в одном месте. */
 export const COACH_RULES = {
-  /** EXAM_SOON: точная дата ближе N дней */
-  examSoonDays: 14,
-  /** STREAK_BROKEN: полных дней без единой выполненной задачи */
-  inactivityDays: 2,
+  /** EXAM_SOON: точная дата ближе N дней (месяц — окно мобилизации: за месяц
+   * до экзамена слабое звено ещё можно усилить; заказ 20.07) */
+  examSoonDays: 30,
+  /** STREAK_BROKEN: полных дней без активности (3+ = «пропал», а не выходной) */
+  inactivityDays: 3,
+  /** BREAKTHROUGH week_streak: серия полных дней кратна этому (неделя плана) */
+  weekStreakStep: 7,
   /** TOPIC_FAILED: strength ниже порога… */
   failedStrength: 30,
   /** …или столько ошибок по одной теме за 7 дней */
@@ -206,6 +209,15 @@ export function detectStates(s: StudentSnapshot): CoachState[] {
       s.prevMock.total != null &&
       (datePart(s.lastMock.createdAt) ?? "") >= isoShift(s.today, -1) &&
       s.lastMock.total - s.prevMock.total >= COACH_RULES.breakthroughMockDelta;
+    // week_streak: план выполнен неделю ПОДРЯД (серия кратна 7) — ловим в день
+    // достижения кратности, иначе бы праздновали каждый день после седьмого
+    const weekStreak =
+      act.streak > 0 &&
+      act.streak % COACH_RULES.weekStreakStep === 0 &&
+      // именно сегодня закрыл неделю (сегодняшний план выполнен), не «висит с ночи»
+      !!act.todayPlan &&
+      act.todayPlan.total > 0 &&
+      act.todayPlan.done >= act.todayPlan.total;
     if (closedToday) {
       list.push({
         id: "BREAKTHROUGH",
@@ -220,6 +232,8 @@ export function detectStates(s: StudentSnapshot): CoachState[] {
         mockDelta: s.lastMock.total! - s.prevMock!.total!,
         mockTotal: s.lastMock.total!,
       });
+    } else if (weekStreak) {
+      list.push({ id: "BREAKTHROUGH", kind: "week_streak", streakDays: act.streak });
     }
   }
 

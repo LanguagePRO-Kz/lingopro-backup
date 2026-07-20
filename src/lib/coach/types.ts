@@ -156,13 +156,15 @@ export type CoachState =
     }
   | {
       id: "BREAKTHROUGH";
-      kind: "topic_closed" | "mock_jump";
+      kind: "topic_closed" | "mock_jump" | "week_streak";
       topic?: string;
       /** сила темы 0–100 при kind='topic_closed' — чтобы «60+» в тексте
        * не превращалось в выдуманные «60 вопросов» */
       strength?: number;
       mockDelta?: number;
       mockTotal?: number;
+      /** длина серии полных дней при kind='week_streak' (кратна 7) */
+      streakDays?: number;
     }
   | { id: "PLATEAU"; topic: string; strength: number; daysSincePracticed: number }
   | { id: "ON_TRACK" };
