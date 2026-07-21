@@ -53,7 +53,7 @@ export async function saveExamPlanToProfile(p: ExamPlan): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({
         target_level: p.targetLevel,
@@ -62,6 +62,9 @@ export async function saveExamPlanToProfile(p: ExamPlan): Promise<void> {
         exam_horizon_months: p.examDateMode === "approx" ? (p.examHorizonMonths ?? null) : null,
       })
       .eq("id", user.id);
+    // молчаливый проглот стоил недели слепоты (тихий C1, Блок 2) — сбой
+    // записи ЦЕЛИ обязан быть виден хотя бы в консоли
+    if (error) console.error("[exam-plan] goal save failed:", error.message);
     // ISOLATED write: the column arrives with migration 0006 — one missing
     // column would 400 the whole update above, so it gets its own statement
     await supabase

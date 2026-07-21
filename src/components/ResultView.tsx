@@ -426,13 +426,17 @@ function V3SectionAccordion({
 /** Честный статус AI-проверки эссе: проверяем / квота / сбой (+ретрай). */
 function YazmaStatus({
   state,
+  hasEssay = true,
   locale,
   onRetry,
 }: {
   state?: "idle" | "checking" | "quota" | "failed";
+  /** false = в этой диагностике эссе не отправлялось — обещать проверку нечестно */
+  hasEssay?: boolean;
   locale: Parameters<typeof qt>[0];
   onRetry?: () => void;
 }) {
+  if (!hasEssay) return <>{qt(locale, "yazmaNoEssay")}</>;
   if (state === "checking") {
     return (
       <span className="inline-flex items-center gap-2">
@@ -640,7 +644,7 @@ export function ResultView({
             emoji="✍️"
             score={sections.yazma}
             delay={0.24}
-            pendingNode={<YazmaStatus state={yazmaState} locale={locale} onRetry={onRetryYazma} />}
+            pendingNode={<YazmaStatus state={yazmaState} hasEssay={!!result.writingText} locale={locale} onRetry={onRetryYazma} />}
           />
           <SectionRow
             label={qt(locale, "stKonusma")}

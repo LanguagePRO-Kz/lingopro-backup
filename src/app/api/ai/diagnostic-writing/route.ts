@@ -7,6 +7,7 @@ import {
   validateWritingReview,
 } from "@/lib/ai/prompts/writing-review";
 import { consumeQuota } from "@/lib/ai/quota";
+import { insertEssay, updateEssayStatus } from "@/lib/essays";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,10 +52,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
   }
 
+  // диагностическое эссе — тоже персистентная сущность (Блок 3): строка в
+  // essays ДО квоты, любой исход виден в истории раздела Yazma
+  const supabaseAuth = await createClient();
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser();
+  if (!user) return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  const essayId = await insertEssay({ userId: user.id, source: "diagnostic", taskPrompt, text });
+
   // session + 2/day, 10/month (src/lib/ai/limits.ts — anti retake-farming)
   const quota = await consumeQuota("diagnostic");
   if (!quota.ok) {
-    return NextResponse.json({ error: quota.reason }, { status: quota.status });
+    await updateEssayStatus(essayId, "quota");
+    return NextResponse.json({ error: quota.reason, essayId }, { status: quota.status });
   }
 
   const result = await callAI({
@@ -66,14 +77,20 @@ export async function POST(req: Request) {
     json: true,
     thinking: true,
   });
-  if (!result) return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
+  if (!result) {
+    await updateEssayStatus(essayId, "failed");
+    return NextResponse.json({ error: "ai_unavailable", essayId }, { status: 503 });
+  }
 
   const review = validateWritingReview(result.parsed);
-  if (!review) return NextResponse.json({ error: "bad_ai_response" }, { status: 502 });
+  if (!review) {
+    await updateEssayStatus(essayId, "failed");
+    return NextResponse.json({ error: "bad_ai_response", essayId }, { status: 502 });
+  }
+  await updateEssayStatus(essayId, "done", review);
 
   if (review.valid && review.errors.length > 0) {
-    const supabase = await createClient();
-    await recordErrors(supabase, quota.userId, "diagnostic", review.errors);
+    await recordErrors(supabaseAuth, quota.userId, "diagnostic", review.errors);
   }
 
   return NextResponse.json({

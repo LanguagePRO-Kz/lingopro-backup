@@ -8,6 +8,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { loadStashedExamPlan, saveExamPlanToProfile } from "@/lib/exam-plan";
 import { saveProfileResult } from "@/lib/profile";
 import { loadResult, clearResult } from "@/lib/quiz";
 
@@ -47,6 +48,12 @@ export async function signUpAndSync(
     const saved = await saveProfileResult(local);
     if (saved) clearResult();
   }
+
+  // Цель/дата из онбординга — В МОМЕНТ реги, не только на визите result:
+  // потерянный стэш = «тихий C1» из дефолта БД у 13 живых юзеров (Блок 2).
+  // Стэш НЕ чистим — result-страница дочистит после своего сохранения.
+  const stashedPlan = loadStashedExamPlan();
+  if (stashedPlan) await saveExamPlanToProfile(stashedPlan);
 
   return { ok: true };
 }

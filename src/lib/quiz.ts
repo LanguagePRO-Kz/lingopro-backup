@@ -525,6 +525,14 @@ const T = {
     kk: "Тексеру өтпеді — AI қызметі жауап бермеді. Эссең сақтаулы, қайта көр.",
   },
   yazmaRetry: { ru: "Проверить ещё раз", en: "Retry the review", tr: "Tekrar dene", kk: "Қайта тексеру" },
+  // эссе в этой диагностике не отправлялось — вечное «балл появится после
+  // проверки» здесь было враньём (правило 1.3)
+  yazmaNoEssay: {
+    ru: "Эссе не было отправлено в этой диагностике. Напиши его в разделе Письма — AI-экзаменатор оценит по тем же критериям.",
+    en: "No essay was submitted in this diagnostic. Write one in the Writing section — the AI examiner scores by the same criteria.",
+    tr: "Bu tanılamada kompozisyon gönderilmedi. Yazma bölümünde yaz — AI aynı ölçütlerle değerlendirir.",
+    kk: "Бұл диагностикада эссе жіберілмеді. Оны Жазылым бөлімінде жаз — AI сол өлшемдермен бағалайды.",
+  },
   cefrCapNote: {
     ru: "Уровень C1 подтверждается только пробным экзаменом — диагностика показывает до B2+.",
     en: "C1 is confirmed only by a mock exam — the diagnostic measures up to B2+.",

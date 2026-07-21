@@ -19,6 +19,28 @@ export type Profile = {
   plan_progress: Progress;
 };
 
+/**
+ * Есть ли у юзера доступ ПРЯМО СЕЙЧАС (план не истёк). Нужен чекауту:
+ * RPC отвечает «trial_used» и юзеру с живым триалом, и юзеру с истёкшим —
+ * следующий шаг у них разный (в дашборд vs оплата). Чтение своего профиля
+ * по RLS; не вошёл или ошибка чтения → честное false.
+ */
+export async function fetchAccessActive(): Promise<boolean> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("plan, plan_expires_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error || !data?.plan) return false;
+  const exp = data.plan_expires_at as string | null;
+  return exp == null || Date.parse(exp) > Date.now();
+}
+
 /** Read the current user's profile (null if not signed in). */
 export async function fetchProfile(): Promise<Profile | null> {
   const supabase = createClient();

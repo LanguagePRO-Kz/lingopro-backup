@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { pick } from "@/lib/localized";
 import type { PackageId } from "@/lib/billing";
+import { markFunnelOnce } from "@/lib/funnel";
+import { fetchAccessActive } from "@/lib/profile";
 import { redeemPromo, type PromoReason } from "@/lib/promo";
 import { currencyFor, fmtMoney, planRow, type Currency } from "@/lib/pricing";
 
@@ -47,8 +48,12 @@ const T = {
     promoPlaceholder: "Промокод",
     promoApply: "Применить",
     promoChecking: "Проверяем…",
-    promoTrial: (n: number) => `Пробный доступ на ${n} дн. активирован! Открываем…`,
+    promoTrial: (n: number) => `Пробный доступ на ${n} дн. активирован!`,
     promoSaved: (n: number) => `Скидка ${n}% применится к оплате.`,
+    promoStart: "Начать обучение →",
+    promoHasAccess: "У тебя уже есть доступ — промокод не нужен.",
+    promoGoLearn: "Перейти к обучению →",
+    promoTrialUsed: "Пробный доступ уже был использован. Дальше доступ откроет оплата пакета.",
     reasons: {
       not_found: "Промокод не найден",
       expired: "Срок действия промокода истёк",
@@ -79,8 +84,12 @@ const T = {
     promoPlaceholder: "Promo code",
     promoApply: "Apply",
     promoChecking: "Checking…",
-    promoTrial: (n: number) => `${n}-day trial activated! Opening your access…`,
+    promoTrial: (n: number) => `${n}-day trial activated!`,
     promoSaved: (n: number) => `A ${n}% discount will apply to your payment.`,
+    promoStart: "Start learning →",
+    promoHasAccess: "You already have access — no promo code needed.",
+    promoGoLearn: "Go to your lessons →",
+    promoTrialUsed: "Your trial has already been used. Purchasing a package will unlock access.",
     reasons: {
       not_found: "Promo code not found",
       expired: "This promo code has expired",
@@ -111,8 +120,12 @@ const T = {
     promoPlaceholder: "Promosyon kodu",
     promoApply: "Uygula",
     promoChecking: "Kontrol ediliyor…",
-    promoTrial: (n: number) => `${n} günlük deneme erişimi açıldı! Yönlendiriliyorsun…`,
+    promoTrial: (n: number) => `${n} günlük deneme erişimi açıldı!`,
     promoSaved: (n: number) => `Ödemene %${n} indirim uygulanacak.`,
+    promoStart: "Öğrenmeye başla →",
+    promoHasAccess: "Zaten erişimin var — koda gerek yok.",
+    promoGoLearn: "Derslere geç →",
+    promoTrialUsed: "Deneme erişimi daha önce kullanılmış. Erişimi paket satın alma açar.",
     reasons: {
       not_found: "Kod bulunamadı",
       expired: "Bu kodun süresi dolmuş",
@@ -143,8 +156,12 @@ const T = {
     promoPlaceholder: "Промокод",
     promoApply: "Қолдану",
     promoChecking: "Тексерілуде…",
-    promoTrial: (n: number) => `${n} күндік сынақ қолжетімділік ашылды! Ашылуда…`,
+    promoTrial: (n: number) => `${n} күндік сынақ қолжетімділік ашылды!`,
     promoSaved: (n: number) => `Төлеміңе ${n}% жеңілдік қолданылады.`,
+    promoStart: "Оқуды бастау →",
+    promoHasAccess: "Сенде қолжетімділік бар — промокод қажет емес.",
+    promoGoLearn: "Оқуға өту →",
+    promoTrialUsed: "Сынақ қолжетімділік бұрын қолданылған. Әрі қарай қолжетімділікті пакет төлемі ашады.",
     reasons: {
       not_found: "Промокод табылмады",
       expired: "Промокодтың мерзімі өтіп кеткен",
@@ -165,6 +182,11 @@ type PromoStatus =
   | { kind: "checking" }
   | { kind: "trial"; days: number }
   | { kind: "saved"; discount: number }
+  // доступ уже есть (активная подписка ИЛИ живой триал) — хорошая новость,
+  // не ошибка: зелёный блок + кнопка в дашборд
+  | { kind: "has_access" }
+  // триал был и истёк, доступа нет — честно + следующий шаг (оплата выше)
+  | { kind: "trial_used" }
   | { kind: "error"; msg: string };
 
 type MethodId = "kaspi" | "card";
@@ -184,9 +206,13 @@ export function CheckoutModal({
   hasDiscount: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const { locale } = useI18n();
   const c = pick(locale, T);
+
+  // воронка: «дошёл до чекаута» — первое касание, дальше видно в разборе
+  useEffect(() => {
+    void markFunnelOnce("checkout_opened_at");
+  }, []);
 
   /* --------------------------- способ оплаты --------------------------- */
   // оба способа доступны всем; дефолт — по рынку интерфейса:
@@ -263,18 +289,31 @@ export function CheckoutModal({
     const normalized = code.replace(/\s+/g, "").toUpperCase();
     if (!normalized || promo.kind === "checking") return;
     setPromo({ kind: "checking" });
+    // воронка: «пытался применить код» — отличает «не было кода» от «застрял»
+    void markFunnelOnce("promo_attempted_at");
 
     try {
       const res = await redeemPromo(normalized, pkgId);
       if (!res.ok) {
-        setPromo({ kind: "error", msg: c.reasons[res.reason] });
+        // «уже есть доступ» и «триал был» — НЕ тупики: у каждого свой
+        // следующий шаг. RPC отвечает trial_used и юзеру с ЖИВЫМ триалом
+        // (флаг проверяется раньше плана) — разводим по факту доступа
+        if (res.reason === "already_active") {
+          setPromo({ kind: "has_access" });
+        } else if (res.reason === "trial_used") {
+          setPromo((await fetchAccessActive()) ? { kind: "has_access" } : { kind: "trial_used" });
+        } else {
+          setPromo({ kind: "error", msg: c.reasons[res.reason] });
+        }
         return;
       }
       // триал: доступ уже выдан СЕРВЕРОМ (redeem_promo, security definer) —
-      // клиент план не пишет никогда, просто идёт в дашборд
+      // клиент план не пишет никогда. Переход полной загрузкой: клиентский
+      // роутер мог закэшировать редирект dashboard→pricing ДО выдачи плана,
+      // и push вернул бы юзера на цены — «мигнуло и выкинуло» (тупик №1)
       if (res.kind === "trial") {
         setPromo({ kind: "trial", days: res.trialDays });
-        router.push("/dashboard");
+        window.location.assign("/dashboard");
         return;
       }
       // скидка сохранена на сервере и применится к оплате
@@ -351,16 +390,21 @@ export function CheckoutModal({
           </div>
         </div>
 
-        {/* оплатить: провайдер off → отключённая кнопка + честный текст */}
+        {/* оплатить: провайдер off → кнопка ЯВНО неактивная (серая, без
+            градиента) и честный текст ВНУТРИ неё — яркая «активная» кнопка
+            с мелкой припиской под ней врала на мобильном */}
         <button
           type="button"
           onClick={payNow}
           disabled={payState === "busy" || payState === "off"}
-          className="btn-primary mt-4 w-full rounded-full px-6 py-4 text-base font-semibold disabled:opacity-60"
+          className={
+            payState === "off"
+              ? "mt-4 w-full cursor-not-allowed rounded-full bg-black/[0.06] px-6 py-4 text-base font-semibold text-[var(--color-muted)]"
+              : "btn-primary mt-4 w-full rounded-full px-6 py-4 text-base font-semibold disabled:opacity-60"
+          }
         >
-          {payState === "busy" ? c.paying : c.pay(priceLabel)}
+          {payState === "off" ? `⏳ ${c.paySoon}` : payState === "busy" ? c.paying : c.pay(priceLabel)}
         </button>
-        {payState === "off" && <div className="mt-2 text-center text-xs font-medium text-[#b45309]">⏳ {c.paySoon}</div>}
         {payState === "error" && <div className="mt-2 text-center text-xs font-medium text-[#dc2626]">❌ {c.payErr}</div>}
         {qr && (
           <div className="mt-3 rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4 text-center">
@@ -381,7 +425,7 @@ export function CheckoutModal({
               // нормализуем прямо при вводе: студент видит ровно то, что уйдёт
               // на сервер (без хвостовых пробелов автокоррекции и регистра)
               setCode(e.target.value.replace(/\s+/g, "").toUpperCase());
-              if (promo.kind === "error") setPromo({ kind: "idle" });
+              if (promo.kind === "error" || promo.kind === "has_access" || promo.kind === "trial_used") setPromo({ kind: "idle" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") applyPromo();
@@ -411,8 +455,37 @@ export function CheckoutModal({
           </button>
         </div>
         {promo.kind === "error" && <div className="mt-2 text-xs font-medium text-[#dc2626]">❌ {promo.msg}</div>}
-        {promo.kind === "trial" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoTrial(promo.days)}</div>}
         {promo.kind === "saved" && <div className="mt-2 text-xs font-medium text-[#16a34a]">✅ {c.promoSaved(promo.discount)}</div>}
+
+        {/* успех триала: авто-переход полной загрузкой уже запущен, но если
+            он медленный/не случился — большая кнопка, тупика нет */}
+        {promo.kind === "trial" && (
+          <div className="mt-3 rounded-2xl border border-[#16a34a]/30 bg-[#16a34a]/[0.07] p-4">
+            <div className="text-sm font-semibold text-[#16a34a]">✅ {c.promoTrial(promo.days)}</div>
+            <a href="/dashboard" className="btn-primary mt-3 block w-full rounded-full px-6 py-3.5 text-center text-base font-semibold">
+              {c.promoStart}
+            </a>
+          </div>
+        )}
+
+        {/* доступ уже есть (активная подписка или живой триал): хорошая
+            новость зелёным + кнопка в дашборд — раньше было красным ❌ */}
+        {promo.kind === "has_access" && (
+          <div className="mt-3 rounded-2xl border border-[#16a34a]/30 bg-[#16a34a]/[0.07] p-4">
+            <div className="text-sm font-semibold text-[#16a34a]">✅ {c.promoHasAccess}</div>
+            <a href="/dashboard" className="btn-primary mt-3 block w-full rounded-full px-6 py-3.5 text-center text-base font-semibold">
+              {c.promoGoLearn}
+            </a>
+          </div>
+        )}
+
+        {/* триал был и истёк: честно, без ❌-паники; следующий шаг — оплата
+            (кнопка выше; пока провайдер off, она честно говорит «скоро») */}
+        {promo.kind === "trial_used" && (
+          <div className="mt-3 rounded-2xl border border-[#b45309]/30 bg-[#b45309]/[0.07] p-3.5 text-xs font-medium leading-relaxed text-[#b45309]">
+            {c.promoTrialUsed}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

@@ -17,7 +17,7 @@ import { LEVELS } from "@/data/types";
  *      точность reading/listening за период — ТОТ ЖЕ источник, куда пишут
  *      разделы, план дня и голосовой разбор; самооценка (is_self_reported)
  *      в точность не входит, в счётчик слов — входит (реальное повторение);
- *    - `ai_usage` feature='writing' → сколько эссе проверено AI;
+ *    - `essays` status='done' → сколько эссе реально проверено (Блок 3);
  *    - `voice_sessions` (seconds > 0) → сколько голосовых уроков;
  *    - `daily_progress` → стрик и неделя (только реальные выполненные дни).
  *
@@ -111,7 +111,14 @@ export function useStats(period: Period): StatsData {
           .gte("answered_at", `${from}T00:00:00Z`)
           .order("answered_at", { ascending: false })
           .limit(5000),
-        supabase.from("ai_usage").select("day, used").eq("user_id", user.id).eq("feature", "writing").gte("day", from),
+        // реальные проверенные эссе (таблица essays, Блок 3) — раньше счётчик
+        // складывал СПИСАННУЮ КВОТУ ai_usage и показывал 0 при живых эссе
+        supabase
+          .from("essays")
+          .select("id, status")
+          .eq("user_id", user.id)
+          .eq("status", "done")
+          .gte("created_at", `${from}T00:00:00Z`),
         supabase.from("voice_sessions").select("started_at, seconds").eq("user_id", user.id).gte("started_at", `${from}T00:00:00Z`),
       ]);
 
@@ -144,7 +151,7 @@ export function useStats(period: Period): StatsData {
           }
         }
       }
-      counts.writing = ((essaysRes.data as { used: number }[] | null) ?? []).reduce((s, r) => s + (r.used || 0), 0);
+      counts.writing = ((essaysRes.data as { id: string }[] | null) ?? []).length;
       counts.speaking = ((voiceRes.data as { seconds: number }[] | null) ?? []).filter((v) => (v.seconds ?? 0) > 0).length;
       const pct = (a: { correct: number; n: number }) => (a.n ? Math.round((100 * a.correct) / a.n) : null);
       const activityByDay = [...byDay.entries()].map(([date, n]) => ({ date, n })).sort((a, b) => (a.date < b.date ? -1 : 1));
