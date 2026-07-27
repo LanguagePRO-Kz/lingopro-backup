@@ -27,6 +27,7 @@ Oturum modu: {{mode_instructions}}
 MODA SADIK KAL: yukarıdaki mod talimatı dersin İSKELETİDİR. Bölüm 1 dışında tanışma sohbetine sapma — moda uygun İLK görevle başla ve modun dışına çıkma.
 
 BU DERSİN ODAĞI: {{lesson_focus}}
+Neden bu odak: {{focus_reason}}
 Dersi bu konular etrafında kur: bu yapıları KULLANDIRACAK sorular ve durumlar yarat (ör. odak 'bulunma/yönelme hâli' ise yer-yön soruları sor; odak 'geçmiş zaman' ise dünü, anıları sorgula). Konu adlarını öğrenciye söyleme — doğal bir sohbet gibi hissettir ama her sorunun bir hedefi olsun. Odak konulardaki hataları ÖNCELİKLE yakala ve düzelt.
 
 ÖĞRENCİ DOSYASI (platform modüllerinden GERÇEK veriler — dil bilgisi, yazma, dinleme, okuma, denemeler, geçmiş dersler):
@@ -155,16 +156,61 @@ const HELLO_A0: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
     `Merhaba ${n}! Ben Ahu, Türkçe öğretmenin. — Сәлем, мен Аху, түрік тілі ұстазыңмын. Ең қарапайымнан бастаймыз. Şimdi söyle: «Merhaba!» — Енді сен айт: «Merhaba!»`,
 };
 
-/** A1 · ступень 2: турецкий + перевод ключевых слов. */
-const HELLO_A1: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
-  ru: (n) => `Merhaba ${n}! Bugün Türkçe konuşacağız (konuşmak — говорить). İlk soru: bugün nasılsın? (nasılsın — как дела?)`,
-  en: (n) => `Merhaba ${n}! Bugün Türkçe konuşacağız (konuşmak — to speak). İlk soru: bugün nasılsın? (nasılsın — how are you?)`,
-  tr: (n) => `Merhaba ${n}! Bugün Türkçe konuşacağız. İlk soru: bugün nasılsın?`,
-  kk: (n) => `Merhaba ${n}! Bugün Türkçe konuşacağız (konuşmak — сөйлеу). İlk soru: bugün nasılsın? (nasılsın — қалайсың?)`,
+/**
+ * Режимная завязка для A1-A2 (Блок 4): без неё любой режим начинался одной
+ * и той же фразой «İlk soru: bugün nasılsın?» — при коротких пробах режимы
+ * были неотличимы на слух. Турецкая фраза проста (уровень держит лестница),
+ * перевод-подсказка добавляется по ступени: A1 — да, A2 — нет.
+ */
+const MODE_OPENER_TR: Record<string, string> = {
+  bolum1: "Bölüm 1: karşılıklı konuşma. İlk soru: bugün nasılsın?",
+  bolum2: "Bölüm 2: kısa anlatım. Konun: «benim günüm». Başla: «Sabah kalkıyorum…»",
+  bolum3: "Bölüm 3: görüş. İlk soru: çay mı, kahve mi? Neden?",
+  full: "Bu bir sınav provası — Bölüm 1'den başlıyoruz. İlk soru: kendini tanıtır mısın?",
+  free: "Bugün serbest sohbet. İlk soru: bugün ne yaptın?",
+};
+const MODE_OPENER_HINT: Record<string, Record<"ru" | "en" | "tr" | "kk", string>> = {
+  bolum1: {
+    ru: "часть 1 — диалог; nasılsın — как дела?",
+    en: "part 1 — dialogue; nasılsın — how are you?",
+    tr: "",
+    kk: "1-бөлім — сұхбат; nasılsın — қалайсың?",
+  },
+  bolum2: {
+    ru: "часть 2 — короткий рассказ, тема «мой день»; sabah kalkıyorum — утром я встаю",
+    en: "part 2 — a short monologue, topic “my day”; sabah kalkıyorum — I get up in the morning",
+    tr: "",
+    kk: "2-бөлім — қысқа әңгіме, тақырып «менің күнім»; sabah kalkıyorum — таңертең тұрамын",
+  },
+  bolum3: {
+    ru: "часть 3 — твоё мнение: чай или кофе? почему?",
+    en: "part 3 — your opinion: tea or coffee? why?",
+    tr: "",
+    kk: "3-бөлім — пікірің: шай ма, кофе ме? неге?",
+  },
+  full: {
+    ru: "проба экзамена, начинаем с части 1 — представься",
+    en: "exam rehearsal, starting with part 1 — introduce yourself",
+    tr: "",
+    kk: "емтихан сынамасы, 1-бөлімнен бастаймыз — өзіңді таныстыр",
+  },
+  free: {
+    ru: "свободная беседа: что ты сегодня делал?",
+    en: "free talk: what did you do today?",
+    tr: "",
+    kk: "еркін әңгіме: бүгін не істедің?",
+  },
 };
 
+/** A1 · ступень 2: турецкий + режимная завязка + перевод-подсказка. */
+function helloA1(n: string, mode: string, locale: "ru" | "en" | "tr" | "kk"): string {
+  const opener = MODE_OPENER_TR[mode] ?? MODE_OPENER_TR.bolum1;
+  const hint = (MODE_OPENER_HINT[mode] ?? MODE_OPENER_HINT.bolum1)[locale];
+  return `Merhaba ${n}! ${opener}${hint ? ` (${hint})` : ""}`;
+}
+
 /** A2 · ступень 1: простой турецкий без перевода — заминка обработается лестницей. */
-const HELLO_A2 = (n: string) => `Merhaba ${n}! Bugün basit Türkçe konuşacağız. İlk soru: bugün nasılsın?`;
+const helloA2 = (n: string, mode: string) => `Merhaba ${n}! ${MODE_OPENER_TR[mode] ?? MODE_OPENER_TR.bolum1}`;
 
 const FIRST_TR: Record<string, (n: string) => string> = {
   bolum1: (n) => `Merhaba ${n}! TÖMER Konuşma Bölüm 1'deyiz: karşılıklı konuşma. İlk sorum: kendini kısaca tanıtır mısın?`,
@@ -190,9 +236,11 @@ const HELLO_PROBE: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
  * турецкий, B1+ → рамка режима). */
 export function firstMessageFor({ level, mode, name, locale }: FirstMsgInput): string {
   if (mode === "diagnostic_speaking") return HELLO_PROBE[locale](name);
+  // A0: самое простое приветствие БЕЗ режимной завязки — первый контакт
+  // с языком важнее формата, режим подхватят mode_instructions
   if (level === "A0") return HELLO_A0[locale](name);
-  if (level === "A1") return HELLO_A1[locale](name);
-  if (level === "A2" || mode === "foundation") return HELLO_A2(name);
+  if (level === "A1") return helloA1(name, mode, locale);
+  if (level === "A2" || mode === "foundation") return helloA2(name, mode);
   return (FIRST_TR[mode] ?? FIRST_TR.free)(name);
 }
 

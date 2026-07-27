@@ -240,7 +240,7 @@ export async function POST(req: Request) {
     mode === "foundation"
       ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
       : foundationLevel
-        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} Mod çerçevesini koru ama görevleri bu destek seviyesine göre KÜÇÜLT (uzun monolog isteme, tek basit soru sor).`
+        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} MOD İSKELETİNİ MUTLAKA KORU — Bölüm 2'de yine küçük bir anlatım, Bölüm 3'te yine görüş, rol oyununda yine rol olmalı; modları birbirine BENZETME. Sadece DİLİ ve UZUNLUĞU küçült: basit kelimeler, kısa görevler (2-3 cümlelik hedef), uzun monolog isteme.`
         : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">];
   // подсказки-заготовки на экран (A0-A1): студент может ПРОЧИТАТЬ ответ
   const foundationHints =
@@ -336,6 +336,22 @@ export async function POST(req: Request) {
       : Math.min(900, (baseLeft + creditsLeft) * 60);
 
   const feedbackLangCode = body.feedbackLang && body.feedbackLang in FEEDBACK_LANG_TR ? body.feedbackLang : "en";
+
+  // диагностика (Блок 4): что реально ушло в сессию — Vercel logs ловят
+  // разрыв «клик → агент» за минуту; полный payload каждой сессии лежит в
+  // ElevenLabs → conversation → conversation_initiation_client_data
+  console.info(
+    "[voice] session vars:",
+    JSON.stringify({
+      requested: body.mode ?? null,
+      mode,
+      level,
+      support: supportStepFor(level, mode),
+      focus: focus.map((t) => t.id),
+      dossierChars: dossier.length,
+      lang: feedbackLangCode,
+    }),
+  );
 
   return NextResponse.json({
     conversationToken,

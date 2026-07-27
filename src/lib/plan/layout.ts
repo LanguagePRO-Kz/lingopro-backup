@@ -174,7 +174,9 @@ export function buildDay(input: {
       count: 1,
       estimatedMinutes: 10, // = the daily base voice quota
       kind: "voice_lesson",
-      voiceMode: modes[(weekIdx - 1) % 3],
+      // ротация по ДНЯМ, не по неделям: недельная давала deep-link с одним
+      // и тем же режимом всю неделю — «Ahu каждый день одинаковая» (Блок 4)
+      voiceMode: modes[(dayNumber - 1) % 3],
       focusTopics: focus,
     });
   }
