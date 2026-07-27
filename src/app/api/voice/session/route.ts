@@ -9,7 +9,7 @@ import { buildAhuContext, stateLineTr } from "@/lib/coach/context";
 import { focusReasonText } from "@/lib/coach/templates";
 import { examFormat } from "@/lib/exam/format";
 import { buildKonusmaPlan, konusmaScript, type KonusmaSessionPlan } from "@/lib/voice/konusma-exam";
-import { assessSpeakingLevel, type SpeakingAssessment } from "@/lib/voice/speaking-level";
+import { assessSpeakingLevel, lessonSpeakingLevel, type SpeakingAssessment } from "@/lib/voice/speaking-level";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -223,7 +223,20 @@ export async function POST(req: Request) {
   }
 
   const quiz = (profile?.quiz_result as { level?: string } | null) ?? null;
-  const level = (profile?.current_level as string | null) ?? quiz?.level ?? "A2";
+  const globalLevel = (profile?.current_level as string | null) ?? quiz?.level ?? "A2";
+  // ЖИВОЙ УРОК живёт по SPEAKING-уровню (жалоба «переводит всем, даже B1»:
+  // лестница стартовала от глобального уровня, речь не учитывалась).
+  // Проба уровня — исключение: уровень ещё неизвестен by design.
+  let level = globalLevel;
+  let levelSource: "voice_reviews" | "diagnostic_probe" | "global" = "global";
+  if (requestedMode !== "diagnostic_speaking") {
+    const adminForLevel = createAdminClient();
+    if (adminForLevel) {
+      const sl = await lessonSpeakingLevel(adminForLevel, user.id, globalLevel);
+      level = sl.level;
+      levelSource = sl.source;
+    }
+  }
 
   // Режим урока (7.7-7.8): «plan» (урок из плана дня) решается СЕРВЕРОМ по
   // уровню — A0-A2 получают «Фундамент» (экзамен не упоминается), B1+ —
@@ -399,6 +412,8 @@ export async function POST(req: Request) {
       requested: body.mode ?? null,
       mode,
       level,
+      levelSource,
+      globalLevel,
       support: supportStepFor(level, mode),
       focus: focus.map((t) => t.id),
       dossierChars: dossier.length,

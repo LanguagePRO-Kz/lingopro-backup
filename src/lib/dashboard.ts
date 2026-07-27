@@ -25,6 +25,9 @@ export const NAV: NavItem[] = [
   // симуляция устного TÖMER (Блок 5): раздел называется просто Konuşma —
   // слово «экзамен» в UI сознательно не пишем
   { id: "konusma", emoji: "🎤", href: "/dashboard/konusma", isNew: true, label: { ru: "Konuşma", en: "Konuşma", tr: "Konuşma", kk: "Konuşma" } },
+  // «Прямой эфир» (27.07): свободная беседа — отдельный вход, не урок и не
+  // экзамен; ведёт на live с запинованным free (чипы скрыты)
+  { id: "sohbet", emoji: "📻", href: "/dashboard/speaking/live?mode=free", isNew: true, label: { ru: "Прямой эфир", en: "Live talk", tr: "Canlı sohbet", kk: "Тікелей эфир" } },
   { id: "leaderboard", emoji: "🏆", href: "/dashboard/leaderboard", label: { ru: "Рейтинг", en: "Leaderboard", tr: "Sıralama", kk: "Рейтинг" } },
   { id: "settings", emoji: "⚙️", href: "/dashboard/settings", label: { ru: "Настройки", en: "Settings", tr: "Ayarlar", kk: "Баптаулар" } },
 ];

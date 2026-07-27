@@ -16,7 +16,11 @@ export const AI_LIMITS = {
   /** Daily Ahu note on the dashboard — client caches per day, 2 covers a
    * mid-day language switch. */
   motivator: { daily: 2, monthly: 40 },
-  voice: { dailyBaseMinutes: 10 },
+  /** 15 (было 10): Konuşma-симуляция B1+ идёт 12-14 мин — обрыв на монологе
+   * хуже лишних минут (решение основателя 27.07). Экономика: медиана голоса
+   * ~45 мин/МЕСЯЦ (RECON-2 §4) в дневной лимит не упирается — изменение
+   * двигает только хвост распределения; база не накапливается день-к-дню. */
+  voice: { dailyBaseMinutes: 15 },
 } as const;
 
 export type QuotaFeature = "writing" | "tutor" | "speaking" | "diagnostic" | "route" | "motivator";

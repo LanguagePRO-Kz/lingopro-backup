@@ -18,8 +18,11 @@ type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "plan" | "foundat
 type Line = { source: "user" | "ai"; text: string };
 type Phase = "idle" | "starting" | "live" | "wrapping" | "ended";
 
-// чипы ручного выбора; plan/foundation приходят только deep-link'ом из плана
-const MODES: Exclude<Mode, "plan" | "foundation">[] = ["bolum1", "bolum2", "bolum3", "full", "free"];
+// чипы ручного выбора; plan/foundation приходят только deep-link'ом из плана.
+// Структура разделов (27.07): «Полный экзамен» ушёл в раздел Konuşma (sinav),
+// «Свободная беседа» — отдельный вход «Прямой эфир» (?mode=free, чипы скрыты);
+// здесь остаётся тренировка с поддержкой: Диалог/Монолог/Мнение.
+const MODES: Exclude<Mode, "plan" | "foundation" | "sinav" | "full" | "free" | "diagnostic_speaking">[] = ["bolum1", "bolum2", "bolum3"];
 
 // oral wrap-up instruction sent as a user message (a message, unlike a
 // contextual update, always triggers a reply turn) when the student ends the
@@ -34,6 +37,8 @@ const T = {
   ru: {
     title: "Живой урок с AI-преподавателем",
     subtitle: "Урок с учебным фокусом: преподаватель ведёт диалог по темам твоего уровня, исправляет по ходу и в конце разбирает по критериям TÖMER Konuşma.",
+    freeTitle: "Прямой эфир с Ahu",
+    freeSubtitle: "Свободная беседа на твои темы — не урок и не экзамен: просто говорите по-турецки о том, что тебе интересно.",
     modes: { bolum1: "Bölüm 1 · Диалог", bolum2: "Bölüm 2 · Монолог", bolum3: "Bölüm 3 · Мнение", full: "Полный экзамен", free: "Свободная беседа" },
     voice: "Голос преподавателя", start: "Начать урок", starting: "Подключение…",
     end: "Завершить с итогом", endNow: "закончить без итога",
@@ -67,6 +72,8 @@ const T = {
   en: {
     title: "Live lesson with the AI teacher",
     subtitle: "A lesson with a teaching focus: the teacher steers the dialogue around your level's topics, corrects on the fly and reviews you against TÖMER Konuşma criteria.",
+    freeTitle: "Live talk with Ahu",
+    freeSubtitle: "A free conversation about your interests — not a lesson, not an exam: just talk in Turkish about what you enjoy.",
     modes: { bolum1: "Bölüm 1 · Dialogue", bolum2: "Bölüm 2 · Monologue", bolum3: "Bölüm 3 · Opinion", full: "Full exam", free: "Free talk" },
     voice: "Teacher's voice", start: "Start lesson", starting: "Connecting…",
     end: "Finish with feedback", endNow: "end without feedback",
@@ -100,6 +107,8 @@ const T = {
   tr: {
     title: "AI öğretmenle canlı ders",
     subtitle: "Öğrenme odaklı ders: öğretmen diyaloğu seviyene uygun konular etrafında yürütür, anında düzeltir ve sonunda TÖMER Konuşma ölçütlerine göre değerlendirir.",
+    freeTitle: "Ahu ile canlı sohbet",
+    freeSubtitle: "İlgi alanlarına göre serbest sohbet — ders de sınav da değil: sadece Türkçe konuşun.",
     modes: { bolum1: "Bölüm 1 · Karşılıklı", bolum2: "Bölüm 2 · Sözlü anlatım", bolum3: "Bölüm 3 · Görüş", full: "Tam sınav", free: "Serbest sohbet" },
     voice: "Öğretmenin sesi", start: "Derse başla", starting: "Bağlanıyor…",
     end: "Değerlendirmeyle bitir", endNow: "değerlendirmesiz bitir",
@@ -133,6 +142,8 @@ const T = {
   kk: {
     title: "AI ұстазбен жанды сабақ",
     subtitle: "Оқу фокусы бар сабақ: ұстаз диалогты деңгейіңе сай тақырыптармен жүргізеді, қатеңді сол сәтте түзетеді, соңында TÖMER Konuşma өлшемдерімен талдайды.",
+    freeTitle: "Ahu-мен тікелей эфир",
+    freeSubtitle: "Қызық тақырыптарыңа еркін әңгіме — сабақ та, емтихан да емес: жай ғана түрікше сөйлесіңдер.",
     modes: { bolum1: "Bölüm 1 · Диалог", bolum2: "Bölüm 2 · Монолог", bolum3: "Bölüm 3 · Пікір", full: "Толық емтихан", free: "Еркін әңгіме" },
     voice: "Ұстаздың дауысы", start: "Сабақты бастау", starting: "Қосылуда…",
     end: "Қорытындымен аяқтау", endNow: "қорытындысыз аяқтау",
@@ -216,13 +227,19 @@ function LiveLesson() {
   const [mode, setMode] = useState<Mode>("bolum1");
   const [voice, setVoice] = useState("ahu");
   const [phase, setPhase] = useState<Phase>("idle");
+  // «Прямой эфир» (27.07): вход ?mode=free из меню — чипы режимов скрыты,
+  // заголовок свой; это отдельный продукт-вход, не урок и не экзамен
+  const [pinnedFree, setPinnedFree] = useState(false);
   // plan-engine deep link (?mode=bolum2&focus=izafet,conditionals) — the daily
   // "voice lesson" task pins the mode and the week's focus topics
   const focusOverrideRef = useRef<string[] | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    if (m && ((MODES as string[]).includes(m) || m === "plan" || m === "foundation")) setMode(m as Mode);
+    if (m && ((MODES as string[]).includes(m) || m === "plan" || m === "foundation" || m === "free")) {
+      setMode(m as Mode);
+      if (m === "free") setPinnedFree(true);
+    }
     const focus = (params.get("focus") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     if (focus.length) focusOverrideRef.current = focus.slice(0, 3); // server re-validates against the registry
   }, []);
@@ -592,8 +609,8 @@ function LiveLesson() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold tracking-tight">{c.title}</h2>
-      <p className="mt-1 max-w-xl text-sm text-[var(--color-muted)]">{c.subtitle}</p>
+      <h2 className="text-xl font-bold tracking-tight">{pinnedFree ? c.freeTitle : c.title}</h2>
+      <p className="mt-1 max-w-xl text-sm text-[var(--color-muted)]">{pinnedFree ? c.freeSubtitle : c.subtitle}</p>
 
       {allowance && (
         <div className="mt-3 flex items-center gap-2 text-xs text-[var(--color-muted)]">
@@ -614,14 +631,16 @@ function LiveLesson() {
 
       {phase === "idle" && (
         <div className="glass mt-5 rounded-3xl p-6">
-          <div className="flex flex-wrap gap-2">
-            {MODES.map((m) => (
-              <button key={m} type="button" onClick={() => setMode(m)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${mode === m ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}>
-                {c.modes[m]}
-              </button>
-            ))}
-          </div>
+          {!pinnedFree && (
+            <div className="flex flex-wrap gap-2">
+              {MODES.map((m) => (
+                <button key={m} type="button" onClick={() => setMode(m)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${mode === m ? "bg-[var(--color-brand)] text-white" : "bg-black/[0.05] text-[var(--color-muted)] hover:bg-black/[0.08]"}`}>
+                  {c.modes[m]}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="mt-4 text-xs font-medium text-[var(--color-muted)]">{c.voice}</div>
           <div className="mt-2 flex flex-wrap gap-2">

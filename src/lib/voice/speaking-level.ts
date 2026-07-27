@@ -33,6 +33,35 @@ export function speakingLevelFromScore(score20: number): KonusmaLevel | "below" 
   return "C1";
 }
 
+/**
+ * SPEAKING-уровень для ЖИВОГО УРОКА (лестница, тон, приветствие) — жалоба
+ * «переводит всем, даже B1»: support_step считался от ГЛОБАЛЬНОГО уровня
+ * (у большинства A1 из-за слабого чтения/аудирования), речь не учитывалась.
+ * Без гейта: слабый спикер получает A1-поддержку, не отказ. Нет speaking-
+ * данных → честный фолбэк на глобальный уровень.
+ */
+export async function lessonSpeakingLevel(
+  admin: SupabaseClient,
+  userId: string,
+  globalLevel: string,
+): Promise<{ level: string; source: "voice_reviews" | "diagnostic_probe" | "global" }> {
+  const a = await assessSpeakingLevel(admin, userId, globalLevel);
+  if (a.kind === "level" && a.source !== "default_a2") {
+    return { level: a.score20 != null && a.score20 < 6 ? "A1" : a.level, source: a.source };
+  }
+  // gate = score20 < 6 (речь совсем слабая) → A1-поддержка в уроке;
+  // default_a2 = данных нет → глобальный уровень честнее выдуманного A2
+  if (a.kind === "gate") {
+    // различаем «данных нет у новичка» (глобальный) и «score низкий» — у
+    // assessSpeakingLevel gate без score теряет причину, поэтому при
+    // глобальном A0/A1 просто остаёмся на глобальном
+    return globalLevel === "A0" || globalLevel === "A1"
+      ? { level: globalLevel, source: "global" }
+      : { level: "A1", source: "voice_reviews" };
+  }
+  return { level: globalLevel, source: "global" };
+}
+
 export async function assessSpeakingLevel(
   admin: SupabaseClient,
   userId: string,
