@@ -260,6 +260,9 @@ export async function maturePendingReport(
     items: conv.transcript ?? [],
     llm_models: actualLlmModels(conv),
     ...(mismatch.length ? { llm_mismatch: mismatch } : {}),
+    // Konuşma-симуляция (Блок 5): использованные юниты банка — следующая
+    // симуляция исключит их (анти-повтор читает это поле)
+    ...(dynVars.konusma_used_ids ? { konusma_used_ids: dynVars.konusma_used_ids } : {}),
   };
 
   if (studentLineCount(lines) < 2) {

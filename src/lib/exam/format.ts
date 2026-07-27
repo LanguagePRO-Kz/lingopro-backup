@@ -35,6 +35,35 @@ export type ExamFormat = {
    *  null = центр такого правила не публикует. Слабое звено топит экзамен. */
   minPerSectionShare: number | null;
   scoring: "classic" | "modern_test_theory";
+  /** Konuşma-симуляция (Блок 5): тайминг 4 частей ПО УРОВНЯМ — параметр
+   *  формата, не константа. null = центр регламент не публикует → фолбэк
+   *  на generic (не выдумываем, правило 1.3). */
+  konusma: KonusmaTiming | null;
+};
+
+export type KonusmaSpeakingLevel = "A2" | "B1" | "B2" | "C1";
+
+export type KonusmaTiming = {
+  /** секунды на Bölüm 1..4 */
+  partSeconds: Record<KonusmaSpeakingLevel, [number, number, number, number]>;
+  /** подготовка: карточка Bölüm 3 и заметки Bölüm 4 — обязательная часть формата */
+  prepSeconds: { bolum3: number; bolum4: number };
+  /** уровни, для которых суммарное время — наша оценка, не публикуемый
+   *  факт: UI обязан пометить «yaklaşık» */
+  approxLevels: KonusmaSpeakingLevel[];
+};
+
+/** Публикуемая структура (LanguageCert AÜ TÖMER TürkYet): A2≈9, B1≈12,
+ *  B2=13 (3+3+3+4); C1 — НАША оценка ~14, помечается «yaklaşık». */
+const KONUSMA_GENERIC: KonusmaTiming = {
+  partSeconds: {
+    A2: [120, 120, 120, 180],
+    B1: [180, 180, 180, 180],
+    B2: [180, 180, 180, 240],
+    C1: [180, 180, 240, 240],
+  },
+  prepSeconds: { bolum3: 20, bolum4: 30 },
+  approxLevels: ["C1"],
 };
 
 const NOTE_GENERIC: Record<Locale, string> = {
@@ -57,6 +86,7 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     failBelowTotal: null,
     minPerSectionShare: null,
     scoring: "classic",
+    konusma: KONUSMA_GENERIC,
   },
   /** TYS (Yunus Emre): пороги ПЛАВАЮЩИЕ (Modern Test Theory, пересчёт после
    *  каждого экзамена) — конкретный балл не обещаем, только готовность. */
@@ -77,6 +107,8 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     failBelowTotal: null,
     minPerSectionShare: null,
     scoring: "modern_test_theory",
+    // устный регламент TYS не публикуется в открытых источниках — фолбэк
+    konusma: null,
   },
   /** Sakarya: 4×25, C1 = 85–100, ниже 50 — провал. Порог B2 не публикуется. */
   tomer_sakarya: {
@@ -96,6 +128,7 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     failBelowTotal: 50,
     minPerSectionShare: null,
     scoring: "classic",
+    konusma: null,
   },
   /** Bayburt/EBYU: B2 от 60, C1 от 75, минимум 60% ПО КАЖДОМУ навыку. */
   tomer_bayburt: {
@@ -115,6 +148,7 @@ export const EXAM_FORMATS: Record<ExamFormatSlug, ExamFormat> = {
     failBelowTotal: null,
     minPerSectionShare: 0.6,
     scoring: "classic",
+    konusma: null,
   },
 };
 
@@ -122,6 +156,11 @@ export const DEFAULT_EXAM_FORMAT: ExamFormatSlug = "tomer_generic";
 
 export function examFormat(slug: string | null | undefined): ExamFormat {
   return EXAM_FORMATS[(slug as ExamFormatSlug) ?? DEFAULT_EXAM_FORMAT] ?? EXAM_FORMATS[DEFAULT_EXAM_FORMAT];
+}
+
+/** Konuşma-тайминг формата; центр не публикует → честный фолбэк на generic. */
+export function konusmaTiming(fmt: ExamFormat): KonusmaTiming {
+  return fmt.konusma ?? (EXAM_FORMATS[DEFAULT_EXAM_FORMAT].konusma as KonusmaTiming);
 }
 
 /* ------------------------------- вердикт -------------------------------- */

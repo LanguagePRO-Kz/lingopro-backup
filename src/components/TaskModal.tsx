@@ -24,7 +24,8 @@ const T = {
     play: "▶ Прослушать", pause: "⏸ Пауза", again: "🔄 Ещё раз", slower: "🐢 Медленнее",
     listening: "🎧 Слушайте внимательно…", showTranscript: "📝 Показать транскрипт", hideTranscript: "📝 Скрыть транскрипт",
     ttsUnsupported: "⚠️ Ваш браузер не поддерживает озвучку. Откройте в Chrome для аудио.",
-    voiceSoon: "🎤 Голосовой ввод скоро — напиши ответ текстом", send: "Отправить", saved: "Сохранено! AI проверит.",
+    speakVoiceTitle: "🎤 Говорение — только голосом", speakVoiceBody: "Печатать вместо говорить нельзя — навык тренируется вслух. Выбери: живой урок с Ahu (поддержка и подсказки) или Konuşma — симуляция устного формата.", speakVoiceLesson: "Живой урок с Ahu →", speakVoiceSim: "Konuşma (симуляция) →",
+    send: "Отправить", saved: "Сохранено! AI проверит.",
     words: "слов", minWords: "минимум", yourAnswer: "Твой ответ", submitEssay: "Отправить сочинение",
   },
   en: {
@@ -37,7 +38,8 @@ const T = {
     play: "▶ Play", pause: "⏸ Pause", again: "🔄 Again", slower: "🐢 Slower",
     listening: "🎧 Listen carefully…", showTranscript: "📝 Show transcript", hideTranscript: "📝 Hide transcript",
     ttsUnsupported: "⚠️ Your browser doesn't support audio. Open in Chrome for sound.",
-    voiceSoon: "🎤 Voice input coming soon — type your answer", send: "Submit", saved: "Saved! AI will review it.",
+    speakVoiceTitle: "🎤 Speaking — voice only", speakVoiceBody: "Typing instead of speaking doesn't train the skill. Pick: a live lesson with Ahu (support and hints) or Konuşma — the oral-format simulation.", speakVoiceLesson: "Live lesson with Ahu →", speakVoiceSim: "Konuşma (simulation) →",
+    send: "Submit", saved: "Saved! AI will review it.",
     words: "words", minWords: "minimum", yourAnswer: "Your answer", submitEssay: "Submit essay",
   },
   tr: {
@@ -50,7 +52,8 @@ const T = {
     play: "▶ Dinle", pause: "⏸ Duraklat", again: "🔄 Tekrar", slower: "🐢 Daha yavaş",
     listening: "🎧 Dikkatle dinle…", showTranscript: "📝 Metni göster", hideTranscript: "📝 Metni gizle",
     ttsUnsupported: "⚠️ Tarayıcın sesi desteklemiyor. Ses için Chrome'da aç.",
-    voiceSoon: "🎤 Sesli giriş yakında — cevabını yaz", send: "Gönder", saved: "Kaydedildi! AI değerlendirecek.",
+    speakVoiceTitle: "🎤 Konuşma — sadece sesle", speakVoiceBody: "Konuşmak yerine yazmak beceriyi geliştirmez. Seç: Ahu ile canlı ders (destek ve ipuçları) ya da Konuşma — sözlü format simülasyonu.", speakVoiceLesson: "Ahu ile canlı ders →", speakVoiceSim: "Konuşma (simülasyon) →",
+    send: "Gönder", saved: "Kaydedildi! AI değerlendirecek.",
     words: "kelime", minWords: "en az", yourAnswer: "Cevabın", submitEssay: "Kompozisyonu gönder",
   },
   kk: {
@@ -63,7 +66,8 @@ const T = {
     play: "▶ Тыңдау", pause: "⏸ Кідірту", again: "🔄 Қайта", slower: "🐢 Баяуырақ",
     listening: "🎧 Мұқият тыңда…", showTranscript: "📝 Транскриптті көрсету", hideTranscript: "📝 Транскриптті жасыру",
     ttsUnsupported: "⚠️ Браузерің дыбысты қолдамайды. Дыбыс үшін Chrome-да аш.",
-    voiceSoon: "🎤 Дауыспен енгізу жақында — жауабыңды жаз", send: "Жіберу", saved: "Сақталды! AI тексереді.",
+    speakVoiceTitle: "🎤 Сөйлеу — тек дауыспен", speakVoiceBody: "Сөйлеудің орнына жазу дағдыны дамытпайды. Таңда: Ahu-мен тірі сабақ (қолдау мен кеңес) немесе Konuşma — ауызша формат симуляциясы.", speakVoiceLesson: "Ahu-мен тірі сабақ →", speakVoiceSim: "Konuşma (симуляция) →",
+    send: "Жіберу", saved: "Сақталды! AI тексереді.",
     words: "сөз", minWords: "кемінде", yourAnswer: "Жауабың", submitEssay: "Шығарманы жіберу",
   },
 };
@@ -530,52 +534,24 @@ function WritingFlow({ content, c, onComplete }: { content: Extract<TaskContent,
 }
 
 /* -------------------------------- Speaking ------------------------------- */
-function SpeakingFlow({ content, c, onComplete }: { content: Extract<TaskContent, { skill: "speaking" }>; c: C; onComplete: (r: Result) => void }) {
-  const st = content.task;
-  const parts = useMemo(() => (st ? st.parts : []), [st]);
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [text, setText] = useState("");
-  const [finished, setFinished] = useState(false);
-
-  if (!st || !parts.length) return <EmptyDone c={c} onComplete={() => onComplete({ score: 0, maxScore: 0, answers: [] })} />;
-
-  if (finished) {
-    return (
-      <DoneScreen c={c} line={c.saved} onDone={() => onComplete({ score: answers.length, maxScore: parts.length, answers })} />
-    );
-  }
-
-  const part = parts[idx];
-  const isLast = idx + 1 >= parts.length;
-
-  function next() {
-    const all = [...answers, text];
-    setAnswers(all);
-    setText("");
-    if (isLast) setFinished(true);
-    else setIdx((n) => n + 1);
-  }
-
+/**
+ * Говорение тренируется ГОЛОСОМ (Блок 5): текстовое поле «напиши ответ»
+ * убрано — печатать вместо говорить нельзя. Задача ведёт в живой урок с Ahu
+ * (тренировка с поддержкой) или в раздел Konuşma (симуляция формата).
+ */
+function SpeakingFlow({ c }: { content: Extract<TaskContent, { skill: "speaking" }>; c: C; onComplete: (r: Result) => void }) {
   return (
     <div>
-      <ProgressLine label={`${c.question} ${idx + 1} ${c.of} ${parts.length}`} value={(idx + 1) / parts.length} />
-      <div className="mt-2 text-xs font-medium text-[var(--color-muted)]">{c.voiceSoon}</div>
-
-      <h3 className="mt-4 text-base font-semibold text-[var(--color-foreground)]">{part.instruction}</h3>
-      <p className="mt-1.5 text-sm text-[var(--color-muted)]">{part.instructionRu}</p>
-
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={6}
-        placeholder={c.yourAnswer}
-        className="mt-4 w-full resize-y rounded-2xl border border-black/[0.08] bg-white p-4 text-sm leading-relaxed text-[var(--color-foreground)] outline-none transition-colors focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/15"
-      />
-
-      <button type="button" onClick={next} className="btn-primary mt-4 w-full rounded-full px-6 py-3.5 text-sm">
-        {isLast ? c.finish : c.next}
-      </button>
+      <h3 className="text-base font-semibold text-[var(--color-foreground)]">{c.speakVoiceTitle}</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-[var(--color-muted)]">{c.speakVoiceBody}</p>
+      <div className="mt-5 flex flex-col gap-2.5">
+        <a href="/dashboard/speaking/live" className="btn-primary block w-full rounded-full px-6 py-3.5 text-center text-sm font-semibold">
+          {c.speakVoiceLesson}
+        </a>
+        <a href="/dashboard/konusma" className="btn-ghost block w-full rounded-full px-6 py-3.5 text-center text-sm font-medium">
+          {c.speakVoiceSim}
+        </a>
+      </div>
     </div>
   );
 }

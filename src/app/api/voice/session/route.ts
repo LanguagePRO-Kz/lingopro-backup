@@ -7,6 +7,9 @@ import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics
 import { buildSnapshot, decide } from "@/lib/coach";
 import { buildAhuContext, stateLineTr } from "@/lib/coach/context";
 import { focusReasonText } from "@/lib/coach/templates";
+import { examFormat } from "@/lib/exam/format";
+import { buildKonusmaPlan, konusmaScript, type KonusmaSessionPlan } from "@/lib/voice/konusma-exam";
+import { assessSpeakingLevel, type SpeakingAssessment } from "@/lib/voice/speaking-level";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -54,7 +57,7 @@ export async function GET(req: Request) {
   return NextResponse.json(state ?? { busy: false, etaMinutes: 0, active: 0 });
 }
 
-type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking" | "foundation" | "plan";
+type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking" | "foundation" | "plan" | "sinav";
 
 /**
  * Режим «Фундамент» (Фаза 7.8, языковой протокол v2): для A0-A2 задачи
@@ -74,7 +77,8 @@ const FOUNDATION_BY_LEVEL: Record<"A0" | "A1" | "A2", string> = {
 // Блок 6 (20.07.2026): режимы РЕАЛЬНО разные — у монолога время на
 // подготовку и запрет перебивать, у мнения обязательный контраргумент,
 // у полного экзамена тайминг и тон экзаменатора.
-const MODE_INSTRUCTIONS: Record<Exclude<Mode, "foundation" | "plan">, string> = {
+// sinav не здесь: его инструкции — сгенерированный сценарий konusmaScript()
+const MODE_INSTRUCTIONS: Record<Exclude<Mode, "foundation" | "plan" | "sinav">, string> = {
   free: "Serbest sohbet, yapı YOK: öğrencinin ilgi alanlarına ve günlük hayatına dair DOĞAL bir konuşma yürüt (dosyadaki bilgilerden yararlan). Ders odağındaki yapıları sohbete GİZLİCE işle — sınav havası yaratma.",
   diagnostic_speaking:
     "2 dakikalık KONUŞMA SEVİYE TESPİTİ: kısa tanışma (ad, nereden), 2-3 basit günlük soru, sonra kısa bir konu (ailen veya şehrin). Cevaplar çok kısa olabilir — sabırlı ol, sustuğunda bekle, düzeltme yapma; amaç ders değil, seviyeyi duymak.",
@@ -107,7 +111,7 @@ export async function POST(req: Request) {
     body = {};
   }
   const requestedMode: Mode =
-    body.mode === "foundation" || body.mode === "plan" || (body.mode && body.mode in MODE_INSTRUCTIONS)
+    body.mode === "foundation" || body.mode === "plan" || body.mode === "sinav" || (body.mode && body.mode in MODE_INSTRUCTIONS)
       ? (body.mode as Mode)
       : "free";
 
@@ -138,7 +142,7 @@ export async function POST(req: Request) {
   const [{ data: profile }, { data: weak }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, handle, timezone, preferred_voice, current_level, target_level, quiz_result")
+      .select("full_name, handle, timezone, preferred_voice, current_level, target_level, quiz_result, exam_format")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -233,15 +237,57 @@ export async function POST(req: Request) {
       : requestedMode === "foundation" && !foundationLevel
         ? "free" // B1+ явного фундамента не получает — он ему вреден
         : requestedMode;
+
+  // Konuşma-симуляция (Блок 5): уровень — SPEAKING per-skill, не глобальный
+  // («B1 по чтению и A1 по говорению — пускать в B1-говорение значит
+  // завалить»); сценарий сэмплится из банка с анти-повтором по прошлой
+  // симуляции; новичков (A0/A1 без speaking-данных или score ниже A2)
+  // сервер гейтит сам — клиентский гейт обходится прямым вызовом API.
+  let sinavPlan: KonusmaSessionPlan | null = null;
+  let sinavSource: SpeakingAssessment | null = null;
+  if (mode === "sinav") {
+    const adminForSinav = createAdminClient();
+    if (!adminForSinav) {
+      await releaseSlot();
+      return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
+    }
+    sinavSource = await assessSpeakingLevel(adminForSinav, user.id, level);
+    if (sinavSource.kind === "gate") {
+      await releaseSlot();
+      return NextResponse.json({ error: "speaking_gate" }, { status: 403 });
+    }
+    let excludeIds: string[] = [];
+    const { data: pastSinav } = await adminForSinav
+      .from("voice_sessions")
+      .select("transcript")
+      .eq("user_id", user.id)
+      .order("started_at", { ascending: false })
+      .limit(5);
+    for (const row of pastSinav ?? []) {
+      const ids = (row.transcript as { konusma_used_ids?: string } | null)?.konusma_used_ids;
+      if (ids) {
+        excludeIds = String(ids).split(",").filter(Boolean);
+        break;
+      }
+    }
+    sinavPlan = buildKonusmaPlan({
+      level: sinavSource.level,
+      format: examFormat((profile?.exam_format as string | null) ?? null),
+      seed: (Date.now() ^ (user.id.charCodeAt(2) << 16)) >>> 0,
+      excludeIds,
+    });
+  }
   // Лестница поддержки применяется ПОВЕРХ ЛЮБОГО режима для A0-A2 (живой
   // баг 19.07: студент сам выбрал Bölüm 2 → Фундамент не применился, Ahu
   // дала «говори 3 минуты» новичку и продолжала по-турецки под его русский)
   const modeInstructions =
-    mode === "foundation"
+    mode === "sinav" && sinavPlan
+      ? konusmaScript(sinavPlan) // симуляция: сценарий целиком, БЕЗ DESTEK-приставки
+      : mode === "foundation"
       ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
       : foundationLevel
-        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} MOD İSKELETİNİ MUTLAKA KORU — Bölüm 2'de yine küçük bir anlatım, Bölüm 3'te yine görüş, rol oyununda yine rol olmalı; modları birbirine BENZETME. Sadece DİLİ ve UZUNLUĞU küçült: basit kelimeler, kısa görevler (2-3 cümlelik hedef), uzun monolog isteme.`
-        : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan">];
+        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan" | "sinav">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} MOD İSKELETİNİ MUTLAKA KORU — Bölüm 2'de yine küçük bir anlatım, Bölüm 3'te yine görüş, rol oyununda yine rol olmalı; modları birbirine BENZETME. Sadece DİLİ ve UZUNLUĞU küçült: basit kelimeler, kısa görevler (2-3 cümlelik hedef), uzun monolog isteme.`
+        : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan" | "sinav">];
   // подсказки-заготовки на экран (A0-A1): студент может ПРОЧИТАТЬ ответ
   const foundationHints =
     mode === "foundation" && (foundationLevel === "A0" || foundationLevel === "A1")
@@ -329,11 +375,18 @@ export async function POST(req: Request) {
 
   const baseLeft = a.base_left ?? 0;
   const creditsLeft = a.credits_left ?? 0;
-  // проба уровня — жёсткий потолок ~2 минуты (+ запас на прощание агента)
+  // проба уровня — жёсткий потолок ~2 минуты (+ запас на прощание агента);
+  // симуляция — сумма частей + подготовки + запас на переходы/прощание
+  // (C1 ≈14 мин не влезает в обычные 900с)
+  const sinavCap = sinavPlan
+    ? sinavPlan.partSeconds.reduce((s, p) => s + p, 0) + sinavPlan.prepSeconds.bolum3 + sinavPlan.prepSeconds.bolum4 + 120
+    : null;
   const maxSeconds =
     requestedMode === "diagnostic_speaking"
       ? Math.min(180, (baseLeft + creditsLeft) * 60)
-      : Math.min(900, (baseLeft + creditsLeft) * 60);
+      : sinavCap != null
+        ? Math.min(sinavCap, 1080, (baseLeft + creditsLeft) * 60)
+        : Math.min(900, (baseLeft + creditsLeft) * 60);
 
   const feedbackLangCode = body.feedbackLang && body.feedbackLang in FEEDBACK_LANG_TR ? body.feedbackLang : "en";
 
@@ -382,7 +435,8 @@ export async function POST(req: Request) {
       // B2 — цель по умолчанию (порог вуза); C1 только если выбран явно
       target_level: (profile?.target_level as string | null) ?? "B2",
       weak_topics: weakTr,
-      lesson_focus: lessonFocusTr,
+      // симуляция: фокус-темы урока не применяются — экзамен не подстраивается
+      lesson_focus: sinavPlan ? "sınav simülasyonu" : lessonFocusTr,
       // почему эти темы — одна TR-строка от ядра агента ({{focus_reason}} в
       // промпте ElevenLabs; пустая строка безопасна, слот просто молчит)
       focus_reason: focusReason,
@@ -394,10 +448,33 @@ export async function POST(req: Request) {
       support_step: supportStepFor(level, mode),
       lang_bridge: langBridgeFor(feedbackLangCode),
       // полное досье (Блок 2): пустая строка при пустом/упавшем снапшоте —
-      // промпт велит агенту молчать о том, чего в досье нет (правило 1.3)
-      student_dossier: dossier || "(henüz veri yok — öğrencinin ilk adımları; geçmişe atıfta bulunma)",
+      // промпт велит агенту молчать о том, чего в досье нет (правило 1.3).
+      // Симуляция: досье НЕ подаётся — экзаменатор не знает студента и не
+      // ссылается на прошлое (иначе промпт-секции «свяжи с прошлым» сработают)
+      student_dossier: sinavPlan
+        ? "(sınav simülasyonu — dosya bu oturumda kullanılmaz; geçmişe atıfta bulunma)"
+        : dossier || "(henüz veri yok — öğrencinin ilk adımları; geçmişe atıfta bulunma)",
       mode: mode,
       mode_instructions: modeInstructions,
+      // read back at settlement → transcript.konusma_used_ids (анти-повтор)
+      konusma_used_ids: sinavPlan ? sinavPlan.usedIds.join(",") : "",
     },
+    // материалы симуляции для экранных оверлеев (карточки/темы/тайминги)
+    ...(sinavPlan && sinavSource?.kind === "level"
+      ? {
+          konusma: {
+            level: sinavPlan.level,
+            approx: sinavPlan.approx,
+            partSeconds: sinavPlan.partSeconds,
+            prepSeconds: sinavPlan.prepSeconds,
+            roleACard: sinavPlan.bolum2.roleA.situationTr,
+            roleBCard: sinavPlan.bolum2.roleB.situationTr,
+            discussion: { topicTr: sinavPlan.bolum3.topicTr, bulletsTr: sinavPlan.bolum3.bulletsTr },
+            monologueTopics: sinavPlan.bolum4.map((m) => m.topicTr),
+            levelSource: sinavSource.source,
+            score20: sinavSource.score20,
+          },
+        }
+      : {}),
   });
 }

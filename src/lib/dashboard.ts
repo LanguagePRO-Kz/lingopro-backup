@@ -22,6 +22,9 @@ export const NAV: NavItem[] = [
   { id: "stats", emoji: "📈", href: "/dashboard/stats", label: { ru: "Статистика", en: "Statistics", tr: "İstatistik", kk: "Статистика" } },
   { id: "vocabulary", emoji: "📕", href: "/dashboard/vocabulary", label: { ru: "Словарь", en: "Vocabulary", tr: "Sözlük", kk: "Сөздік" } },
   { id: "speaking", emoji: "🎙", href: "/dashboard/speaking", isNew: true, label: { ru: "Урок с Ahu", en: "Lesson with Ahu", tr: "Ahu ile ders", kk: "Ahu-мен сабақ" } },
+  // симуляция устного TÖMER (Блок 5): раздел называется просто Konuşma —
+  // слово «экзамен» в UI сознательно не пишем
+  { id: "konusma", emoji: "🎤", href: "/dashboard/konusma", isNew: true, label: { ru: "Konuşma", en: "Konuşma", tr: "Konuşma", kk: "Konuşma" } },
   { id: "leaderboard", emoji: "🏆", href: "/dashboard/leaderboard", label: { ru: "Рейтинг", en: "Leaderboard", tr: "Sıralama", kk: "Рейтинг" } },
   { id: "settings", emoji: "⚙️", href: "/dashboard/settings", label: { ru: "Настройки", en: "Settings", tr: "Ayarlar", kk: "Баптаулар" } },
 ];

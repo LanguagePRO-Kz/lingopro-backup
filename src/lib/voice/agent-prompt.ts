@@ -116,6 +116,11 @@ export function supportStepFor(level: string, mode: string): string {
     // проба: уровень ещё неизвестен — средняя ступень, чтобы услышать турецкий
     return "2 — Türkçe + anahtar kelime çevirisi";
   }
+  if (mode === "sinav") {
+    // симуляция экзамена (Блок 5): лестница ВЫКЛЮЧЕНА — только турецкий,
+    // без переводов и адаптации; это проверка, не урок
+    return "0 — sadece Türkçe (sınav simülasyonu, merdiven kapalı)";
+  }
   const byLevel: Record<string, string> = {
     A0: "3 — Türkçe + tam çeviri",
     A1: "2 — Türkçe + anahtar kelime çevirisi",
@@ -213,6 +218,9 @@ function helloA1(n: string, mode: string, locale: "ru" | "en" | "tr" | "kk"): st
 const helloA2 = (n: string, mode: string) => `Merhaba ${n}! ${MODE_OPENER_TR[mode] ?? MODE_OPENER_TR.bolum1}`;
 
 const FIRST_TR: Record<string, (n: string) => string> = {
+  // симуляция экзамена (Блок 5): экзаменский тон с порога, без переводов
+  sinav: (n) =>
+    `Merhaba ${n}, hoş geldin. Konuşma sınavı simülasyonuna başlıyoruz: dört bölüm var — sorular, iki küçük rol oyunu, karttan tartışma ve uzun konuşma. Bölüm 1 ile başlayalım. Kendini kısaca tanıtır mısın?`,
   bolum1: (n) => `Merhaba ${n}! TÖMER Konuşma Bölüm 1'deyiz: karşılıklı konuşma. İlk sorum: kendini kısaca tanıtır mısın?`,
   bolum2: (n) => `Merhaba ${n}! Bölüm 2'deyiz: sözlü anlatım. Sana bir konu vereceğim, sen kesintisiz anlatacaksın. Hazır mısın?`,
   bolum3: (n) => `Merhaba ${n}! Bölüm 3'teyiz: görüş bildirme. Sana tartışmalı bir konu vereceğim. Hazır mısın?`,
@@ -236,6 +244,9 @@ const HELLO_PROBE: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
  * турецкий, B1+ → рамка режима). */
 export function firstMessageFor({ level, mode, name, locale }: FirstMsgInput): string {
   if (mode === "diagnostic_speaking") return HELLO_PROBE[locale](name);
+  // симуляция экзамена: только турецкий на любом уровне (A2-гейт уже
+  // отсёк новичков) — уровневые приветствия с переводами здесь запрещены
+  if (mode === "sinav") return FIRST_TR.sinav(name);
   // A0: самое простое приветствие БЕЗ режимной завязки — первый контакт
   // с языком важнее формата, режим подхватят mode_instructions
   if (level === "A0") return HELLO_A0[locale](name);
