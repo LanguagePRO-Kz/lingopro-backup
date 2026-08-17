@@ -476,7 +476,7 @@ function KonusmaExam() {
             <div className="rounded-2xl bg-[#d97706]/10 p-5">
               <div className="text-base font-semibold text-[#92400e]">{c.gateTitle}</div>
               <p className="mt-1.5 text-sm leading-relaxed text-[#92400e]">{c.gateBody}</p>
-              <Link href="/dashboard/speaking/live" className="btn-primary mt-4 inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+              <Link href="/dashboard/speaking" className="btn-primary mt-4 inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
                 {c.gateCta}
               </Link>
             </div>

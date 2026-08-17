@@ -11,6 +11,7 @@ import { pick } from "@/lib/localized";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile } from "@/lib/profile";
 import { loadResult } from "@/lib/quiz";
+import { postAuthDestination } from "@/lib/auth-destination";
 import { authErrorRu } from "@/lib/auth-errors";
 
 const T = {
@@ -95,10 +96,12 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     const supabase = createClient();
-    const next = loadResult() ? "/quiz/result" : "/dashboard";
+    // маршрут после входа выбирает СЕРВЕР по профилю (/auth/callback);
+    // отсюда уезжает только время локального результата диагностики
+    const at = loadResult()?.takenAt ?? 0;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${next}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?at=${at}` },
     });
   }
 
@@ -116,19 +119,12 @@ export default function LoginPage() {
       return;
     }
 
-    // funnel:
-    //  • a pending anonymous result → show it (it gets saved on /quiz/result)
-    //  • profile has a result but no plan → show the result → pricing
-    //  • profile fully set up → dashboard
-    //  • nothing yet → take the diagnostic
-    if (loadResult()) {
-      window.location.href = "/quiz/result";
-      return;
-    }
+    // то же правило, что и в /auth/callback: решает профиль, а не localStorage.
+    // Дальше кабинет сам развернёт на /quiz или /pricing своим гейтом.
     const profile = await fetchProfile();
-    if (!profile?.quiz_result) router.push("/quiz");
-    else if (!profile.plan) router.push("/quiz/result");
-    else router.push("/dashboard");
+    router.push(
+      postAuthDestination(profile?.quiz_result?.takenAt ?? 0, loadResult()?.takenAt ?? 0),
+    );
   }
 
   return (

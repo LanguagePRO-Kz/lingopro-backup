@@ -46,7 +46,17 @@ async function main() {
 
   const patch = {
     conversation_config: {
-      agent: { prompt: { prompt: AGENT_PROMPT, llm: AGENT_SETTINGS.llm } },
+      agent: {
+        prompt: {
+          prompt: AGENT_PROMPT,
+          llm: AGENT_SETTINGS.llm,
+          // ElevenLabs по умолчанию дописывает СВОЮ «личность» перед нашим
+          // промптом на КАЖДОМ ходу — это токены, которые мы оплачиваем и не
+          // контролируем. На проде флаг стоял false (проверено 16.08.2026);
+          // у агента практики он выставлен true с рождения.
+          ignore_default_personality: true,
+        },
+      },
       turn: { turn_timeout: AGENT_SETTINGS.turnTimeoutSeconds },
     },
     platform_settings: {

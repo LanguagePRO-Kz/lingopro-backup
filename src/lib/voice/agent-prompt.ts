@@ -9,9 +9,15 @@
  *  - турецкий — язык по умолчанию, урок начинается по-турецки на ЛЮБОМ уровне;
  *  - лестница поддержки 0-4 с быстрым спуском И ОБЯЗАТЕЛЬНЫМ подъёмом
  *    (2 турецких ответа подряд → ступень вверх);
- *  - язык поддержки строго = язык интерфейса ({{feedback_lang}}), никакой
- *    другой, даже если студент заговорил на нём;
  *  - для казахского — мосты родства языков ({{lang_bridge}}).
+ *
+ * Блок 2 (16.08.2026): язык поддержки выбирает СТУДЕНТ, а не настройка.
+ * Прежнее правило («язык поддержки строго = язык интерфейса, даже если
+ * студент заговорил на другом») отменено: студент, обратившийся по-казахски,
+ * получал ответ по-русски. Теперь {{feedback_lang}} — СТАРТОВОЕ значение, а
+ * дальше Ahu переходит на язык обращения с ПЕРВОГО раза. Решение принимается
+ * по большинству слов реплики: одно русское слово внутри турецкой фразы
+ * («ну, ben gidiyorum») переключением НЕ является.
  *
  * Слоты {{...}} заполняет /api/voice/session через dynamicVariables.
  */
@@ -21,10 +27,10 @@ export const AGENT_PROMPT = `Sen LingoPRO platformunun sesli Türkçe öğretmen
 Öğrenci:
 - İsim: {{student_name}} · Seviye: {{level}} · Hedef: {{target_level}} (TÖMER)
 - Zayıf konular: {{weak_topics}}
-- Destek dili (arayüz dili): {{feedback_lang}}
+- Başlangıç destek dili (arayüz dili, öğrenci değiştirebilir): {{feedback_lang}}
 
-Oturum modu: {{mode_instructions}}
-MODA SADIK KAL: yukarıdaki mod talimatı dersin İSKELETİDİR. Bölüm 1 dışında tanışma sohbetine sapma — moda uygun İLK görevle başla ve modun dışına çıkma.
+Oturum biçimi: {{mode_instructions}}
+BU TALİMATA SADIK KAL: yukarıdaki talimat dersin İSKELETİDİR. Uzun tanışma sohbetine sapma — kısa selamdan sonra İLK göreve geç.
 
 BU DERSİN ODAĞI: {{lesson_focus}}
 Neden bu odak: {{focus_reason}}
@@ -73,7 +79,13 @@ MEKANİK KURAL (canlı derslerde merdiven alta yapışıyordu — bu kural bunu 
 - Aynı derste ÜST ÜSTE 3 replikte çeviri verdiysen DUR: bir sonraki repliğin çevirisiz olmak ZORUNDA.
 - Çeviri PLAN değil, YEDEKTİR: öğrenci takılmadıkça yeni cümleni çevirmeden söyle.
 
-Destek dili SADECE {{feedback_lang}}: öğrenci sana başka bir dilde konuşsa bile açıklamalarını {{feedback_lang}} dilinde yap.{{lang_bridge}}
+DESTEK DİLİNİ ÖĞRENCİ SEÇER (dersin dili değil — açıklamanın dili):
+- Başlangıç destek dili: {{feedback_lang}} (arayüz dili).
+- Öğrenci sana BAŞKA bir dilde (Rusça/Kazakça/İngilizce) dönerse, İLK seferinde o dile geç ve açıklamalarını ARTIK o dilde yap. İkinci kez sormasını BEKLEME — anlamadığını bir kez söylemesi yeterli.
+- Dil seçimi CÜMLENİN ÇOĞUNLUĞUNA bakar, tek kelimeye değil: Türkçe cümlenin içindeki tek bir yabancı kelime («ну, ben gidiyorum») dil değiştirme sebebi DEĞİLDİR — bu normaldir, Türkçe devam et. Ama cümlenin ÇOĞU başka dildeyse o dile geç.
+- Geçtiğin dil dersin sonuna kadar geçerlidir; öğrenci tekrar dil değiştirirse sen de değiştirirsin.
+- Bu SADECE açıklama/çeviri dilini değiştirir. Sohbetin, övgülerin ve görevlerin dili yine TÜRKÇEDİR — destek dili değişti diye ders Türkçeden çıkmaz.
+- ÖNEMLİ: Bu promptun HER yerinde geçen «{{feedback_lang}}» ifadesi, o anda GEÇERLİ olan destek dili anlamına gelir. Öğrenci dili değiştirdiyse, aşağıdaki bütün kurallar (kural açıklaması, çeviri, ders sonu değerlendirmesi) YENİ dilde uygulanır.{{lang_bridge}}
 
 SEVİYE UYUMU ({{level}}) — Türkçenin zorluğu (destek diliyle karıştırma; dil seçimi merdivenin işidir):
 - A0: tek kelimeler ve 2-3 kelimelik kalıplar («Merhaba», «Benim adım …»). Uzun Türkçe cümle kurma. Sınav/puan/kriter KONUŞMA.
@@ -133,12 +145,19 @@ export function supportStepFor(level: string, mode: string): string {
   return byLevel[level] ?? "0 — sadece Türkçe";
 }
 
-/** Мост родства языков: казахская аудитория — наше преимущество; для
- * остальных локалей слот пустой (паттерн {{focus_reason}} — пустая строка
- * безопасна). */
+/**
+ * Мост родства языков: казахская аудитория — наше преимущество.
+ * Полная версия для kk-интерфейса; для остальных локалей — короткое условное
+ * напоминание, потому что язык поддержки теперь выбирает СТУДЕНТ по ходу
+ * урока (Блок 2 от 16.08.2026): студент с русским интерфейсом может перейти
+ * на казахский, и мост должен сработать — но платить за полный абзац на
+ * КАЖДОМ ходу ради этого случая не нужно.
+ */
 export function langBridgeFor(locale: string): string {
-  if (locale !== "kk") return "";
-  return "\nKAZAKÇA KÖPRÜSÜ: Kazakça ile Türkçe akraba dillerdir — bundan AKTİF yararlan: yeni yapıyı Kazakça paraleliyle bağla (ör. «Kazakçadaki “келу” gibi — Türkçesi “gelmek”», «жатыс септік -да/-де = bulunma hâli -da/-de»). Bu köprüler öğrenmeyi hızlandırır.";
+  const full =
+    "\nKAZAKÇA KÖPRÜSÜ: Kazakça ile Türkçe akraba dillerdir — bundan AKTİF yararlan: yeni yapıyı Kazakça paraleliyle bağla (ör. «Kazakçadaki “келу” gibi — Türkçesi “gelmek”», «жатыс септік -да/-де = bulunma hâli -da/-de»). Bu köprüler öğrenmeyi hızlandırır.";
+  if (locale === "kk") return full;
+  return "\nKAZAKÇA KÖPRÜSÜ: Öğrenci Kazakçaya geçerse, Kazakça-Türkçe akrabalığından yararlan («келу» → «gelmek», жатыс септік -да/-де = bulunma hâli).";
 }
 
 /* ------------------------- первое сообщение урока -------------------------
@@ -149,7 +168,7 @@ export function langBridgeFor(locale: string): string {
 
 type FirstMsgInput = {
   level: string;
-  mode: string; // resolved: foundation | free | bolum1..3 | full | diagnostic_speaking
+  mode: string; // resolved: lesson | foundation | sinav | diagnostic_speaking
   name: string;
   locale: "ru" | "en" | "tr" | "kk";
 };
@@ -166,70 +185,35 @@ const HELLO_A0: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
 };
 
 /**
- * Режимная завязка для A1-A2 (Блок 4): без неё любой режим начинался одной
- * и той же фразой «İlk soru: bugün nasılsın?» — при коротких пробах режимы
- * были неотличимы на слух. Турецкая фраза проста (уровень держит лестница),
- * перевод-подсказка добавляется по ступени: A1 — да, A2 — нет.
+ * Завязка урока для A1-A2. Режимов внутри урока больше НЕТ (16.08.2026):
+ * экзаменационные форматы («Bölüm 2, рассказывай 3 минуты») уехали целиком
+ * в Konuşma, поэтому и завязок больше одной не нужно — урок начинается с
+ * того, что понятно на любом уровне, а дальше его ведут mode_instructions
+ * и досье. Турецкая фраза проста (уровень держит лестница), перевод-подсказка
+ * добавляется по ступени: A1 — да, A2 — нет.
  */
-const MODE_OPENER_TR: Record<string, string> = {
-  bolum1: "Bölüm 1: karşılıklı konuşma. İlk soru: bugün nasılsın?",
-  bolum2: "Bölüm 2: kısa anlatım. Konun: «benim günüm». Başla: «Sabah kalkıyorum…»",
-  bolum3: "Bölüm 3: görüş. İlk soru: çay mı, kahve mi? Neden?",
-  full: "Bu bir sınav provası — Bölüm 1'den başlıyoruz. İlk soru: kendini tanıtır mısın?",
-  free: "Bugün serbest sohbet. İlk soru: bugün ne yaptın?",
-};
-const MODE_OPENER_HINT: Record<string, Record<"ru" | "en" | "tr" | "kk", string>> = {
-  bolum1: {
-    ru: "часть 1 — диалог; nasılsın — как дела?",
-    en: "part 1 — dialogue; nasılsın — how are you?",
-    tr: "",
-    kk: "1-бөлім — сұхбат; nasılsın — қалайсың?",
-  },
-  bolum2: {
-    ru: "часть 2 — короткий рассказ, тема «мой день»; sabah kalkıyorum — утром я встаю",
-    en: "part 2 — a short monologue, topic “my day”; sabah kalkıyorum — I get up in the morning",
-    tr: "",
-    kk: "2-бөлім — қысқа әңгіме, тақырып «менің күнім»; sabah kalkıyorum — таңертең тұрамын",
-  },
-  bolum3: {
-    ru: "часть 3 — твоё мнение: чай или кофе? почему?",
-    en: "part 3 — your opinion: tea or coffee? why?",
-    tr: "",
-    kk: "3-бөлім — пікірің: шай ма, кофе ме? неге?",
-  },
-  full: {
-    ru: "проба экзамена, начинаем с части 1 — представься",
-    en: "exam rehearsal, starting with part 1 — introduce yourself",
-    tr: "",
-    kk: "емтихан сынамасы, 1-бөлімнен бастаймыз — өзіңді таныстыр",
-  },
-  free: {
-    ru: "свободная беседа: что ты сегодня делал?",
-    en: "free talk: what did you do today?",
-    tr: "",
-    kk: "еркін әңгіме: бүгін не істедің?",
-  },
+const LESSON_OPENER_TR = "Bugün birlikte çalışacağız. İlk soru: bugün nasılsın?";
+const LESSON_OPENER_HINT: Record<"ru" | "en" | "tr" | "kk", string> = {
+  ru: "сегодня позанимаемся вместе; nasılsın — как дела?",
+  en: "we'll work together today; nasılsın — how are you?",
+  tr: "",
+  kk: "бүгін бірге айналысамыз; nasılsın — қалайсың?",
 };
 
-/** A1 · ступень 2: турецкий + режимная завязка + перевод-подсказка. */
-function helloA1(n: string, mode: string, locale: "ru" | "en" | "tr" | "kk"): string {
-  const opener = MODE_OPENER_TR[mode] ?? MODE_OPENER_TR.bolum1;
-  const hint = (MODE_OPENER_HINT[mode] ?? MODE_OPENER_HINT.bolum1)[locale];
-  return `Merhaba ${n}! ${opener}${hint ? ` (${hint})` : ""}`;
+/** A1 · ступень 2: турецкий + завязка урока + перевод-подсказка. */
+function helloA1(n: string, locale: "ru" | "en" | "tr" | "kk"): string {
+  const hint = LESSON_OPENER_HINT[locale];
+  return `Merhaba ${n}! ${LESSON_OPENER_TR}${hint ? ` (${hint})` : ""}`;
 }
 
 /** A2 · ступень 1: простой турецкий без перевода — заминка обработается лестницей. */
-const helloA2 = (n: string, mode: string) => `Merhaba ${n}! ${MODE_OPENER_TR[mode] ?? MODE_OPENER_TR.bolum1}`;
+const helloA2 = (n: string) => `Merhaba ${n}! ${LESSON_OPENER_TR}`;
 
 const FIRST_TR: Record<string, (n: string) => string> = {
   // симуляция экзамена (Блок 5): экзаменский тон с порога, без переводов
   sinav: (n) =>
     `Merhaba ${n}, hoş geldin. Konuşma sınavı simülasyonuna başlıyoruz: dört bölüm var — sorular, iki küçük rol oyunu, karttan tartışma ve uzun konuşma. Bölüm 1 ile başlayalım. Kendini kısaca tanıtır mısın?`,
-  bolum1: (n) => `Merhaba ${n}! TÖMER Konuşma Bölüm 1'deyiz: karşılıklı konuşma. İlk sorum: kendini kısaca tanıtır mısın?`,
-  bolum2: (n) => `Merhaba ${n}! Bölüm 2'deyiz: sözlü anlatım. Sana bir konu vereceğim, sen kesintisiz anlatacaksın. Hazır mısın?`,
-  bolum3: (n) => `Merhaba ${n}! Bölüm 3'teyiz: görüş bildirme. Sana tartışmalı bir konu vereceğim. Hazır mısın?`,
-  full: (n) => `Merhaba ${n}! Tam TÖMER Konuşma simülasyonu yapıyoruz — Bölüm 1'den başlıyoruz. İlk sorum: kendini kısaca tanıtır mısın?`,
-  free: (n) => `Merhaba ${n}! Bugün seninle sohbet edeceğiz. İlk sorum: günün nasıl geçiyor?`,
+  lesson: (n) => `Merhaba ${n}! Bugün birlikte çalışacağız. İlk sorum: günün nasıl geçiyor?`,
 };
 
 /** Проба уровня: турецкий старт + перевод рамки (уровень ещё неизвестен). */
@@ -245,18 +229,18 @@ const HELLO_PROBE: Record<"ru" | "en" | "tr" | "kk", (n: string) => string> = {
 
 /** Первое сообщение: по-турецки на любом уровне, поддержка по стартовой
  * ступени лестницы (A0 → полный перевод, A1 → ключевые слова, A2 → простой
- * турецкий, B1+ → рамка режима). */
+ * турецкий, B1+ → обычная турецкая завязка). */
 export function firstMessageFor({ level, mode, name, locale }: FirstMsgInput): string {
   if (mode === "diagnostic_speaking") return HELLO_PROBE[locale](name);
   // симуляция экзамена: только турецкий на любом уровне (A2-гейт уже
   // отсёк новичков) — уровневые приветствия с переводами здесь запрещены
   if (mode === "sinav") return FIRST_TR.sinav(name);
-  // A0: самое простое приветствие БЕЗ режимной завязки — первый контакт
-  // с языком важнее формата, режим подхватят mode_instructions
+  // A0: самое простое приветствие — первый контакт с языком важнее рамки,
+  // ход урока подхватят mode_instructions
   if (level === "A0") return HELLO_A0[locale](name);
-  if (level === "A1") return helloA1(name, mode, locale);
-  if (level === "A2" || mode === "foundation") return helloA2(name, mode);
-  return (FIRST_TR[mode] ?? FIRST_TR.free)(name);
+  if (level === "A1") return helloA1(name, locale);
+  if (level === "A2" || mode === "foundation") return helloA2(name);
+  return FIRST_TR.lesson(name);
 }
 
 /** Настройки агента, которые синк держит в согласии с кодом. */

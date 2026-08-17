@@ -123,10 +123,12 @@ export default function RegisterPage() {
 
   async function handleGoogleLogin() {
     const supabase = createClient();
-    const next = loadResult() ? "/quiz/result" : "/dashboard";
+    // маршрут после входа выбирает СЕРВЕР по профилю (/auth/callback):
+    // у «нового» аккаунта может уже быть и результат, и оплата
+    const at = loadResult()?.takenAt ?? 0;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${next}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?at=${at}` },
     });
   }
 

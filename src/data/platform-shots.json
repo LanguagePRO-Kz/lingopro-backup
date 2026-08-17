@@ -1,7 +1,7 @@
 {
   "speaking": {
     "src": "/platform/speaking.png",
-    "route": "/dashboard/speaking/push"
+    "route": "/dashboard/speaking"
   },
   "tutor": {
     "src": "/platform/tutor.png",

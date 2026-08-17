@@ -177,7 +177,10 @@ console.log("— day layout —");
   const voice = day1.find((t) => t.kind === "voice_lesson");
   check("voice lesson on day 1", !!voice);
   check("voice focus ⊆ week topics", !!voice && voice.focusTopics!.every((t) => route.weeks[0].topics.includes(t)));
-  check("voice mode bolum1 (week 1)", voice?.voiceMode === "bolum1");
+  // проверка «voice mode bolum1» снята вместе с самими режимами урока
+  // (16.08.2026): задача больше не выбирает формат, его выбирает сервер по
+  // уровню. Разнообразие держит ротация ТЕМ — она проверена строкой выше.
+  check("voice task carries a focus, not a mode", !!voice && (voice.focusTopics?.length ?? 0) > 0);
 
   // mock schedule far from the exam: 1 section on dow 6
   check("day 6 has a section mock", mocksForDay(6, 70).includes("section"));

@@ -7,6 +7,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { VOICE_PACKS, type VoicePackId } from "@/lib/pricing";
 import type { PaymentProviderId, WebhookEvent } from "./types";
 
 type PaymentRow = {
@@ -95,23 +96,27 @@ export async function applyWebhookEvent(
     return { status: 500, body: { ok: false, reason: "db_error" } };
   }
 
-  /* --------- пакет минут → начисление в voice_minute_credits --------- */
-  const packMinutes = VP_MINUTES[row.package_id];
-  if (packMinutes) {
-    // «живут до конца месяца» — конец календарного месяца покупки (UTC)
-    const now = new Date();
-    const expires = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+  /* ------------- докупка (Блок 5) → voice_minute_credits ------------- */
+  const pack = VOICE_PACKS.kzt[row.package_id as VoicePackId] as
+    | { kind: string; units: number }
+    | undefined;
+  if (pack) {
+    // expires_at = null: купленное лежит СВЕРХ месячного лимита и не сгорает
+    // вместе с ним (решение основателя 16.08.2026). Прежние пакеты минут
+    // жили до конца календарного месяца — купивший 28-го терял их через три
+    // дня, и это была самая частая претензия к допам.
     const { error: creditErr } = await admin.from("voice_minute_credits").insert({
       user_id: row.user_id,
-      minutes: packMinutes,
+      kind: pack.kind,
+      minutes: pack.units, // колонка называется minutes исторически; для уроков и экзаменов это штуки
       source: "purchase",
-      expires_at: expires,
+      expires_at: null,
     });
     if (creditErr) {
-      console.error("[payments] voice credit grant failed", creditErr.message);
+      console.error("[payments] top-up grant failed", creditErr.message);
       return { status: 500, body: { ok: false, reason: "grant_failed" } };
     }
-    return { status: 200, body: { ok: true, paid: true, minutes: packMinutes } };
+    return { status: 200, body: { ok: true, paid: true, kind: pack.kind, units: pack.units } };
   }
 
   /* --------------- пакет доступа → plan + срок (P0-2, 0014) --------------- */
@@ -144,6 +149,5 @@ export async function applyWebhookEvent(
   return { status: 200, body: { ok: true, paid: true, expiresAt } };
 }
 
-const VP_MINUTES: Record<string, number> = { vp30: 30, vp60: 60, vp120: 120 };
 /** Дни доступа по тарифу — источник срока plan_expires_at. */
 const ACCESS_DAYS: Record<string, number> = { "1m": 30, "3m": 90, "6m": 180 };

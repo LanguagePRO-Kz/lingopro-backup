@@ -21,13 +21,17 @@ export const NAV: NavItem[] = [
   { id: "mock", emoji: "🧪", href: "/dashboard/mock", label: { ru: "Пробные тесты", en: "Mock tests", tr: "Deneme testleri", kk: "Сынақ тесттер" } },
   { id: "stats", emoji: "📈", href: "/dashboard/stats", label: { ru: "Статистика", en: "Statistics", tr: "İstatistik", kk: "Статистика" } },
   { id: "vocabulary", emoji: "📕", href: "/dashboard/vocabulary", label: { ru: "Словарь", en: "Vocabulary", tr: "Sözlük", kk: "Сөздік" } },
+  /* ---- три голосовых раздела (Блок 3 от 16.08.2026): Практика · Урок · Konuşma ----
+   * Порядок = от ежедневного к редкому: разговаривать студент должен часто,
+   * разбираться — реже, экзаменоваться — совсем редко. */
+  // ПРАКТИКА заменила «Прямой эфир»: тот вёл на урочный движок с закреплённым
+  // режимом free — болталка тянула полный урочный промпт с досье и стоила как
+  // урок. Теперь это отдельный режим на своём агенте (Блок 1).
+  { id: "practice", emoji: "📻", href: "/dashboard/practice", isNew: true, label: { ru: "Практика", en: "Practice", tr: "Pratik", kk: "Практика" } },
   { id: "speaking", emoji: "🎙", href: "/dashboard/speaking", isNew: true, label: { ru: "Урок с Ahu", en: "Lesson with Ahu", tr: "Ahu ile ders", kk: "Ahu-мен сабақ" } },
   // симуляция устного TÖMER (Блок 5): раздел называется просто Konuşma —
   // слово «экзамен» в UI сознательно не пишем
   { id: "konusma", emoji: "🎤", href: "/dashboard/konusma", isNew: true, label: { ru: "Konuşma", en: "Konuşma", tr: "Konuşma", kk: "Konuşma" } },
-  // «Прямой эфир» (27.07): свободная беседа — отдельный вход, не урок и не
-  // экзамен; ведёт на live с запинованным free (чипы скрыты)
-  { id: "sohbet", emoji: "📻", href: "/dashboard/speaking/live?mode=free", isNew: true, label: { ru: "Прямой эфир", en: "Live talk", tr: "Canlı sohbet", kk: "Тікелей эфир" } },
   { id: "leaderboard", emoji: "🏆", href: "/dashboard/leaderboard", label: { ru: "Рейтинг", en: "Leaderboard", tr: "Sıralama", kk: "Рейтинг" } },
   { id: "settings", emoji: "⚙️", href: "/dashboard/settings", label: { ru: "Настройки", en: "Settings", tr: "Ayarlar", kk: "Баптаулар" } },
 ];

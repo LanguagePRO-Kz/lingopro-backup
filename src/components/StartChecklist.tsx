@@ -124,7 +124,7 @@ export function StartChecklist({ level, firstTaskDone }: { level: string; firstT
   const items = [
     { id: "diagnostic", done: true, label: c.diagnostic(level), href: null, go: null },
     { id: "firstTask", done: firstTaskDone, label: c.firstTask, href: "#plan", go: c.firstTaskGo },
-    { id: "voice", done: progress.voiceLesson, label: c.voice, href: "/dashboard/speaking/live", go: c.voiceGo },
+    { id: "voice", done: progress.voiceLesson, label: c.voice, href: "/dashboard/speaking", go: c.voiceGo },
     // founder's call: the essay step opens the Writing task LIST — the
     // student picks something doable, we never lock them into one prompt
     { id: "essay", done: progress.essay, label: c.essay, href: "/dashboard/writing", go: c.essayGo },

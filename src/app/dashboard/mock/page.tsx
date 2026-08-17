@@ -826,7 +826,9 @@ export default function MockPage() {
                 {s === "konusma" ? (
                   <>
                     <p className="mt-2 text-xs leading-relaxed text-[var(--color-muted)]">{c.konusmaBody}</p>
-                    <Link href="/dashboard/speaking/live?mode=full" className="btn-primary mt-3 w-fit rounded-full px-4 py-2 text-xs font-semibold">
+                    {/* полная симуляция говорения живёт в Konuşma, а не в уроке
+                        (16.08.2026): режим full из урока убран как дубль */}
+                    <Link href="/dashboard/konusma" className="btn-primary mt-3 w-fit rounded-full px-4 py-2 text-xs font-semibold">
                       🎤 {c.konusmaGo}
                     </Link>
                   </>

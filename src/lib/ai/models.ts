@@ -13,7 +13,7 @@
  */
 
 export type AiTask =
-  | "speaking_chat" // existing push-to-talk speaking coach (/api/speaking)
+  | "speaking_chat" // короткая текстовая подсказка Ahu на странице плана (/api/speaking)
   | "tutor_chat"
   | "writing_review"
   | "diagnostic_analysis"

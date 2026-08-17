@@ -8,18 +8,18 @@ import { currencyFor, fmtMoney, VOICE_PACKS, VOICE_PACK_IDS, type VoicePackId, t
 import { MethodCard, MethodIcon } from "./CheckoutModal";
 
 /**
- * Покупка пакета голосовых минут (допы): 30/60/120 мин, живут до конца
- * календарного месяца. Та же платёжная механика, что у пакетов доступа:
+ * Докупки сверх месячного лимита (Блок 5 от 16.08.2026): минуты практики,
+ * уроки, пробные Konuşma. Та же платёжная механика, что у пакетов доступа:
  * Kaspi (₸) / карта Dodo ($) на выбор, провайдер — по выбранному способу,
- * минуты начисляет ТОЛЬКО сервер по подписанному webhook'у.
- * Промокодов здесь нет — коды дают доступ к платформе, не минуты.
+ * начисляет ТОЛЬКО сервер по подписанному webhook'у.
+ * Промокодов здесь нет — коды дают доступ к платформе, не занятия.
  */
 
 const T = {
   ru: {
-    title: "Пакеты минут",
-    subtitle: "Голосовые уроки сверх дневной базы. Минуты действуют до конца месяца.",
-    minutes: (n: number) => `${n} минут`,
+    title: "Докупить занятия",
+    subtitle: "Сверх месячного лимита. Купленное не сгорает — остаётся с тобой, пока не используешь.",
+    unit: { practice_minutes: "мин практики", lesson: "уроков", exam: "Konuşma" },
     method: "Способ оплаты",
     methodKaspi: "Kaspi",
     methodKaspiNote: "Приложение Kaspi.kz · счёт в тенге",
@@ -30,12 +30,12 @@ const T = {
     payErr: "Не удалось открыть оплату — попробуй ещё раз.",
     payOff: "Оплата временно недоступна — попробуй чуть позже.",
     qrHint: "Отсканируй в приложении Kaspi:",
-    validity: "до конца месяца",
+    validity: "не сгорает",
   },
   en: {
-    title: "Minute packs",
-    subtitle: "Voice lessons beyond the daily base. Minutes are valid until the end of the month.",
-    minutes: (n: number) => `${n} minutes`,
+    title: "Top up",
+    subtitle: "On top of your monthly limit. What you buy never expires — it stays until you use it.",
+    unit: { practice_minutes: "min practice", lesson: "lessons", exam: "Konuşma" },
     method: "Payment method",
     methodKaspi: "Kaspi",
     methodKaspiNote: "Kaspi.kz app · billed in KZT",
@@ -46,12 +46,12 @@ const T = {
     payErr: "Couldn't open checkout — please try again.",
     payOff: "Payments are temporarily unavailable — please try again later.",
     qrHint: "Scan in the Kaspi app:",
-    validity: "until the end of the month",
+    validity: "never expires",
   },
   tr: {
-    title: "Dakika paketleri",
-    subtitle: "Günlük tabanın ötesinde sesli dersler. Dakikalar ay sonuna kadar geçerli.",
-    minutes: (n: number) => `${n} dakika`,
+    title: "Ek satın al",
+    subtitle: "Aylık limitin üstüne. Satın aldığın hiç yanmaz — kullanana kadar seninle kalır.",
+    unit: { practice_minutes: "dk pratik", lesson: "ders", exam: "Konuşma" },
     method: "Ödeme yöntemi",
     methodKaspi: "Kaspi",
     methodKaspiNote: "Kaspi.kz uygulaması · KZT olarak",
@@ -62,12 +62,12 @@ const T = {
     payErr: "Ödeme açılamadı — lütfen tekrar dene.",
     payOff: "Ödeme geçici olarak kullanılamıyor — daha sonra tekrar dene.",
     qrHint: "Kaspi uygulamasında tara:",
-    validity: "ay sonuna kadar",
+    validity: "süresiz",
   },
   kk: {
-    title: "Минут пакеттері",
-    subtitle: "Күнделікті базадан тыс дауысты сабақтар. Минуттар ай соңына дейін жарамды.",
-    minutes: (n: number) => `${n} минут`,
+    title: "Қосымша сатып алу",
+    subtitle: "Айлық лимиттен тыс. Сатып алғаның жанбайды — қолданғанша сенде қалады.",
+    unit: { practice_minutes: "мин практика", lesson: "сабақ", exam: "Konuşma" },
     method: "Төлем тәсілі",
     methodKaspi: "Kaspi",
     methodKaspiNote: "Kaspi.kz қосымшасы · теңгемен",
@@ -78,7 +78,7 @@ const T = {
     payErr: "Төлемді ашу мүмкін болмады — қайталап көр.",
     payOff: "Төлем уақытша қолжетімсіз — сәлден соң қайталап көр.",
     qrHint: "Kaspi қосымшасында сканерле:",
-    validity: "ай соңына дейін",
+    validity: "жанбайды",
   },
 };
 
@@ -91,7 +91,7 @@ export function VoicePackModal({ onClose }: { onClose: () => void }) {
 
   const [method, setMethod] = useState<MethodId>(currencyFor(locale) === "kzt" ? "kaspi" : "card");
   const currency = METHOD_CURRENCY[method];
-  const [pack, setPack] = useState<VoicePackId>("vp60");
+  const [pack, setPack] = useState<VoicePackId>("pp60");
   const [payState, setPayState] = useState<"idle" | "busy" | "off" | "error">("idle");
   const [qr, setQr] = useState<string | null>(null);
 
@@ -157,8 +157,8 @@ export function VoicePackModal({ onClose }: { onClose: () => void }) {
         </div>
         <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">{c.subtitle}</p>
 
-        {/* выбор пакета */}
-        <div className="mt-5 grid grid-cols-3 gap-2.5">
+        {/* выбор докупки: три вида по два размера */}
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
           {VOICE_PACK_IDS.map((id) => {
             const p = VOICE_PACKS[currency][id];
             const active = pack === id;
@@ -174,14 +174,14 @@ export function VoicePackModal({ onClose }: { onClose: () => void }) {
                     : "border-black/[0.08] bg-black/[0.02] hover:border-black/[0.16]"
                 }`}
               >
-                <span className="text-lg font-bold text-[var(--color-foreground)]">{p.minutes}</span>
-                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted)]">{c.minutes(p.minutes).replace(/^\d+\s*/, "")}</span>
+                <span className="text-lg font-bold text-[var(--color-foreground)]">+{p.units}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted)]">{c.unit[p.kind]}</span>
                 <span className="mt-1 text-sm font-semibold text-[var(--color-brand)]">{fmtMoney(currency, p.price)}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-2 text-center text-[11px] text-[var(--color-muted)]">⏳ {c.validity}</p>
+        <p className="mt-2 text-center text-[11px] text-[var(--color-muted)]">♾️ {c.validity}</p>
 
         {/* способ оплаты */}
         <div className="mt-4">

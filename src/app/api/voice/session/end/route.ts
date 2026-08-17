@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AI_COST_ESTIMATE_USD, AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
+import { AI_COST_ESTIMATE_USD, billingPeriod, limitFor, todayInTimezone, usageKindFor } from "@/lib/ai/limits";
 import { recordErrors, recordSuccesses } from "@/lib/ai/mastery";
 import { type VoiceReport } from "@/lib/ai/prompts/voice-review";
 import { recordVoiceSummary } from "@/lib/coach/voice-summary";
@@ -78,7 +78,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "settle_not_ready" }, { status: 503 });
   }
 
-  if (conv.agent_id !== process.env.ELEVENLABS_AGENT_ID) {
+  // Оба наших агента легитимны: урочный и агент практики (Блок 1). Без этой
+  // ветки практика возвращала бы 403 на сеттле — минуты НЕ списывались бы,
+  // то есть болталка была бы бесплатной для студента и платной для нас.
+  const lessonAgentId = process.env.ELEVENLABS_AGENT_ID;
+  const practiceAgentId = process.env.ELEVENLABS_PRACTICE_AGENT_ID;
+  const isPractice = !!practiceAgentId && conv.agent_id === practiceAgentId;
+  if (conv.agent_id !== lessonAgentId && !isPractice) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   const dynVars =
@@ -133,8 +139,14 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (existing) {
       let report = (existing.report as VoiceReport | null) ?? null;
-      let reportState: ReportState = report ? (report.valid ? "ready" : "too_short") : "pending_transcript";
-      if (!report) {
+      let reportState: ReportState = report
+        ? report.valid
+          ? "ready"
+          : "too_short"
+        : isPractice
+          ? "none" // у практики разбора не будет — дозревать нечего
+          : "pending_transcript";
+      if (!report && !isPractice) {
         const { data: genderRow } = await supabase.from("profiles").select("gender").eq("id", user.id).maybeSingle();
         const matured = await maturePendingReport(admin, {
           sessionId: existing.id as string,
@@ -165,18 +177,34 @@ export async function POST(req: Request) {
   // gender is read in ISOLATION — the column ships with migration 0006, and
   // bundled here a missing column would 400 the timezone (billing day) too
   const [{ data: profile }, { data: genderRow }] = await Promise.all([
-    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("timezone, plan, plan_expires_at").eq("id", user.id).maybeSingle(),
     supabase.from("profiles").select("gender").eq("id", user.id).maybeSingle(),
   ]);
 
+  /* Списание по ВИДУ занятия (Блок 4). Практика списывает минуты, урок и
+   * экзамен — по одной штуке за состоявшееся занятие. Что считать
+   * состоявшимся: минута речи. Урок, оборвавшийся на «алло, не слышно», не
+   * должен съедать один из четырёх в месяце — а вот заплатить провайдеру за
+   * него мы всё равно платим, поэтому стоимость пишется всегда. */
+  const usageKind = usageKindFor(String(dynVars.mode ?? "lesson"));
+  const costUsd = minutes * AI_COST_ESTIMATE_USD.voiceMinute;
   let settle: { ok?: boolean; from_base?: number; from_credits?: number; uncovered?: number } = {};
-  if (minutes > 0) {
+  if (usageKind && minutes > 0) {
     const day = todayInTimezone((profile?.timezone as string | null) ?? null);
-    const { data, error } = await supabase.rpc("consume_voice_minutes", {
+    const period = billingPeriod((profile?.plan_expires_at as string | null) ?? null, new Date(), (profile?.timezone as string | null) ?? null);
+    const limits = limitFor(usageKind, (profile?.plan as string | null) ?? null);
+    const amount = usageKind === "practice_minutes" ? minutes : billedSeconds >= 60 ? 1 : 0;
+    // amount может быть 0 (урок оборвался за 40 секунд) — вызов всё равно
+    // делаем: лимит не тронется, а расход запишется, иначе деньги провайдеру
+    // ушли бы мимо всех счётчиков
+    const { data, error } = await supabase.rpc("consume_usage", {
+      p_kind: usageKind,
       p_day: day,
-      p_minutes: minutes,
-      p_daily_base: AI_LIMITS.voice.dailyBaseMinutes,
-      p_cost_usd: minutes * AI_COST_ESTIMATE_USD.voiceMinute,
+      p_period: period,
+      p_amount: amount,
+      p_daily: limits.daily,
+      p_monthly: limits.monthly,
+      p_cost_usd: costUsd,
     });
     if (error) console.error("[voice] settle failed:", error.message);
     settle = (data as typeof settle) ?? {};
@@ -192,7 +220,12 @@ export async function POST(req: Request) {
 
   let report: VoiceReport | null = null;
   let reportState: ReportState = "pending_transcript";
-  if (finalized) {
+  if (isPractice) {
+    // У практики разбора нет by design (Блок 1): это разговор, а не урок.
+    // Состояние терминальное — клиент не должен предлагать «получить разбор»,
+    // а ретрай не должен запускать генерацию (это отдельный платный вызов).
+    reportState = "none";
+  } else if (finalized) {
     if (studentLineCount(lines) < 2) {
       report = tooShortReport();
       reportState = "too_short";

@@ -36,8 +36,8 @@ export interface DailyTask {
   kind?: "regular" | "voice_lesson" | "mock_section" | "mock_full";
   /** registry topic ids this task targets (voice lesson focus / spaced review) */
   focusTopics?: string[];
-  /** voice lesson mode for /dashboard/speaking/live?mode=… */
-  voiceMode?: "bolum1" | "bolum2" | "bolum3";
+  /* voiceMode убран 16.08.2026 вместе с режимами урока: план дня передаёт
+   * только фокус-темы (?focus=…), формат урока решает сервер по уровню. */
   mockSection?: "dinleme" | "okuma" | "yazma" | "konusma";
 }
 

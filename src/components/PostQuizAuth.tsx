@@ -152,9 +152,13 @@ export function PostQuizAuth() {
 
   async function handleGoogle() {
     const supabase = createClient();
+    // свежая диагностика: её takenAt заведомо новее профильного, и сервер
+    // сам приведёт на NEXT — там результат мигрирует в БД (маршрут решает
+    // /auth/callback по профилю, а не localStorage)
+    const at = loadResult()?.takenAt ?? 0;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${NEXT}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?at=${at}` },
     });
   }
 

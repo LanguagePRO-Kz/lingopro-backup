@@ -163,7 +163,6 @@ export function buildDay(input: {
   if (voiceLessonDay(dayNumber, minutesDaily)) {
     const weak = new Set(input.mastery.filter((m) => m.strength < 60).map((m) => m.topic));
     const focus = [...week.topics.filter((t) => weak.has(t)), ...week.topics.filter((t) => !weak.has(t))].slice(0, 3);
-    const modes = ["bolum1", "bolum2", "bolum3"] as const;
     push({
       id: "voice-lesson",
       skill: "speaking",
@@ -174,9 +173,8 @@ export function buildDay(input: {
       count: 1,
       estimatedMinutes: 10, // = the daily base voice quota
       kind: "voice_lesson",
-      // ротация по ДНЯМ, не по неделям: недельная давала deep-link с одним
-      // и тем же режимом всю неделю — «Ahu каждый день одинаковая» (Блок 4)
-      voiceMode: modes[(dayNumber - 1) % 3],
+      // разнообразие уроков держится ротацией ТЕМ (ниже), а не режимов:
+      // режимы урока убраны 16.08.2026, формат выбирает сервер по уровню
       focusTopics: focus,
     });
   }

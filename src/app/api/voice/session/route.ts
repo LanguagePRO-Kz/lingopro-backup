@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireActivePlan } from "@/lib/access";
 import { firstMessageFor, langBridgeFor, supportStepFor } from "@/lib/voice/agent-prompt";
-import { AI_LIMITS, todayInTimezone } from "@/lib/ai/limits";
+import { practiceFirstMessage, practiceLevelStyle } from "@/lib/voice/practice-prompt";
+import { billingPeriod, limitFor, todayInTimezone, usageKindFor } from "@/lib/ai/limits";
 import { voiceById, VOICE_OPTIONS } from "@/lib/ai/voices";
 import { TOPICS, normalizeTopicId, topicById, type Topic } from "@/lib/ai/topics";
 import { buildSnapshot, decide } from "@/lib/coach";
@@ -57,7 +58,31 @@ export async function GET(req: Request) {
   return NextResponse.json(state ?? { busy: false, etaMinutes: 0, active: 0 });
 }
 
-type Mode = "free" | "bolum1" | "bolum2" | "bolum3" | "full" | "diagnostic_speaking" | "foundation" | "plan" | "sinav";
+/**
+ * Три голосовых раздела и ничего больше (решение основателя 16.08.2026):
+ * practice — болталка, lesson — урок, sinav — Konuşma. `foundation` не
+ * запрашивается клиентом: это РЕЗУЛЬТАТ серверного резолва урока для A0-A2.
+ * Прежние bolum1/2/3, full и free убраны — выбор режима внутри урока
+ * дублировал Konuşma и Практику; урок теперь один, ведёт его досье.
+ */
+type Mode = "practice" | "lesson" | "sinav" | "diagnostic_speaking" | "foundation";
+
+/**
+ * Провайдер голоса на режим (Блок 1 от 16.08.2026). Сейчас всё на ElevenLabs;
+ * практика — первый кандидат на переезд: замер (30 сессий) показал, что 77%
+ * счёта у ElevenLabs — поминутная платформенная ставка ($0.0794/мин), которая
+ * не зависит от промпта. Практике с окном контекста провайдер без такой ставки
+ * даёт ~17 ₸/мин против ~45 ₸/мин здесь. Когда Gemini-адаптер будет готов —
+ * меняется только эта функция и клиентский слой; остальной роут не трогается.
+ */
+type VoiceProvider = "elevenlabs" | "gemini";
+
+/** Пусто = все режимы на дефолтном провайдере. Переезд практики: `practice: "gemini"`. */
+const PROVIDER_BY_MODE: Partial<Record<Mode, VoiceProvider>> = {};
+
+function providerForMode(mode: Mode): VoiceProvider {
+  return PROVIDER_BY_MODE[mode] ?? "elevenlabs";
+}
 
 /**
  * Режим «Фундамент» (Фаза 7.8, языковой протокол v2): для A0-A2 задачи
@@ -73,22 +98,19 @@ const FOUNDATION_BY_LEVEL: Record<"A0" | "A1" | "A2", string> = {
 };
 
 // Injected into the agent prompt as {{mode_instructions}} (Turkish — the
-// agent thinks in Turkish; per-part framing mirrors TÖMER Konuşma).
-// Блок 6 (20.07.2026): режимы РЕАЛЬНО разные — у монолога время на
-// подготовку и запрет перебивать, у мнения обязательный контраргумент,
-// у полного экзамена тайминг и тон экзаменатора.
+// agent thinks in Turkish).
+// Один урок вместо шести режимов (16.08.2026): выбор Bölüm 1/2/3 внутри урока
+// заставлял студента решать методический вопрос («какой мне сегодня формат?»),
+// на который ответ есть только у Ahu — он лежит в досье. Экзаменационные
+// форматы целиком ушли в Konuşma (mode=sinav), где им и место.
 // sinav не здесь: его инструкции — сгенерированный сценарий konusmaScript()
-const MODE_INSTRUCTIONS: Record<Exclude<Mode, "foundation" | "plan" | "sinav">, string> = {
-  free: "Serbest sohbet, yapı YOK: öğrencinin ilgi alanlarına ve günlük hayatına dair DOĞAL bir konuşma yürüt (dosyadaki bilgilerden yararlan). Ders odağındaki yapıları sohbete GİZLİCE işle — sınav havası yaratma.",
+// practice сюда не входит: у практики свой агент со своим промптом, режимных
+// инструкций у неё нет by design (Блок 1).
+const MODE_INSTRUCTIONS: Record<"lesson" | "diagnostic_speaking", string> = {
+  lesson:
+    "DERS (tek biçim — «Bölüm 1/2/3» ayrımı YOK, sınav provası da DEĞİL): dersi SEN yönetirsin, öğrenciye format seçtirme. Dosyadaki bilgilerden ve DERSİN ODAĞINDAKİ yapılardan yola çıkarak doğal bir konuşma kur. Akış: (1) kısa ısınma sorusu, (2) odak yapıyı GEREKTİREN durumlar aç — yapının adını söyleme, kullanmak zorunda kalacağı soruları sor, (3) öğrenci ısındıkça daha uzun anlatım iste («biraz daha anlat», «neden böyle düşünüyorsun?»), (4) konu tükenince aynı odak yapıyı BAŞKA bir bağlamda tekrar dene. Hataları ders boyunca kısa ve nazikçe düzelt, sonra hemen sohbete dön — dil bilgisi dersine girme. Bir önceki dersten bir şey hatırlıyorsan ona atıf yap: bu ders serisi, tek seferlik sohbet değil.",
   diagnostic_speaking:
     "2 dakikalık KONUŞMA SEVİYE TESPİTİ: kısa tanışma (ad, nereden), 2-3 basit günlük soru, sonra kısa bir konu (ailen veya şehrin). Cevaplar çok kısa olabilir — sabırlı ol, sustuğunda bekle, düzeltme yapma; amaç ders değil, seviyeyi duymak.",
-  bolum1:
-    "TÖMER Konuşma Bölüm 1 (karşılıklı konuşma, ~2 dakika): SEN sorarsın, öğrenci cevaplar — kendini tanıtma, aile, günlük rutin, hobiler. Kısa, net sorular; monolog isteme, tartışma açma — bu bölüm diyalog bölümüdür.",
-  bolum2:
-    "TÖMER Konuşma Bölüm 2 (sözlü anlatım, ~3 dakika): öğrenciye SOMUT bir konu ver (ör. 'şehrini anlat', 'unutamadığın bir anını anlat') ve HAZIRLIK SÜRESİ tanı: «30 saniye düşün, hazır olunca başla» de ve SUS. Anlatmaya başlayınca SÖZÜNÜ KESME — bu bölümün özü kesintisiz konuşmadır: duraklarsa sadece kısa cesaretlendirme ver («devam et, dinliyorum») ve tekrar sus; düzeltmeleri anlatım BİTENE KADAR sakla. Bittiğinde 1-2 takip sorusu sor, sonra kısa geri bildirim ver.",
-  bolum3:
-    "TÖMER Konuşma Bölüm 3 (görüş bildirme, ~3 dakika): TARTIŞMALI bir soru sor (teknoloji, şehir/köy, eğitim, gelenek/modernlik) ve görüşünü gerekçelendirmesini iste. Görüş bildirdikten sonra HER SEFERİNDE bir KARŞI ARGÜMAN sun ve cevaplamasını iste — nazik ama ısrarcı: sınavda ölçülen şey görüşünü SAVUNABİLMEKTİR. Kolayca hemfikir olma.",
-  full: "Tam TÖMER Konuşma simülasyonu — SINAV DEĞERLENDİRİCİSİ tonu: resmî ama destekleyici. Sırasıyla ve SÜREYE UYARAK: Bölüm 1 karşılıklı konuşma ~2 dk; Bölüm 2 sözlü anlatım ~3 dk (30 sn hazırlık ver, anlatımı KESME); Bölüm 3 görüş bildirme ~3 dk (karşı argüman sun). Her bölüm geçişini duyur («Şimdi Bölüm 2'ye geçiyoruz»). Ders sohbetine sapma — bu bir sınav provasıdır.",
 };
 
 const FEEDBACK_LANG_TR: Record<string, string> = { ru: "RUSÇA", en: "İNGİLİZCE", tr: "TÜRKÇE", kk: "KAZAKÇA" };
@@ -99,8 +121,8 @@ export async function POST(req: Request) {
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  const agentId = process.env.ELEVENLABS_AGENT_ID;
-  if (!apiKey || !agentId) {
+  const lessonAgentId = process.env.ELEVENLABS_AGENT_ID;
+  if (!apiKey || !lessonAgentId) {
     return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
   }
 
@@ -110,10 +132,24 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
+  // Незнакомый режим (старая вкладка со ссылкой ?mode=bolum2, чужой клиент)
+  // молча становится уроком — это единственный оставшийся урочный формат.
   const requestedMode: Mode =
-    body.mode === "foundation" || body.mode === "plan" || body.mode === "sinav" || (body.mode && body.mode in MODE_INSTRUCTIONS)
-      ? (body.mode as Mode)
-      : "free";
+    body.mode === "practice" || body.mode === "sinav" || body.mode === "diagnostic_speaking"
+      ? body.mode
+      : "lesson";
+
+  // ПРАКТИКА идёт на своём агенте: платформа запрещает override промпта, а
+  // разрешать его нельзя — минимальный промпт ушёл бы на клиент, где его можно
+  // подменить. Нет агента практики → честный 503, а не тихий откат на урочный
+  // (иначе болталка молча стоила бы как урок — правило 1.3).
+  const isPractice = requestedMode === "practice";
+  const practiceAgentId = process.env.ELEVENLABS_PRACTICE_AGENT_ID;
+  if (isPractice && !practiceAgentId) {
+    console.error("[voice] ELEVENLABS_PRACTICE_AGENT_ID не задан — практика недоступна");
+    return NextResponse.json({ error: "voice_unavailable" }, { status: 503 });
+  }
+  const agentId = isPractice ? (practiceAgentId as string) : lessonAgentId;
 
   const supabase = await createClient();
   const {
@@ -139,38 +175,73 @@ export async function POST(req: Request) {
     if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
   }
 
-  const [{ data: profile }, { data: weak }] = await Promise.all([
+  // Практике слабые темы не нужны — у неё нет фокуса урока by design.
+  type WeakRow = { topic: string; strength: number };
+  const [{ data: profile }, weakRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, handle, timezone, preferred_voice, current_level, target_level, quiz_result, exam_format")
+      .select("full_name, handle, timezone, preferred_voice, current_level, target_level, quiz_result, exam_format, plan, plan_expires_at")
       .eq("id", user.id)
       .maybeSingle(),
-    supabase
-      .from("topic_mastery")
-      .select("topic, strength")
-      .eq("user_id", user.id)
-      .lt("strength", 60)
-      .order("strength", { ascending: true })
-      .limit(5),
+    isPractice
+      ? Promise.resolve({ data: null as WeakRow[] | null })
+      : supabase
+          .from("topic_mastery")
+          .select("topic, strength")
+          .eq("user_id", user.id)
+          .lt("strength", 60)
+          .order("strength", { ascending: true })
+          .limit(5),
   ]);
+  const weak = weakRes.data as WeakRow[] | null;
 
-  // minute allowance: daily base + purchased credits (server-checked)
+  /* Лимит по ВИДУ занятия (Блок 4): практика — минуты, урок и экзамен —
+   * штуки, у каждого свой счётчик. Раньше счётчик был один на всё, и болталка
+   * съедала минуты, отложенные под уроки. Пробе уровня лимит не нужен —
+   * она бесплатна и одна на студента. */
   const day = todayInTimezone((profile?.timezone as string | null) ?? null);
-  const { data: allowance, error: allowErr } = await supabase.rpc("check_voice_allowance", {
-    p_day: day,
-    p_daily_base: AI_LIMITS.voice.dailyBaseMinutes,
-  });
-  if (allowErr) {
-    console.error("[voice] allowance failed:", allowErr.message);
-    return NextResponse.json({ error: "quota_unavailable" }, { status: 503 });
+  const period = billingPeriod((profile?.plan_expires_at as string | null) ?? null, new Date(), (profile?.timezone as string | null) ?? null);
+  const usageKind = usageKindFor(requestedMode);
+  const limits = usageKind ? limitFor(usageKind, (profile?.plan as string | null) ?? null) : null;
+  type Allowance = { allowed: boolean; daily_left?: number | null; monthly_left?: number; credits_left?: number };
+  let a: Allowance = { allowed: true, daily_left: null, monthly_left: 0, credits_left: 0 };
+  if (usageKind && limits) {
+    const { data: allowance, error: allowErr } = await supabase.rpc("check_usage_allowance", {
+      p_kind: usageKind,
+      p_day: day,
+      p_period: period,
+      p_daily: limits.daily,
+      p_monthly: limits.monthly,
+    });
+    if (allowErr) {
+      console.error("[voice] allowance failed:", allowErr.message);
+      return NextResponse.json({ error: "quota_unavailable" }, { status: 503 });
+    }
+    a = allowance as Allowance;
+    if (!a.allowed) {
+      // клиент показывает разный текст: минуты кончились на сегодня или
+      // на месяц — это разные новости и разные кнопки
+      return NextResponse.json(
+        {
+          error: "no_minutes",
+          kind: usageKind,
+          dailyLeft: a.daily_left ?? null,
+          monthlyLeft: a.monthly_left ?? 0,
+          creditsLeft: a.credits_left ?? 0,
+          // старые поля — пока клиент не обновлён везде
+          baseLeft: a.monthly_left ?? 0,
+        },
+        { status: 429 },
+      );
+    }
   }
-  const a = allowance as { allowed: boolean; base_left?: number; credits_left?: number };
-  if (!a.allowed) {
-    return NextResponse.json(
-      { error: "no_minutes", baseLeft: a.base_left ?? 0, creditsLeft: a.credits_left ?? 0 },
-      { status: 429 },
-    );
-  }
+  /** Сколько минут студент вправе проговорить в этой сессии (уроку и экзамену
+   *  штучный лимит уже разрешён — их держит только потолок длительности).
+   *  Практике режет БОЛЕЕ ЖЁСТКИЙ из двух потолков, дневной или месячный. */
+  const minutesLeft =
+    usageKind === "practice_minutes"
+      ? Math.min(a.daily_left ?? Number.POSITIVE_INFINITY, a.monthly_left ?? 0) + (a.credits_left ?? 0)
+      : Number.POSITIVE_INFINITY;
 
   // все слоты одновременных уроков заняты → честное «занято» с оценкой ожидания
   const slots = await slotState(user.id);
@@ -238,18 +309,57 @@ export async function POST(req: Request) {
     }
   }
 
-  // Режим урока (7.7-7.8): «plan» (урок из плана дня) решается СЕРВЕРОМ по
-  // уровню — A0-A2 получают «Фундамент» (экзамен не упоминается), B1+ —
-  // полный экзаменационный формат. Явный foundation тоже штампуется уровнем.
+  /* ------------------------------ ПРАКТИКА ------------------------------
+   * Разговор, а не урок: единственный параметр — уровень. Досье, память
+   * прошлых уроков, фокус-темы, лестница поддержки и разбор в конце здесь
+   * ОТСУТСТВУЮТ намеренно (Блок 1) — и продуктово (это болталка), и по цене:
+   * каждый токен промпта оплачивается на КАЖДОМ ходу. Поэтому выходим до
+   * построения снапшота — он и не нужен, и стоит запросов к БД.
+   */
+  if (isPractice) {
+    const practiceLang = body.feedbackLang && body.feedbackLang in FEEDBACK_LANG_TR ? body.feedbackLang : "en";
+    // Потолок сессии практики = дневной лимит плана (5 мин), но не больше
+    // того, что реально осталось с учётом месячного лимита и докупленного.
+    const practiceMax = Math.min((limits?.daily || 5) * 60, minutesLeft * 60);
+    console.info(
+      "[voice] practice session:",
+      JSON.stringify({ level, levelSource, globalLevel, lang: practiceLang, provider: providerForMode("practice") }),
+    );
+    return NextResponse.json({
+      conversationToken,
+      provider: providerForMode("practice"),
+      voiceId: voice.elevenVoiceId,
+      maxSeconds: practiceMax,
+      allowance: {
+        baseLeft: Math.min(a.daily_left ?? Number.POSITIVE_INFINITY, a.monthly_left ?? 0),
+        creditsLeft: a.credits_left ?? 0,
+        monthlyLeft: a.monthly_left ?? 0,
+      },
+      resolvedMode: "practice",
+      level,
+      // практика не даёт разбора — фокуса и его объяснения тоже нет
+      lessonFocus: [],
+      lessonFocusReason: null,
+      foundationHints: [],
+      firstMessage: practiceFirstMessage({
+        level,
+        name: (profile?.full_name as string | null)?.split(" ")[0] ?? "",
+      }),
+      dynamicVariables: {
+        user_id: user.id, // ownership check at settlement
+        mode: "practice", // читается на сеттле → voice_sessions.mode
+        level,
+        level_style: practiceLevelStyle(level),
+        feedback_lang: FEEDBACK_LANG_TR[practiceLang],
+        lang_bridge: langBridgeFor(practiceLang),
+      },
+    });
+  }
+
+  // Вариант урока решает СЕРВЕР по уровню, а не студент чипами: A0-A2 получают
+  // «Фундамент» (экзамен не упоминается — рано), B1+ — обычный урок.
   const foundationLevel = (["A0", "A1", "A2"].includes(level) ? level : null) as "A0" | "A1" | "A2" | null;
-  const mode: string =
-    requestedMode === "plan"
-      ? foundationLevel
-        ? "foundation"
-        : "full"
-      : requestedMode === "foundation" && !foundationLevel
-        ? "free" // B1+ явного фундамента не получает — он ему вреден
-        : requestedMode;
+  const mode: string = requestedMode === "lesson" && foundationLevel ? "foundation" : requestedMode;
 
   // Konuşma-симуляция (Блок 5): уровень — SPEAKING per-skill, не глобальный
   // («B1 по чтению и A1 по говорению — пускать в B1-говорение значит
@@ -297,10 +407,8 @@ export async function POST(req: Request) {
     mode === "sinav" && sinavPlan
       ? konusmaScript(sinavPlan) // симуляция: сценарий целиком, БЕЗ DESTEK-приставки
       : mode === "foundation"
-      ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
-      : foundationLevel
-        ? `${MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan" | "sinav">]}\n\nDESTEK SEVİYESİ (ZORUNLU): ${FOUNDATION_BY_LEVEL[foundationLevel]} MOD İSKELETİNİ MUTLAKA KORU — Bölüm 2'de yine küçük bir anlatım, Bölüm 3'te yine görüş, rol oyununda yine rol olmalı; modları birbirine BENZETME. Sadece DİLİ ve UZUNLUĞU küçült: basit kelimeler, kısa görevler (2-3 cümlelik hedef), uzun monolog isteme.`
-        : MODE_INSTRUCTIONS[mode as Exclude<Mode, "foundation" | "plan" | "sinav">];
+        ? FOUNDATION_BY_LEVEL[foundationLevel ?? "A2"]
+        : MODE_INSTRUCTIONS[mode as "lesson" | "diagnostic_speaking"];
   // подсказки-заготовки на экран (A0-A1): студент может ПРОЧИТАТЬ ответ
   const foundationHints =
     mode === "foundation" && (foundationLevel === "A0" || foundationLevel === "A1")
@@ -386,7 +494,9 @@ export async function POST(req: Request) {
   }
   const lessonFocusTr = focus.map((t) => t.label.tr).join(", ");
 
-  const baseLeft = a.base_left ?? 0;
+  // урок и экзамен считаются ШТУКАМИ (Блок 4): их длину держит не остаток
+  // минут, а потолок сессии — 15 мин у урока, тайминг сценария у симуляции
+  const monthlyLeft = a.monthly_left ?? 0;
   const creditsLeft = a.credits_left ?? 0;
   // проба уровня — жёсткий потолок ~2 минуты (+ запас на прощание агента);
   // симуляция — сумма частей + подготовки + запас на переходы/прощание
@@ -396,10 +506,10 @@ export async function POST(req: Request) {
     : null;
   const maxSeconds =
     requestedMode === "diagnostic_speaking"
-      ? Math.min(180, (baseLeft + creditsLeft) * 60)
+      ? 180
       : sinavCap != null
-        ? Math.min(sinavCap, 1080, (baseLeft + creditsLeft) * 60)
-        : Math.min(900, (baseLeft + creditsLeft) * 60);
+        ? Math.min(sinavCap, 1080)
+        : 900;
 
   const feedbackLangCode = body.feedbackLang && body.feedbackLang in FEEDBACK_LANG_TR ? body.feedbackLang : "en";
 
@@ -423,9 +533,12 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     conversationToken,
+    provider: providerForMode(mode as Mode),
     voiceId: voice.elevenVoiceId,
     maxSeconds,
-    allowance: { baseLeft, creditsLeft },
+    // baseLeft теперь «сколько занятий этого вида осталось в месяце» —
+    // урок и экзамен считаются штуками, минуты им больше не потолок
+    allowance: { baseLeft: monthlyLeft, creditsLeft, monthlyLeft, kind: usageKind },
     lessonFocus: focus.map((t) => ({ id: t.id, label: t.label })),
     // «почему эта тема» на языке интерфейса (null = фокус не от ядра)
     lessonFocusReason: focusReasonLocalized,

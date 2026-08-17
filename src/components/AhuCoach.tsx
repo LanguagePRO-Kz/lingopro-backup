@@ -125,7 +125,7 @@ export function AhuCoach() {
         return { href: "#plan", label: c.chips.task };
       case "suggest_voice":
         return {
-          href: `/dashboard/speaking/live${topic ? `?focus=${encodeURIComponent(brief.focusTopics.join(","))}` : ""}`,
+          href: `/dashboard/speaking${topic ? `?focus=${encodeURIComponent(brief.focusTopics.join(","))}` : ""}`,
           label: `${c.chips.voice} ${topic ? (topicById(topic)?.label[locale] ?? topic) : ""}`.trim(),
         };
       case "suggest_mock":

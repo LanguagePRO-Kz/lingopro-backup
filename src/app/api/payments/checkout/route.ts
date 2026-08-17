@@ -116,7 +116,11 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   const description = packageId
     ? `LingoPRO · пакет ${packageId} · ${DAYS[packageId]} дней доступа`
-    : `LingoPRO · пакет минут · ${VOICE_PACKS[currency][voicePackId as VoicePackId].minutes} мин голосовых уроков`;
+    : (() => {
+        const p = VOICE_PACKS[currency][voicePackId as VoicePackId];
+        const what = p.kind === "practice_minutes" ? "мин практики" : p.kind === "lesson" ? "уроков" : "пробных Konuşma";
+        return `LingoPRO · докупка · +${p.units} ${what}`;
+      })();
   const session = await provider.createCheckout({
     userId: user.id,
     packageId: itemId,

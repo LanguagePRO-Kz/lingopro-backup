@@ -26,10 +26,15 @@ export type PlanRow = {
 export const PRICING: Record<Currency, { sym: string; plans: PlanRow[] }> = {
   kzt: {
     sym: "₸",
+    /* Цены основателя от 16.08.2026 стоят в `disc` — это то, что студент
+     * РЕАЛЬНО платит после бесплатной диагностики (checkout берёт disc при
+     * скидке 30%, а диагностику проходят практически все). Экономика лимитов
+     * считалась именно от 16990/39990/69990; поставить их в `price` значило бы
+     * получить фактическую выручку на 30% ниже расчётной. `price` — якорь. */
     plans: [
-      { id: "1m", price: 19990, perDay: 666, disc: 13990, discPerDay: 466 },
-      { id: "3m", price: 42990, perDay: 478, disc: 29990, discPerDay: 333, popular: true },
-      { id: "6m", price: 64990, perDay: 361, disc: 44990, discPerDay: 250 },
+      { id: "1m", price: 23990, perDay: 800, disc: 16990, discPerDay: 566 },
+      { id: "3m", price: 56990, perDay: 633, disc: 39990, discPerDay: 444, popular: true },
+      { id: "6m", price: 99990, perDay: 555, disc: 69990, discPerDay: 389 },
     ],
   },
   usd: {
@@ -61,27 +66,38 @@ export function planRow(cur: Currency, id: PackageId): PlanRow {
   return PRICING[cur].plans.find((p) => p.id === id)!;
 }
 
-/* ------------------------- пакеты голосовых минут ------------------------- */
+/* ------------------------------- докупки --------------------------------- */
 
-export type VoicePackId = "vp30" | "vp60" | "vp120";
+export type VoicePackId = "pp60" | "pp150" | "pl4" | "pl10" | "pe2" | "pe5";
 
-export const VOICE_PACK_IDS: VoicePackId[] = ["vp30", "vp60", "vp120"];
+export const VOICE_PACK_IDS: VoicePackId[] = ["pp60", "pp150", "pl4", "pl10", "pe2", "pe5"];
+
+export type PackKind = "practice_minutes" | "lesson" | "exam";
 
 /**
- * Допы: докупаемые минуты голосовых уроков (живут до конца календарного
- * месяца покупки — см. grant.ts). KZT — цены основателя (P0);
+ * Докупки сверх месячного лимита (Блок 5, цены основателя от 16.08.2026).
+ * Купленное ложится СВЕРХ лимита и НЕ сгорает вместе с ним — в отличие от
+ * прежних пакетов минут, которые жили до конца календарного месяца.
  * USD — плейсхолдер по курсу ≈512 ₸/$ до финальной сетки.
+ *
+ * `units`: для практики это минуты, для уроков и экзаменов — штуки.
  */
-export const VOICE_PACKS: Record<Currency, Record<VoicePackId, { minutes: number; price: number }>> = {
+export const VOICE_PACKS: Record<Currency, Record<VoicePackId, { kind: PackKind; units: number; price: number }>> = {
   kzt: {
-    vp30: { minutes: 30, price: 4990 },
-    vp60: { minutes: 60, price: 8990 },
-    vp120: { minutes: 120, price: 15990 },
+    pp60: { kind: "practice_minutes", units: 60, price: 2990 },
+    pp150: { kind: "practice_minutes", units: 150, price: 5990 },
+    pl4: { kind: "lesson", units: 4, price: 3990 },
+    pl10: { kind: "lesson", units: 10, price: 8990 },
+    pe2: { kind: "exam", units: 2, price: 2990 },
+    pe5: { kind: "exam", units: 5, price: 5990 },
   },
   usd: {
-    vp30: { minutes: 30, price: 9.99 },
-    vp60: { minutes: 60, price: 17.99 },
-    vp120: { minutes: 120, price: 30.99 },
+    pp60: { kind: "practice_minutes", units: 60, price: 5.99 },
+    pp150: { kind: "practice_minutes", units: 150, price: 11.99 },
+    pl4: { kind: "lesson", units: 4, price: 7.99 },
+    pl10: { kind: "lesson", units: 10, price: 17.99 },
+    pe2: { kind: "exam", units: 2, price: 5.99 },
+    pe5: { kind: "exam", units: 5, price: 11.99 },
   },
 };
 

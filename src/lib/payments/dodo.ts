@@ -37,14 +37,18 @@ function productIdFor(pkg: PurchasableId, discounted: boolean): string | undefin
     "1m": "DODO_PRODUCT_1M",
     "3m": "DODO_PRODUCT_3M",
     "6m": "DODO_PRODUCT_6M",
-    // пакеты голосовых минут — расходники, скидочных вариантов нет
-    vp30: "DODO_PRODUCT_VP30",
-    vp60: "DODO_PRODUCT_VP60",
-    vp120: "DODO_PRODUCT_VP120",
+    // докупки (Блок 5) — расходники, скидочных вариантов нет
+    pp60: "DODO_PRODUCT_PP60",
+    pp150: "DODO_PRODUCT_PP150",
+    pl4: "DODO_PRODUCT_PL4",
+    pl10: "DODO_PRODUCT_PL10",
+    pe2: "DODO_PRODUCT_PE2",
+    pe5: "DODO_PRODUCT_PE5",
   }[pkg];
   // скидка = отдельный продукт; молча подменять на полный прайс НЕЛЬЗЯ —
   // сумма разойдётся с ожидаемой и webhook отклонит оплату (amount_mismatch)
-  return env(discounted && !pkg.startsWith("vp") ? `${base}_DISC` : base);
+  const isTopUp = /^(pp|pl|pe)\d/.test(pkg);
+  return env(discounted && !isTopUp ? `${base}_DISC` : base);
 }
 
 async function createCheckout(input: CheckoutInput): Promise<CheckoutSession> {

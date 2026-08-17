@@ -73,9 +73,12 @@ export function llmMismatch(conv: ConvSnapshot, expected: string): string[] {
  *  ready              — разбор есть;
  *  too_short          — разговор финализирован, студент сказал <2 реплик (терминально);
  *  pending_transcript — ElevenLabs ещё не финализировал запись, повтор даст разбор;
- *  failed             — транскрипт есть, но AI-генерация не удалась, повтор разрешён.
+ *  failed             — транскрипт есть, но AI-генерация не удалась, повтор разрешён;
+ *  none               — режим без разбора (практика, Блок 1): терминально,
+ *                       клиент не предлагает «получить разбор», ретрай ничего
+ *                       не генерирует.
  */
-export type ReportState = "ready" | "too_short" | "pending_transcript" | "failed";
+export type ReportState = "ready" | "too_short" | "pending_transcript" | "failed" | "none";
 
 export async function fetchConversation(conversationId: string, apiKey: string): Promise<ConvSnapshot | null> {
   return fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {

@@ -545,7 +545,7 @@ function SpeakingFlow({ c }: { content: Extract<TaskContent, { skill: "speaking"
       <h3 className="text-base font-semibold text-[var(--color-foreground)]">{c.speakVoiceTitle}</h3>
       <p className="mt-1.5 text-sm leading-relaxed text-[var(--color-muted)]">{c.speakVoiceBody}</p>
       <div className="mt-5 flex flex-col gap-2.5">
-        <a href="/dashboard/speaking/live" className="btn-primary block w-full rounded-full px-6 py-3.5 text-center text-sm font-semibold">
+        <a href="/dashboard/speaking" className="btn-primary block w-full rounded-full px-6 py-3.5 text-center text-sm font-semibold">
           {c.speakVoiceLesson}
         </a>
         <a href="/dashboard/konusma" className="btn-ghost block w-full rounded-full px-6 py-3.5 text-center text-sm font-medium">

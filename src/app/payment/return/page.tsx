@@ -99,7 +99,7 @@ function ReturnInner() {
       if (paid) {
         // доступ уже выдан сервером (вебхук → grant.ts); кэшей гейта нет (P0-2)
         setState("done");
-        const dest = itemId?.startsWith("vp") ? "/dashboard/speaking/live" : "/dashboard";
+        const dest = itemId?.startsWith("vp") ? "/dashboard/speaking" : "/dashboard";
         setTimeout(() => (window.location.href = dest), 1500);
         return;
       }

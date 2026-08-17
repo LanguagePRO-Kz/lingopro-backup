@@ -22,6 +22,7 @@ import {
 } from "@/lib/quiz";
 import { topicById } from "@/lib/ai/topics";
 import { fetchExamPlan, type ExamPlan } from "@/lib/exam-plan";
+import { fetchAccessActive } from "@/lib/profile";
 import { assessPlan, type StudentLevel } from "@/lib/plan/feasibility";
 import { examReadiness, type SectionEstimate } from "@/lib/coach/readiness";
 import { examFormat, type SectionId } from "@/lib/exam/format";
@@ -487,10 +488,17 @@ export function ResultView({
   // real goal/date/pace from the profile — the personal-plan block must
   // reflect the student's actual inputs, not a static "6–12 мес · 30 мин"
   const [examPlan, setExamPlan] = useState<(ExamPlan & { minutesDaily: number | null }) | null>(null);
+  // есть ли доступ ПРЯМО СЕЙЧАС: оплатившему студенту эта страница звала
+  // «Выбрать тариф» при живом плане (баг 17.08.2026). null = ещё не знаем —
+  // тогда не показываем НИ ОДНУ кнопку, чтобы не мигнуть неправдой
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   useEffect(() => {
     let active = true;
     void fetchExamPlan().then((p) => {
       if (p && active) setExamPlan(p);
+    });
+    void fetchAccessActive().then((v) => {
+      if (active) setHasAccess(v);
     });
     return () => {
       active = false;
@@ -782,7 +790,7 @@ export function ResultView({
                   <p className="flex flex-wrap items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-[var(--color-muted)]">
                     {qt(locale, "konusmaPending")}
                     <Link
-                      href="/dashboard/speaking/live"
+                      href="/dashboard/speaking"
                       className="rounded-full bg-[var(--color-brand)]/10 px-2.5 py-1 font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/20"
                     >
                       {qt(locale, "konusmaCta")} →
@@ -1014,14 +1022,26 @@ export function ResultView({
       {/* ============ 7. CTA ============ */}
       <div className="mt-7">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Link href="/pricing" className="btn-primary flex-1 rounded-full px-6 py-4 text-center text-sm">
-            {pick(locale, { ru: "Выбрать тариф", en: "Choose a plan", tr: "Plan seç", kk: "Тариф таңдау" })} →
-          </Link>
+          {/* оплачено → в кабинет; нет доступа → тариф; пока не знаем → пустое
+              место той же высоты (не зовём покупать то, что уже куплено) */}
+          {hasAccess === null ? (
+            <div aria-hidden className="flex-1 rounded-full bg-black/[0.04] px-6 py-4" />
+          ) : hasAccess ? (
+            <Link href="/dashboard" className="btn-primary flex-1 rounded-full px-6 py-4 text-center text-sm">
+              {pick(locale, { ru: "В кабинет", en: "To dashboard", tr: "Panele dön", kk: "Кабинетке" })} →
+            </Link>
+          ) : (
+            <Link href="/pricing" className="btn-primary flex-1 rounded-full px-6 py-4 text-center text-sm">
+              {pick(locale, { ru: "Выбрать тариф", en: "Choose a plan", tr: "Plan seç", kk: "Тариф таңдау" })} →
+            </Link>
+          )}
           <button type="button" onClick={retake} className="btn-ghost flex-1 rounded-full px-6 py-4 text-center text-sm font-medium">
             {qt(locale, "retake")}
           </button>
         </div>
-        <p className="mt-3 text-center text-xs text-[var(--color-muted)]">🎁 {qt(locale, "discountNote")}</p>
+        {hasAccess === false && (
+          <p className="mt-3 text-center text-xs text-[var(--color-muted)]">🎁 {qt(locale, "discountNote")}</p>
+        )}
       </div>
     </div>
   );

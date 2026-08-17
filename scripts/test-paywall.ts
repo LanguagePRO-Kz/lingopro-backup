@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 
 import { trialDaysLeft, trialLeftLabel } from "../src/lib/trial";
+import { postAuthDestination } from "../src/lib/auth-destination";
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -73,6 +74,27 @@ console.log("\nКлиент не решает и не пишет доступ:")
   check("кнопка оплаты отключается при провайдере off", modal.includes('payState === "off"') && modal.includes("paySoon"));
   const access = src("src/lib/access.ts");
   check("requireActivePlan проверяет срок (plan_expires_at > now)", access.includes("Date.parse(expiresAt) <= Date.now()"));
+}
+
+console.log("\nМаршрут после входа решает профиль, а не localStorage:");
+{
+  // баг 17.08.2026: устаревший lingopro:quizResult уводил оплатившего
+  // студента на страницу диагностики с кнопкой «Выбрать тариф»
+  const AT = 1_784_610_315_228; // реальный takenAt из прод-профиля
+  check("результат в БД, локального нет → кабинет", postAuthDestination(AT, 0) === "/dashboard");
+  check("локальный не новее профильного → кабинет", postAuthDestination(AT, AT) === "/dashboard");
+  check("локальный СВЕЖЕЕ → /quiz/result (мигрировать, не потерять)", postAuthDestination(AT, AT + 1) === "/quiz/result");
+  check("нигде ничего → /quiz/result (страница сама уводит на /quiz)", postAuthDestination(0, 0) === "/quiz/result");
+
+  const cb = src("src/app/auth/callback/route.ts");
+  check("колбэк читает quiz_result из БД", cb.includes('.select("quiz_result")'));
+  check("колбэк решает маршрут воронки сам (?next= не навязывает)", cb.includes("FUNNEL_ROUTES") && cb.includes("postAuthDestination"));
+  for (const f of ["src/app/login/page.tsx", "src/app/register/page.tsx", "src/components/PostQuizAuth.tsx"]) {
+    check(`${f.replace("src/", "")} не подставляет next= из localStorage`, !src(f).includes("/auth/callback?next="));
+  }
+  const rv = src("src/components/ResultView.tsx");
+  check("ResultView спрашивает доступ у БД (fetchAccessActive)", rv.includes("fetchAccessActive"));
+  check("оплатившему — «В кабинет», а не «Выбрать тариф»", rv.includes('hasAccess ? (') && rv.includes('href="/dashboard"'));
 }
 
 console.log("\nЧестный остаток триала (правило 1.3: не завышать):");
